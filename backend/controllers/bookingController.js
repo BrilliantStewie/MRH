@@ -1,0 +1,343 @@
+import bookingModel from "../models/bookingModel.js";
+import axios from "axios";
+
+/* ===================================================================
+   HELPER: Normalize Date (midnight)
+=================================================================== */
+const normalizeDate = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+/* ===================================================================
+   1. CREATE BOOKING (DOUBLE BOOKING PROTECTED)
+=================================================================== */
+export const createBooking = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const {
+      room_ids = [],
+      check_in,
+      check_out,
+      participants,
+      total_price,
+    } = req.body;
+
+    const start = normalizeDate(check_in);
+    const end = normalizeDate(check_out);
+    const today = normalizeDate(new Date());
+
+    if (start < today)
+      return res.json({ success: false, message: "Past dates not allowed" });
+
+    if (end <= start)
+      return res.json({ success: false, message: "Invalid date range" });
+
+    // 🔥 BLOCK DOUBLE BOOKING (approved only)
+    const conflict = await bookingModel.findOne({
+      room_ids: { $in: room_ids },
+      status: "approved",
+      check_in: { $lt: end },
+      check_out: { $gt: start },
+    });
+
+    if (conflict)
+      return res.json({
+        success: false,
+        message: "Selected dates are already booked",
+      });
+
+    const booking = await bookingModel.create({
+      user_id: userId,
+      room_ids,
+      check_in: start,
+      check_out: end,
+      participants,
+      total_price,
+      status: "pending",
+      payment: false,
+      paymentStatus: "unpaid",
+      paymentMethod: "n/a",
+    });
+
+    res.json({ success: true, booking });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   2. USER BOOKINGS
+=================================================================== */
+export const userBookings = async (req, res) => {
+  try {
+    const bookings = await bookingModel
+      .find({ user_id: req.userId })
+      .populate("room_ids")
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, bookings });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   3. CANCEL BOOKING
+=================================================================== */
+export const cancelBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    const booking = await bookingModel.findById(bookingId);
+
+    if (!booking)
+      return res.json({ success: false, message: "Booking not found" });
+
+    if (booking.user_id.toString() !== req.userId)
+      return res.json({ success: false, message: "Unauthorized" });
+
+    if (booking.status === "pending") booking.status = "cancelled";
+    else if (booking.status === "approved")
+      booking.status = "cancellation_pending";
+    else
+      return res.json({
+        success: false,
+        message: "Booking cannot be cancelled",
+      });
+
+    await booking.save();
+    res.json({ success: true, message: "Cancellation processed" });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   4. MARK CASH PAYMENT
+=================================================================== */
+export const markCash = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    const booking = await bookingModel.findByIdAndUpdate(
+      bookingId,
+      {
+        paymentMethod: "cash",
+        paymentStatus: "pending",
+        payment: false,
+      },
+      { new: true }
+    );
+
+    if (!booking)
+      return res.json({ success: false, message: "Booking not found" });
+
+    res.json({
+      success: true,
+      message: "Marked as Pay Over the Counter",
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   5. VERIFY PAYMENT (GCASH / ONLINE)
+=================================================================== */
+export const verifyPayment = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+
+    await bookingModel.findByIdAndUpdate(bookingId, {
+      payment: true,
+      paymentStatus: "paid",
+      paymentMethod: "gcash",
+    });
+
+    res.json({ success: true, message: "Payment verified" });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   6. PAYMONGO CHECKOUT
+=================================================================== */
+export const createCheckoutSession = async (req, res) => {
+  try {
+    const { bookingId } = req.body;
+    const booking = await bookingModel
+      .findById(bookingId)
+      .populate("room_ids");
+
+    if (!booking)
+      return res.json({ success: false, message: "Booking not found" });
+
+    if (booking.status !== "approved")
+      return res.json({ success: false, message: "Booking not approved" });
+
+    if (booking.payment)
+      return res.json({ success: false, message: "Already paid" });
+
+    booking.paymentMethod = "gcash";
+    booking.paymentStatus = "pending";
+    booking.payment = false;
+    await booking.save();
+
+    const response = await axios.post(
+      "https://api.paymongo.com/v1/checkout_sessions",
+      {
+        data: {
+          attributes: {
+            line_items: [
+              {
+                currency: "PHP",
+                amount: booking.total_price * 100,
+                name: booking.room_ids[0]?.name || "Retreat Booking",
+                quantity: 1,
+              },
+            ],
+            payment_method_types: ["gcash"],
+            success_url: `${process.env.FRONTEND_URL}/my-bookings?success=true&bookingId=${booking._id}`,
+            cancel_url: `${process.env.FRONTEND_URL}/my-bookings?success=false&bookingId=${booking._id}`,
+          },
+        },
+      },
+      {
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            process.env.PAYMONGO_SECRET_KEY
+          ).toString("base64")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    res.json({
+      success: true,
+      checkoutUrl: response.data.data.attributes.checkout_url,
+    });
+  } catch (error) {
+    console.error(error);
+    res.json({ success: false, message: "Payment initialization failed" });
+  }
+};
+
+/* ===================================================================
+   7. RATE BOOKING
+=================================================================== */
+export const rateBooking = async (req, res) => {
+  try {
+    const { bookingId, rating, review } = req.body;
+
+    await bookingModel.findByIdAndUpdate(bookingId, { rating, review });
+
+    res.json({ success: true, message: "Review submitted" });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   8. CHECK AVAILABILITY
+=================================================================== */
+export const checkAvailability = async (req, res) => {
+  try {
+    const { roomIds = [], checkIn, checkOut } = req.body;
+
+    const start = normalizeDate(checkIn);
+    const end = normalizeDate(checkOut);
+
+    const conflict = await bookingModel.findOne({
+      room_ids: { $in: roomIds },
+      status: "approved",
+      check_in: { $lt: end },
+      check_out: { $gt: start },
+    });
+
+    if (conflict)
+      return res.json({ success: false, message: "Rooms unavailable" });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   9. GET UNAVAILABLE DATES
+=================================================================== */
+export const getUnavailableDates = async (req, res) => {
+  try {
+    const { roomIds = [] } = req.body;
+
+    const bookings = await bookingModel.find({
+      room_ids: { $in: roomIds },
+      status: "approved",
+    });
+
+    const blockedDates = [];
+
+    bookings.forEach((b) => {
+      let cur = normalizeDate(b.check_in);
+      const end = normalizeDate(b.check_out);
+      while (cur < end) {
+        blockedDates.push(new Date(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    res.json({ success: true, blockedDates });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   10. USER BOOKED DATES
+=================================================================== */
+export const getUserBookedDates = async (req, res) => {
+  try {
+    const bookings = await bookingModel.find({
+      user_id: req.userId,
+      status: "approved",
+    });
+
+    const dates = [];
+
+    bookings.forEach((b) => {
+      let cur = normalizeDate(b.check_in);
+      const end = normalizeDate(b.check_out);
+      while (cur < end) {
+        dates.push(new Date(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+    });
+
+    res.json({ success: true, userBusyDates: dates });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   11. GET OCCUPIED ROOMS (TODAY)
+=================================================================== */
+export const getOccupiedRooms = async (req, res) => {
+  try {
+    const today = normalizeDate(new Date());
+
+    const bookings = await bookingModel.find({
+      status: "approved",
+      check_in: { $lte: today },
+      check_out: { $gt: today },
+    });
+
+    const occupiedRoomIds = bookings.flatMap((b) => b.room_ids);
+
+    res.json({ success: true, occupiedRoomIds });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
