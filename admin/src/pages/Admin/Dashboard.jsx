@@ -1,369 +1,313 @@
-import React, { useEffect, useContext, useState, useMemo } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
-import axios from "axios";
-import {
-  AreaChart,
-  Area,
-  ComposedChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  RefreshCw,
-  Clock,
-  Users,
-  CalendarCheck,
-  Banknote,
-  Home as HomeIcon,
-  Loader2,
-  TrendingUp,
-  Zap,
-  CalendarDays,
+import AvailabilityCalendar from "./AvailabilityCalendar"; // Ensure this path is correct
+import { 
+  Users, BedDouble, Wallet, 
+  Clock, Package, ArrowUpRight, 
+  Zap, Bell, Search, Settings, Calendar 
 } from "lucide-react";
 
 const Dashboard = () => {
-  const { aToken } = useContext(AdminContext);
-  const backendUrl = "http://localhost:4000";
+  const { 
+    aToken, allRooms, getAllRooms, 
+    allBookings, getAllBookings, 
+    allUsers, getAllUsers,
+    allPackages, getAllPackages 
+  } = useContext(AdminContext);
 
-  const [stats, setStats] = useState({
-    roomsCount: 0,
-    bookingsCount: 0,
-    guestsCount: 0,
-    activeRooms: 0,
-    totalRevenue: 0,
-    latestBookings: [],
-    revenueTrend: [],
-    predictedRevenue: 0,
-    busiestDay: "Monday",
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  /* =========================
-     LIVE CLOCK
-  ========================= */
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  /* =========================
-     FETCH DASHBOARD DATA
-  ========================= */
-  const fetchStats = async () => {
-    try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/dashboard`,
-        {
-          headers: { Authorization: `Bearer ${aToken}` },
-        }
-      );
-
-      if (data.success) {
-        const d = data.dashData || {};
-
-        // ✅ FILTER VALID BOOKINGS
-        const validBookings = (d.latestBookings || []).filter(
-          (b) => !["cancelled", "declined"].includes(b.status)
-        );
-
-        const approvedBookings = validBookings.filter(
-          (b) => b.status === "approved"
-        );
-
-        // ✅ CALCULATE REVENUE (PAID ONLY)
-        const revenue = approvedBookings.reduce(
-          (sum, b) =>
-            b.paymentStatus === "paid"
-              ? sum + b.total_price
-              : sum,
-          0
-        );
-
-        setStats({
-          roomsCount: d.rooms || 0,
-          bookingsCount: validBookings.length,
-          guestsCount: approvedBookings.length,
-          activeRooms: d.activeRooms || 0,
-          totalRevenue: revenue,
-          latestBookings: validBookings.slice(0, 5),
-          revenueTrend: d.revenueTrend || [],
-          predictedRevenue: d.predictedRevenue || 0,
-          busiestDay: d.busiestDay || "Monday",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to fetch dashboard stats", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // --- STATE FOR POPUP ---
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   useEffect(() => {
     if (aToken) {
-      fetchStats();
-      const interval = setInterval(fetchStats, 30000);
-      return () => clearInterval(interval);
+      getAllRooms();
+      getAllBookings();
+      getAllUsers();
+      getAllPackages();
     }
-  }, [aToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aToken]); 
 
-  /* =========================
-     FORECAST DATA
-  ========================= */
-  const forecastData = useMemo(() => {
-    const data = [...stats.revenueTrend];
+  // --- STATS LOGIC ---
+  const stats = useMemo(() => {
+    const bookings = allBookings || [];
+    const rooms = allRooms || [];
 
-    if (stats.predictedRevenue && data.length) {
-      data.push({
-        name: "Next Month",
-        revenue: null,
-        forecast: stats.predictedRevenue,
-      });
+    // 1. Calculate Revenue (Confirmed or Paid)
+    const revenue = bookings
+      .filter(b => b.status === "confirmed" || b.payment === true)
+      .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+    
+    // 2. Calculate Occupancy (Active Bookings)
+    // We count a room as occupied if it has a confirmed/checked-in booking
+    const occupiedCount = bookings.filter(b => 
+       b.status === "confirmed" || b.status === "checked_in" || b.payment === true
+    ).length;
 
-      data[data.length - 2].forecast =
-        data[data.length - 2].revenue;
-    }
+    const totalRooms = rooms.length || 1; 
+    
+    // Cap occupancy rate at 100% just in case of data anomalies
+    const rawRate = Math.round((occupiedCount / totalRooms) * 100);
+    const occupancyRate = rawRate > 100 ? 100 : rawRate;
 
-    return data;
-  }, [stats.revenueTrend, stats.predictedRevenue]);
+    return {
+      revenue,
+      totalUsers: (allUsers || []).length + 1, // +1 for admin
+      occupancy: occupiedCount,
+      totalRooms: rooms.length,
+      occupancyRate,
+      pendingActions: bookings.filter(b => ["pending", "cancellation_pending"].includes(b.status)).length,
+    };
+  }, [allRooms, allBookings, allUsers]);
 
-  /* =========================
-     HELPERS
-  ========================= */
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-      minimumFractionDigits: 0,
-    }).format(amount || 0);
-
-  const formatDate = (date) =>
-    new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case "approved":
-        return "bg-emerald-100 text-emerald-700 border-emerald-200";
-      case "pending":
-        return "bg-amber-100 text-amber-700 border-amber-200";
-      case "cancelled":
-        return "bg-red-100 text-red-700 border-red-200";
-      default:
-        return "bg-slate-100 text-slate-600 border-slate-200";
-    }
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
   };
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-blue-600" />
-      </div>
-    );
-
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans text-slate-900">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between mb-8 gap-4">
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-6 font-sans">
+      
+      {/* --- MODAL POPUP --- */}
+      <AvailabilityCalendar 
+        isOpen={isCalendarOpen} 
+        onClose={() => setIsCalendarOpen(false)} 
+        bookings={allBookings || []} 
+      />
+
+      {/* --- HEADER --- */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">
-            Dashboard Overview
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            {getGreeting()}, Admin
           </h1>
-          <p className="text-slate-500 text-sm">
-            Real-time performance & analytics
-          </p>
+          <p className="text-slate-500 font-medium mt-1">Here's what's happening at the property today.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200 flex items-center gap-2 text-slate-600 text-sm font-medium">
-            <Clock className="w-4 h-4 text-blue-500" />
-            {currentTime.toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+        
+        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl text-emerald-700 font-bold text-xs border border-emerald-100">
+             <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div>
+             SYSTEM ONLINE
           </div>
-          <button
-            onClick={fetchStats}
-            className="p-2 bg-white rounded-lg border border-slate-200 hover:bg-slate-50"
-          >
-            <RefreshCw className="w-4 h-4" />
+          <button className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors">
+            <Bell size={20} />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* STAT CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Total Revenue"
-          value={formatCurrency(stats.totalRevenue)}
-          icon={Banknote}
-          color="emerald"
-          subtext="Paid bookings only"
-        />
-        <StatCard
-          title="Active Guests"
-          value={stats.guestsCount}
-          icon={Users}
-          color="blue"
-          subtext="Approved bookings"
-        />
-        <StatCard
-          title="Occupancy"
-          value={`${stats.activeRooms} / ${stats.roomsCount}`}
-          icon={HomeIcon}
-          color="orange"
-          subtext="Rooms occupied today"
-        />
-        <StatCard
-          title="Total Bookings"
-          value={stats.bookingsCount}
-          icon={CalendarCheck}
-          color="purple"
-          subtext="Valid bookings"
-        />
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* --- LEFT COLUMN (MAIN CONTENT) --- */}
+        <div className="lg:col-span-8 space-y-6">
+          
+          {/* KPI GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <StatCard 
+              label="Total Revenue" 
+              value={`₱${stats.revenue.toLocaleString()}`} 
+              icon={<Wallet size={20} />}
+              color="indigo"
+              trend="+12%"
+            />
+            <StatCard 
+              label="Active Guests" 
+              value={stats.totalUsers} 
+              icon={<Users size={20} />}
+              color="emerald"
+              trend="+5%"
+            />
+            
+            {/* Occupancy Card */}
+            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+               <div className="flex justify-between items-start">
+                  <div className="p-2.5 rounded-xl bg-orange-50 text-orange-600 border border-orange-100">
+                    <BedDouble size={20} />
+                  </div>
+                  <span className="text-2xl font-black text-slate-900">{stats.occupancyRate}%</span>
+               </div>
+               <div>
+                  <div className="flex justify-between items-end mb-2">
+                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Occupancy</p>
+                    <p className="text-[10px] text-slate-500 font-medium">{stats.occupancy}/{stats.totalRooms} Booked</p>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div 
+                        className="bg-orange-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        style={{ width: `${stats.occupancyRate}%` }}
+                    ></div>
+                  </div>
+               </div>
+            </div>
+          </div>
 
-      {/* ANALYTICS */}
-      <div className="mb-8">
-        <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-amber-500" />
-          Revenue Forecast
-        </h2>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={forecastData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="#f1f5f9"
-                />
-                <XAxis dataKey="name" />
-                <YAxis
-                  tickFormatter={(val) =>
-                    val ? `₱${(val / 1000).toFixed(0)}k` : ""
-                  }
-                />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value)}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
-                  fillOpacity={0.15}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="forecast"
-                  stroke="#a855f7"
-                  strokeDasharray="5 5"
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+          {/* RECENT BOOKINGS TABLE */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+              <h2 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                <Clock size={18} className="text-slate-400"/> Recent Activity
+              </h2>
+              <button className="text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors">
+                View Report
+              </button>
+            </div>
+            
+            <div className="overflow-x-auto flex-grow">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                  <tr>
+                    <th className="px-6 py-4">Guest</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {(allBookings || []).slice(0, 6).map((booking, i) => (
+                    <tr key={i} className="hover:bg-slate-50/80 transition-colors cursor-default">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold border border-slate-200">
+                             {booking.user_id?.name?.charAt(0) || "G"}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-700 text-sm">{booking.user_id?.name || "Guest User"}</p>
+                            <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                                <Calendar size={10} /> {booking.date ? new Date(booking.date).toLocaleDateString() : new Date().toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={booking.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold text-slate-700">
+                        ₱{Number(booking.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {(allBookings || []).length === 0 && (
+                     <tr><td colSpan={3} className="p-8 text-center text-slate-400 italic">No recent bookings found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* RECENT BOOKINGS */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100">
-          <h2 className="font-bold text-slate-800 text-lg">
-            Recent Bookings
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400">
-              <tr>
-                <th className="px-6 py-4">Guest</th>
-                <th className="px-6 py-4">Rooms</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {stats.latestBookings.map((b) => (
-                <tr key={b._id}>
-                  <td className="px-6 py-4 font-medium">
-                    {b.user_id?.name || "Guest"}
-                  </td>
-                  <td className="px-6 py-4">
-                    {b.room_ids?.map((r) => r.name).join(", ")}
-                  </td>
-                  <td className="px-6 py-4">
-                    {formatDate(b.createdAt)}
-                  </td>
-                  <td className="px-6 py-4">
-                    {formatCurrency(b.total_price)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs border ${getStatusColor(
-                        b.status
-                      )}`}
-                    >
-                      {b.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-              {!stats.latestBookings.length && (
-                <tr>
-                  <td
-                    colSpan="5"
-                    className="px-6 py-6 text-center text-slate-400"
-                  >
-                    No bookings found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        {/* --- RIGHT COLUMN (SIDEBAR) --- */}
+        <div className="lg:col-span-4 space-y-6">
+          
+          {/* QUICK ACTIONS */}
+          <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl shadow-slate-200 overflow-hidden relative">
+             <div className="relative z-10">
+                <h3 className="font-bold text-lg mb-1 flex items-center gap-2"><Zap size={18} className="text-yellow-400 fill-yellow-400"/> Quick Actions</h3>
+                <p className="text-slate-400 text-xs mb-5">Common management tasks.</p>
+                <div className="space-y-2">
+                    {/* BUTTON THAT OPENS THE CALENDAR */}
+                    <SidebarButton 
+                      icon={<Search size={16}/>} 
+                      label="Check Availability" 
+                      onClick={() => setIsCalendarOpen(true)}
+                    />
+                    
+                    <SidebarButton icon={<Users size={16}/>} label="New Registration" />
+                    <SidebarButton icon={<Settings size={16}/>} label="Maintenance Mode" />
+                </div>
+             </div>
+             <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
+          </div>
+
+          {/* TOP PACKAGES */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+            <div className="flex justify-between items-center mb-5">
+                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-widest flex items-center gap-2">
+                    <Package size={16} className="text-indigo-500"/> Popular Packages
+                </h3>
+            </div>
+            
+            <div className="space-y-3">
+               {(allPackages || []).slice(0, 4).map((pkg, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group">
+                      <div className="flex items-center gap-3">
+                         <div className="text-xs font-bold text-slate-300 w-4 group-hover:text-indigo-500 transition-colors">0{i+1}</div>
+                         <div>
+                            <div className="text-sm font-bold text-slate-700">{pkg.name}</div>
+                            <div className="text-[10px] text-slate-400 line-clamp-1 w-24">
+                                 {pkg.description || "Standard inclusion"}
+                            </div>
+                         </div>
+                      </div>
+                      <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+                        ₱{pkg.price}
+                      </span>
+                  </div>
+               ))}
+            </div>
+            <button className="w-full mt-5 py-3 rounded-xl border border-dashed border-slate-300 text-xs font-bold text-slate-400 hover:text-slate-600 hover:border-slate-400 hover:bg-slate-50 transition-all">
+                + Add New Package
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
   );
 };
 
-/* =========================
-   STAT CARD
-========================= */
-const StatCard = ({ title, value, icon: Icon, color, subtext }) => {
-  const colors = {
-    blue: "bg-blue-50 text-blue-600",
-    emerald: "bg-emerald-50 text-emerald-600",
-    purple: "bg-purple-50 text-purple-600",
-    orange: "bg-orange-50 text-orange-600",
+// --- SUB-COMPONENTS ---
+
+const StatCard = ({ label, value, icon, color, trend }) => {
+  const styles = {
+    indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
   };
+  const activeStyle = styles[color] || styles.indigo;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-      <div className="flex justify-between mb-4">
-        <div>
-          <p className="text-xs font-bold uppercase text-slate-500 mb-1">
-            {title}
-          </p>
-          <h3 className="text-2xl font-extrabold text-slate-800">
-            {value}
-          </h3>
-        </div>
-        <div className={`p-3 rounded-xl ${colors[color]}`}>
-          <Icon size={20} />
-        </div>
+    <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
+      <div className="flex justify-between items-start">
+         <div className={`p-2.5 rounded-xl border ${activeStyle}`}>
+            {icon}
+         </div>
+         {trend && (
+            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-0.5">
+               {trend} <ArrowUpRight size={10} />
+            </span>
+         )}
       </div>
-      <p className="text-xs text-slate-400 font-medium">{subtext}</p>
+      <div>
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-0.5">{label}</p>
+        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
+      </div>
     </div>
   );
+};
+
+const SidebarButton = ({ icon, label, onClick }) => (
+    <button 
+      onClick={onClick} 
+      className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors text-left group"
+    >
+        <span className="text-slate-400 group-hover:text-white transition-colors">{icon}</span>
+        <span className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">{label}</span>
+    </button>
+);
+
+const StatusBadge = ({ status }) => {
+    let styles = "bg-slate-100 text-slate-500 border-slate-200";
+    const s = (status || "").toLowerCase();
+
+    if (s === 'confirmed' || s === 'checked_in') styles = "bg-emerald-50 text-emerald-700 border-emerald-100";
+    else if (s === 'pending') styles = "bg-amber-50 text-amber-700 border-amber-100";
+    else if (s === 'cancelled') styles = "bg-rose-50 text-rose-700 border-rose-100";
+
+    return (
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${styles} inline-flex items-center gap-1.5`}>
+            <span className={`w-1.5 h-1.5 rounded-full bg-current opacity-60`}></span>
+            {status}
+        </span>
+    );
 };
 
 export default Dashboard;

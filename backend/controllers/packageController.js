@@ -3,7 +3,8 @@ import packageModel from "../models/packageModel.js";
 // ➕ Add Package
 const addPackage = async (req, res) => {
   try {
-    const { name, description, price, building, includesFood, includesAC } = req.body;
+    // 👇 ADD 'amenities' HERE 👇
+    const { name, description, price, building, includesFood, includesAC, amenities } = req.body;
 
     const newPackage = new packageModel({
       name,
@@ -12,6 +13,8 @@ const addPackage = async (req, res) => {
       building,
       includesFood: Boolean(includesFood),
       includesAC: Boolean(includesAC),
+      // 👇 AND PASS IT HERE 👇
+      amenities: amenities || [] 
     });
 
     await newPackage.save();

@@ -7,6 +7,8 @@ const packageSchema = new mongoose.Schema({
     building: { type: String, default: "Nolasco" },
     includesFood: { type: Boolean, default: false },
     includesAC: { type: Boolean, default: false },
+    // 👇 ADD THIS LINE 👇
+    amenities: { type: [String], default: [] } 
 }, { timestamps: true });
 
 const packageModel = mongoose.models.package || mongoose.model("package", packageSchema);

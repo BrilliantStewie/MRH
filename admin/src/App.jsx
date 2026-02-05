@@ -18,52 +18,63 @@ import AllBookings from "./pages/admin/AllBookings";
 import Users from "./pages/admin/Users";
 import StaffList from "./pages/admin/StaffList";
 import Packages from "./pages/admin/Packages";
+import Analytics from "./pages/admin/Analytics";
 
 const App = () => {
-  // Get Admin Token (aToken) from AdminContext to manage session
   const { aToken } = useContext(AdminContext);
 
   return (
-    <div className="bg-slate-50 min-h-screen">
+    /* FIX 1: Set the root div to h-screen and overflow-hidden. 
+      This prevents the browser window itself from ever scrolling.
+    */
+    <div className="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans antialiased">
       <ToastContainer position="top-right" autoClose={3000} />
 
       {aToken ? (
-        // --------------------------------------------------
-        // 🔐 AUTHENTICATED ADMIN LAYOUT
-        // --------------------------------------------------
         <>
+          {/* Navbar stays fixed at the top because of the flex-col parent */}
           <Navbar />
-          <div className="flex items-start">
+
+          {/* FIX 2: This wrapper takes up the remaining height (flex-1).
+            overflow-hidden ensures child components handle their own scrolling.
+          */}
+          <div className="flex flex-1 overflow-hidden">
             <Sidebar />
 
-            <main className="flex-1 h-screen overflow-y-auto bg-slate-50 p-4 transition-all pb-20">
-              <Routes>
-                {/* Redirect root "/" to Dashboard when logged in */}
-                <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
+            {/* FIX 3: Removed 'h-screen'. 
+              'flex-1' makes it fill the remaining width.
+              'overflow-y-auto' makes ONLY the main content area scrollable.
+            */}
+            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8 transition-all">
+              <div className="max-w-7xl mx-auto pb-20">
+                <Routes>
+                  {/* Redirect root "/" to Dashboard */}
+                  <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
 
-                {/* Main Admin Pages */}
-                <Route path="/admin-dashboard" element={<Dashboard />} />
-                <Route path="/rooms-list" element={<RoomsList />} />
-                <Route path="/all-bookings" element={<AllBookings />} />
-                <Route path="/admin-users" element={<Users />} />
-                <Route path="/admin-staff-list" element={<StaffList />} />
-                <Route path="/admin-packages" element={<Packages />} />
+                  {/* Operational Routes */}
+                  <Route path="/admin-dashboard" element={<Dashboard />} />
+                  <Route path="/admin-analytics" element={<Analytics />} />
+                  <Route path="/rooms-list" element={<RoomsList />} />
+                  <Route path="/all-bookings" element={<AllBookings />} />
+                  <Route path="/admin-users" element={<Users />} />
+                  <Route path="/admin-staff-list" element={<StaffList />} />
+                  <Route path="/admin-packages" element={<Packages />} />
 
-                {/* Catch-all: Redirect unknown routes to Dashboard */}
-                <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
-              </Routes>
+                  {/* Catch-all */}
+                  <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
+                </Routes>
+              </div>
             </main>
           </div>
         </>
       ) : (
-        // --------------------------------------------------
-        // 🔓 PUBLIC / LOGIN LAYOUT
-        // --------------------------------------------------
-        <Routes>
-          <Route path="/" element={<Login />} />
-          {/* Redirect any random URL to Login if not authenticated */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        /* Login Layout */
+        <div className="flex-1 flex items-center justify-center bg-slate-100">
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       )}
     </div>
   );

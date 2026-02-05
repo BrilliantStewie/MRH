@@ -18,7 +18,7 @@ const AdminContextProvider = ({ children }) => {
   const [allPackages, setAllPackages] = useState([]);
 
   const getAuthHeaders = () => ({
-    headers: { token: aToken },
+    headers: { token: aToken }, // Ensure this matches your middleware (some use 'token', some 'atoken')
   });
 
   // ==============================
@@ -53,7 +53,7 @@ const AdminContextProvider = ({ children }) => {
   };
 
   // ==============================
-  // 📊 DASHBOARD  ✅ FIXED
+  // 📊 DASHBOARD
   // ==============================
   const getDashboardData = async () => {
     if (!aToken) return;
@@ -106,6 +106,27 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
+  // 👇👇👇 NEW FUNCTION ADDED HERE 👇👇👇
+  const changeUserStatus = async (userId) => {
+    if (!aToken) return;
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/change-user-status`,
+        { userId },
+        getAuthHeaders()
+      );
+      if (data.success) {
+        toast.success(data.message);
+        getAllUsers(); // Refresh the list so the UI updates immediately
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+  // 👆👆👆 END NEW FUNCTION 👆👆👆
+
   // ==============================
   // 🛏️ ROOMS
   // ==============================
@@ -141,33 +162,32 @@ const AdminContextProvider = ({ children }) => {
   };
 
   const deleteRoom = async (roomId) => {
-  if (!aToken) return;
-  if (!roomId) {
-    toast.error("Room ID required");
-    return;
-  }
-
-  if (!window.confirm("Delete this room?")) return;
-
-  try {
-    const { data } = await axios.post(
-      `${backendUrl}/api/admin/delete-room`,
-      { id: roomId }, // ✅ FIXED
-      getAuthHeaders()
-    );
-
-    if (data.success) {
-      toast.success("Room deleted successfully");
-      getAllRooms(); // refresh UI
-    } else {
-      toast.error(data.message);
+    if (!aToken) return;
+    if (!roomId) {
+      toast.error("Room ID required");
+      return;
     }
-  } catch (error) {
-    console.error("Delete Room Error:", error);
-    toast.error(error.response?.data?.message || "Failed to delete room");
-  }
-};
 
+    if (!window.confirm("Delete this room?")) return;
+
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/delete-room`,
+        { id: roomId },
+        getAuthHeaders()
+      );
+
+      if (data.success) {
+        toast.success("Room deleted successfully");
+        getAllRooms();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.error("Delete Room Error:", error);
+      toast.error(error.response?.data?.message || "Failed to delete room");
+    }
+  };
 
   // ==============================
   // 📅 BOOKINGS
@@ -358,6 +378,7 @@ const AdminContextProvider = ({ children }) => {
     allUsers,
     getAllUsers,
     createStaff,
+    changeUserStatus, // ✅ ADDED HERE: This exposes the function to your components
   };
 
   return (

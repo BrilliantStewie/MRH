@@ -17,9 +17,9 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      default: "", // Added default
+      default: "", 
     },
-    image: {  // ✅ Renamed from 'image_url' to 'image' to match Frontend
+    image: { 
       type: String,
       default: "",
     },
@@ -28,7 +28,11 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "staff", "user"],
       default: "user",
     },
-    // Gender, DOB, Address are NOT here, keeping DB clean.
+    // 👇 ADD THIS LINE HERE
+    disabled: {
+      type: Boolean,
+      default: false, // Accounts are active by default
+    },
   },
   { timestamps: true }
 );

@@ -16,7 +16,8 @@ const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
     if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-      const token = jwt.sign(email + password, process.env.JWT_SECRET);
+      // ✅ Fix: Use process.env.JWT_SECRET
+const token = jwt.sign({ email, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1d" })
       res.json({ success: true, token });
     } else {
       res.json({ success: false, message: "Invalid credentials" });
@@ -37,7 +38,7 @@ const adminDashboard = async (req, res) => {
     const rooms = await roomModel.find({});
 
     const bookings = await bookingModel.find({})
-      .populate("user_id", "name image")
+      .populate("user_id", "name images")
       .populate("room_ids", "name")
       .sort({ createdAt: -1 });
 
@@ -205,6 +206,29 @@ const createStaff = async (req, res) => {
   }
 };
 
+const changeUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
+    }
+
+    // Toggle the disabled status
+    await userModel.findByIdAndUpdate(userId, { disabled: !user.disabled });
+
+    res.json({ 
+      success: true, 
+      message: user.disabled ? "Account Activated" : "Account Frozen" 
+    });
+
+  } catch (error) {
+    console.log(error);
+    res.json({ success: false, message: error.message });
+  }
+};
+
 // ----------------------------------------------------------------------
 // 🛏️ ROOM MANAGEMENT
 // ----------------------------------------------------------------------
@@ -212,17 +236,17 @@ const createStaff = async (req, res) => {
 const addRoom = async (req, res) => {
   try {
     const { name, room_type, building, capacity, description, amenities } = req.body;
-    const imageFiles = req.files; 
+    const imagesFiles = req.files; 
 
     if (!name || !capacity) return res.json({ success: false, message: "Missing required details" });
 
-    let imageUrls = [];
-    if (imageFiles && imageFiles.length > 0) {
-      const uploadPromises = imageFiles.map(async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, { resource_type: "image" });
+    let imagesUrls = [];
+    if (imagesFiles && imagesFiles.length > 0) {
+      const uploadPromises = imagesFiles.map(async (file) => {
+        const result = await cloudinary.uploader.upload(file.path, { resource_type: "images" });
         return result.secure_url;
       });
-      imageUrls = await Promise.all(uploadPromises);
+      imagesUrls = await Promise.all(uploadPromises);
     }
 
     let parsedAmenities = [];
@@ -237,7 +261,7 @@ const addRoom = async (req, res) => {
       capacity: Number(capacity), 
       description, 
       amenities: parsedAmenities, 
-      image: imageUrls, 
+      images: imagesUrls, 
       available: true
     });
 
@@ -251,27 +275,27 @@ const addRoom = async (req, res) => {
 
 const updateRoom = async (req, res) => {
   try {
-    const { roomId, id, existingImages, ...updateData } = req.body;
+    const { roomId, id, existingimagess, ...updateData } = req.body;
     const recordId = roomId || id;
     
     if (!recordId) return res.json({ success: false, message: "Room ID missing" });
 
-    const imageFiles = req.files;
-    let finalImages = [];
-    if (existingImages) {
-        finalImages = typeof existingImages === 'string' ? JSON.parse(existingImages) : existingImages;
+    const imagesFiles = req.files;
+    let finalimagess = [];
+    if (existingimagess) {
+        finalimagess = typeof existingimagess === 'string' ? JSON.parse(existingimagess) : existingimagess;
     }
 
-    if (imageFiles && imageFiles.length > 0) {
-      const uploadPromises = imageFiles.map(async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, { resource_type: "image" });
+    if (imagesFiles && imagesFiles.length > 0) {
+      const uploadPromises = imagesFiles.map(async (file) => {
+        const result = await cloudinary.uploader.upload(file.path, { resource_type: "images" });
         return result.secure_url;
       });
       const newUrls = await Promise.all(uploadPromises);
-      finalImages = [...finalImages, ...newUrls];
+      finalimagess = [...finalimagess, ...newUrls];
     }
 
-    updateData.image = finalImages;
+    updateData.images = finalimagess;
 
     if (updateData.amenities) {
       updateData.amenities = typeof updateData.amenities === 'string' ? JSON.parse(updateData.amenities) : updateData.amenities;
@@ -336,8 +360,8 @@ const deleteRoom = async (req, res) => {
 const allBookings = async (req, res) => {
   try {
     const bookings = await bookingModel.find({})
-      .populate('user_id', 'name image email')
-      .populate('room_ids', 'name image'); 
+      .populate('user_id', 'name images email')
+      .populate('room_ids', 'name images'); 
     res.json({ success: true, bookings });
   } catch (error) {
     console.log(error);
@@ -439,7 +463,8 @@ export {
   loginAdmin, 
   adminDashboard, 
   getAllUsers,      
-  createStaff,      
+  createStaff,
+  changeUserStatus,      
   addRoom, 
   updateRoom,
   getAllRooms, 

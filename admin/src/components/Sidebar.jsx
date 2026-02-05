@@ -8,6 +8,7 @@ import {
   Package,
   Users,
   User,
+  TrendingUp, // Added for Analytics
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -30,6 +31,12 @@ const Sidebar = () => {
       <NavLink to="/admin-dashboard" className={linkClass}>
         <LayoutDashboard size={18} />
         Dashboard
+      </NavLink>
+
+      {/* New Analytics Link */}
+      <NavLink to="/admin-analytics" className={linkClass}>
+        <TrendingUp size={18} />
+        Analytics
       </NavLink>
 
       <NavLink to="/all-bookings" className={linkClass}>
