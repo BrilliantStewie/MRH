@@ -12,7 +12,9 @@ import {
   Home,
   Layers,
   Tag,
-  Phone
+  Phone,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -21,6 +23,7 @@ const StaffBookings = () => {
 
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
+  const [expandedBookings, setExpandedBookings] = useState({}); 
 
   const [searchTerm, setSearchTerm] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("All Buildings");
@@ -29,6 +32,13 @@ const StaffBookings = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  const toggleRooms = (id) => {
+    setExpandedBookings(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const formatDatePHT = (dateInput) => {
     if (!dateInput) return "N/A";
@@ -86,7 +96,6 @@ const StaffBookings = () => {
   useEffect(() => {
     let filtered = [...bookings];
     
-    // UPDATED SEARCH LOGIC: Match from start of the string only
     if (searchTerm) {
       filtered = filtered.filter((b) =>
         b.user_id?.name?.toLowerCase().trim().startsWith(searchTerm.toLowerCase().trim())
@@ -113,11 +122,7 @@ const StaffBookings = () => {
         filtered = filtered.filter((b) => {
           const rawDate = b.slotDate || b.check_in || b.date;
           if (!rawDate) return false;
-
-          const bookingDateStr = new Date(rawDate).toLocaleDateString('en-CA', { 
-            timeZone: 'Asia/Manila' 
-          });
-
+          const bookingDateStr = new Date(rawDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
           if (startDate && bookingDateStr < startDate) return false;
           if (endDate && bookingDateStr > endDate) return false;
           return true;
@@ -249,7 +254,7 @@ const StaffBookings = () => {
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guest Profile</th>
-              <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Room Selection</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-[300px]">Room Selection</th>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stay Duration</th>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Billing</th>
@@ -262,6 +267,11 @@ const StaffBookings = () => {
                 const cout = b.check_out || b.checkOutDate;
                 const nights = calculateNights(cin, cout);
                 const roomCount = b.room_ids?.length || 0;
+                
+                // LIMIT TO 1 ROOM LOGIC
+                const isExpanded = expandedBookings[b._id];
+                const visibleRooms = isExpanded ? b.room_ids : b.room_ids?.slice(0, 1);
+                const hiddenCount = roomCount - 1;
 
                 const userImage = b.user_id?.image;
                 const fullImageUrl = userImage 
@@ -306,17 +316,21 @@ const StaffBookings = () => {
                             {roomCount > 1 && (
                                 <div className="flex items-center gap-1.5 mb-1 px-1">
                                     <Layers size={11} className="text-emerald-500" />
-                                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Multi-Room ({roomCount})</span>
+                                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+                                        {/* Grammar: Room vs Rooms */}
+                                        {roomCount} {roomCount === 1 ? 'Room' : 'Rooms'} Booked
+                                    </span>
                                 </div>
                             )}
-                            {b.room_ids?.map((room, idx) => (
-                                <div key={idx} className="flex flex-col p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 shadow-sm relative">
+                            
+                            {visibleRooms?.map((room, idx) => (
+                                <div key={idx} className="flex flex-col p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 shadow-sm relative animate-in fade-in slide-in-from-top-1">
                                     <div className="flex items-center justify-between mb-1.5 gap-4">
                                         <div className="flex items-center gap-2">
                                             <Home size={13} className="text-slate-400" />
                                             <span className="text-[11px] font-bold text-slate-700 leading-tight">{room.name}</span>
                                         </div>
-                                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-500 uppercase tracking-tighter whitespace-nowrap">
+                                        <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-500 uppercase tracking-tighter">
                                             {room.building}
                                         </span>
                                     </div>
@@ -328,6 +342,26 @@ const StaffBookings = () => {
                                     </div>
                                 </div>
                             ))}
+
+                            {roomCount > 1 && (
+                                <button 
+                                    onClick={() => toggleRooms(b._id)}
+                                    className="flex items-center justify-center gap-1.5 py-2 px-3 mt-1 rounded-lg border border-dashed border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/30 text-[10px] font-bold text-slate-500 hover:text-emerald-600 transition-all group"
+                                >
+                                    {isExpanded ? (
+                                        <>
+                                            <ChevronUp size={12} className="group-hover:-translate-y-0.5 transition-transform" />
+                                            Show less
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
+                                            {/* Grammar: more room vs more rooms */}
+                                            +{hiddenCount} {hiddenCount === 1 ? 'more room' : 'more rooms'}
+                                        </>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     </td>
 
