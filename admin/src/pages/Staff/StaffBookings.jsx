@@ -14,7 +14,9 @@ import {
   Tag,
   Phone,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ArrowDownWideNarrow,
+  ArrowUpWideNarrow
 } from "lucide-react";
 import { toast } from "react-toastify";
 
@@ -32,12 +34,14 @@ const StaffBookings = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest"); // 'newest' or 'oldest'
 
   const toggleRooms = (id) => {
-    setExpandedBookings(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
+    setExpandedBookings(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleSort = () => {
+    setSortOrder(prev => prev === "newest" ? "oldest" : "newest");
   };
 
   const formatDatePHT = (dateInput) => {
@@ -132,11 +136,11 @@ const StaffBookings = () => {
     filtered.sort((a, b) => {
       const dateB = new Date(b.slotDate || b.check_in || b.date);
       const dateA = new Date(a.slotDate || a.check_in || a.date);
-      return dateB - dateA;
+      return sortOrder === "newest" ? dateB - dateA : dateA - dateB;
     });
 
     setFilteredBookings(filtered);
-  }, [searchTerm, buildingFilter, typeFilter, paymentFilter, statusFilter, startDate, endDate, bookings]);
+  }, [searchTerm, buildingFilter, typeFilter, paymentFilter, statusFilter, startDate, endDate, sortOrder, bookings]);
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -146,6 +150,7 @@ const StaffBookings = () => {
     setStatusFilter("All Status");
     setStartDate("");
     setEndDate("");
+    setSortOrder("newest");
   };
 
   const filterStyle = "px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-600 outline-none shadow-sm cursor-pointer hover:border-emerald-400 transition-all appearance-none";
@@ -200,17 +205,28 @@ const StaffBookings = () => {
         </div>
       </div>
 
-      {/* FILTERS */}
+      {/* SEARCH AND SORT BAR */}
       <div className="flex flex-col lg:flex-row items-start justify-between mb-8 gap-6">
-        <div className="relative">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input
-            type="text"
-            placeholder="Search Guest Name..."
-            className="pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-full text-[12px] font-medium outline-none w-80 shadow-sm focus:ring-4 focus:ring-emerald-500/5 transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search Guest..."
+              className="pl-12 pr-6 py-3.5 bg-white border border-slate-200 rounded-full text-[12px] font-medium outline-none w-80 shadow-sm focus:ring-4 focus:ring-emerald-500/5 transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          {/* SORT ARROW BUTTON */}
+          <button 
+            onClick={toggleSort}
+            className="flex items-center gap-2 ml-4 text-[10px] font-bold text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-widest"
+          >
+            {sortOrder === "newest" ? <ArrowDownWideNarrow size={14} /> : <ArrowUpWideNarrow size={14} />}
+            {sortOrder === "newest" ? "Newest First" : "Oldest First"}
+          </button>
         </div>
 
         <div className="flex flex-col items-end gap-2.5">
@@ -268,7 +284,6 @@ const StaffBookings = () => {
                 const nights = calculateNights(cin, cout);
                 const roomCount = b.room_ids?.length || 0;
                 
-                // LIMIT TO 1 ROOM LOGIC
                 const isExpanded = expandedBookings[b._id];
                 const visibleRooms = isExpanded ? b.room_ids : b.room_ids?.slice(0, 1);
                 const hiddenCount = roomCount - 1;
@@ -317,7 +332,6 @@ const StaffBookings = () => {
                                 <div className="flex items-center gap-1.5 mb-1 px-1">
                                     <Layers size={11} className="text-emerald-500" />
                                     <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">
-                                        {/* Grammar: Room vs Rooms */}
                                         {roomCount} {roomCount === 1 ? 'Room' : 'Rooms'} Booked
                                     </span>
                                 </div>
@@ -356,7 +370,6 @@ const StaffBookings = () => {
                                     ) : (
                                         <>
                                             <ChevronDown size={12} className="group-hover:translate-y-0.5 transition-transform" />
-                                            {/* Grammar: more room vs more rooms */}
                                             +{hiddenCount} {hiddenCount === 1 ? 'more room' : 'more rooms'}
                                         </>
                                     )}
