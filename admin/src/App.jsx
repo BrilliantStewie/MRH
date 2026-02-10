@@ -3,15 +3,22 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// Context
+// Contexts
 import { AdminContext } from "./context/AdminContext";
+import { StaffContext } from "./context/StaffContext";
 
-// Components
+// Admin Components
 import Sidebar from "./components/Sidebar";
 import Navbar from "./components/Navbar";
-import Login from "./pages/Login";
+
+// Staff Components
+import StaffNavbar from "./components/staff/StaffNavbar";
+import StaffSidebar from "./components/staff/StaffSidebar";
 
 // Pages
+import Login from "./pages/Login";
+
+// Admin Pages
 import Dashboard from "./pages/admin/Dashboard";
 import RoomsList from "./pages/admin/RoomsList";
 import AllBookings from "./pages/admin/AllBookings";
@@ -20,38 +27,34 @@ import StaffList from "./pages/admin/StaffList";
 import Packages from "./pages/admin/Packages";
 import Analytics from "./pages/admin/Analytics";
 
+// Staff Pages
+import StaffDashboard from "./pages/Staff/StaffDashboard";
+import StaffBookings from "./pages/Staff/StaffBookings";
+import StaffProfile from "./pages/Staff/StaffProfile";
+
+// Route Guard
+import StaffProtectedRoute from "./routes/StaffProtectedRoute";
+
 const App = () => {
   const { aToken } = useContext(AdminContext);
+  const { sToken } = useContext(StaffContext);
 
   return (
-    /* FIX 1: Set the root div to h-screen and overflow-hidden. 
-      This prevents the browser window itself from ever scrolling.
-    */
     <div className="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans antialiased">
       <ToastContainer position="top-right" autoClose={3000} />
 
+      {/* ================= ADMIN ================= */}
       {aToken ? (
         <>
-          {/* Navbar stays fixed at the top because of the flex-col parent */}
           <Navbar />
 
-          {/* FIX 2: This wrapper takes up the remaining height (flex-1).
-            overflow-hidden ensures child components handle their own scrolling.
-          */}
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
 
-            {/* FIX 3: Removed 'h-screen'. 
-              'flex-1' makes it fill the remaining width.
-              'overflow-y-auto' makes ONLY the main content area scrollable.
-            */}
-            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8 transition-all">
+            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8">
               <div className="max-w-7xl mx-auto pb-20">
                 <Routes>
-                  {/* Redirect root "/" to Dashboard */}
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
-
-                  {/* Operational Routes */}
                   <Route path="/admin-dashboard" element={<Dashboard />} />
                   <Route path="/admin-analytics" element={<Analytics />} />
                   <Route path="/rooms-list" element={<RoomsList />} />
@@ -59,16 +62,59 @@ const App = () => {
                   <Route path="/admin-users" element={<Users />} />
                   <Route path="/admin-staff-list" element={<StaffList />} />
                   <Route path="/admin-packages" element={<Packages />} />
-
-                  {/* Catch-all */}
                   <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
                 </Routes>
               </div>
             </main>
           </div>
         </>
+      ) : sToken ? (
+        /* ================= STAFF ================= */
+        <>
+          <StaffNavbar />
+
+          <div className="flex flex-1 overflow-hidden">
+            <StaffSidebar />
+
+            <main className="flex-1 overflow-y-auto bg-slate-50 p-6">
+              <Routes>
+                <Route
+                  path="/staff-dashboard"
+                  element={
+                    <StaffProtectedRoute>
+                      <StaffDashboard />
+                    </StaffProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/staff-bookings"
+                  element={
+                    <StaffProtectedRoute>
+                      <StaffBookings />
+                    </StaffProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="/staff-profile"
+                  element={
+                    <StaffProtectedRoute>
+                      <StaffProfile />
+                    </StaffProtectedRoute>
+                  }
+                />
+
+                <Route
+                  path="*"
+                  element={<Navigate to="/staff-dashboard" replace />}
+                />
+              </Routes>
+            </main>
+          </div>
+        </>
       ) : (
-        /* Login Layout */
+        /* ================= LOGIN ================= */
         <div className="flex-1 flex items-center justify-center bg-slate-100">
           <Routes>
             <Route path="/" element={<Login />} />

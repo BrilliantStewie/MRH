@@ -3,56 +3,72 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import cron from "node-cron";
+
+// =======================
+// 📦 MODELS
+// =======================
 import bookingModel from "./models/bookingModel.js";
 
-// Cloudinary
+// =======================
+// ☁️ CLOUDINARY
+// =======================
 import connectCloudinary from "./config/cloudinary.js";
 
-// Routes
+// =======================
+// 🛣️ ROUTES
+// =======================
+import adminRouter from "./routes/adminRoute.js";
+import staffRouter from "./routes/staffRoute.js";
 import roomRouter from "./routes/roomRoute.js";
 import userRouter from "./routes/userRoute.js";
 import bookingRouter from "./routes/bookingRoute.js";
-import adminRouter from "./routes/adminRoute.js";
 import paymentRouter from "./routes/paymentRoute.js";
-import packageRouter from "./routes/packageRoute.js"; // ✅ 1. IMPORT ADDED
+import packageRouter from "./routes/packageRoute.js";
 
+// =======================
+// 🚀 APP INIT
+// =======================
 const app = express();
 
 // =======================
-// ✅ MIDDLEWARE (ORDER MATTERS)
+// ✅ GLOBAL MIDDLEWARE
 // =======================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 app.use(
   cors({
     origin: ["http://localhost:5173", "http://localhost:5174"],
-    credentials: true
+    credentials: true,
   })
 );
 
-// Serve uploaded images
+// Serve uploaded files
 app.use("/uploads", express.static("uploads"));
 
 // =======================
-// ✅ ROUTES (FIXED)
+// ✅ ROUTES (ORDERED & CLEAN)
 // =======================
 
-// ADMIN ROOM ROUTES
-app.use("/api/admin", roomRouter);        
+// ADMIN ROUTES
+app.use("/api/admin", adminRouter);
 
-// OPTIONAL: Public room listing
-app.use("/api/room", roomRouter);         
+// STAFF ROUTES
+app.use("/api/staff", staffRouter);
 
+// ROOM ROUTES
+app.use("/api/admin", roomRouter); // admin room management
+app.use("/api/room", roomRouter);  // public room listing
+
+// OTHER ROUTES
 app.use("/api/user", userRouter);
 app.use("/api/booking", bookingRouter);
-app.use("/api/admin", adminRouter);
 app.use("/api/payment", paymentRouter);
-
-// ✅ 2. ROUTE ADDED (Fixes the 404 Error)
 app.use("/api/package", packageRouter);
 
 // =======================
 // 🕒 CRON JOB
+// Auto-decline pending bookings after 24 hours
 // =======================
 cron.schedule("0 * * * *", async () => {
   console.log("⏳ CRON: Checking for expired pending bookings...");
@@ -75,7 +91,7 @@ cron.schedule("0 * * * *", async () => {
 });
 
 // =======================
-// 🚀 SERVER START
+// 🧠 DATABASE + SERVER START
 // =======================
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URL;
@@ -88,9 +104,9 @@ const startServer = async () => {
     await connectCloudinary();
     console.log("✅ Cloudinary Connected");
 
-    app.listen(PORT, () =>
-      console.log(`🚀 Server running on port ${PORT}`)
-    );
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
   } catch (err) {
     console.error("❌ Server Start Failed:", err);
   }

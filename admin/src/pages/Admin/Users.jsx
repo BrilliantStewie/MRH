@@ -13,15 +13,15 @@ import {
   CircleDot,
   XCircle,
   ChevronDown,
-  Check
+  Check,
+  RefreshCcw // Added Refresh Icon
 } from "lucide-react";
 
-// 🎨 INTERNAL COMPONENT: Custom Rounded Dropdown
+// ... [Keep CustomDropdown Component as is] ...
 const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -36,7 +36,6 @@ const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm font-bold transition-all ${
@@ -53,7 +52,6 @@ const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
         <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
-      {/* Floating Menu */}
       {isOpen && (
         <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in zoom-in-95 duration-100">
           {options.map((opt) => (
@@ -81,6 +79,7 @@ const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
     </div>
   );
 };
+// ... [End CustomDropdown] ...
 
 const Users = () => {
   const { aToken, allUsers, getAllUsers, changeUserStatus } = useContext(AdminContext);
@@ -91,17 +90,30 @@ const Users = () => {
 
   const [adminInfo, setAdminInfo] = useState({ email: "", isYou: false });
 
+  // 1. DEBUGGING LOGS & FETCH
   useEffect(() => {
     if (aToken) {
+      console.log("Fetching users..."); // Check console to see if this runs
       getAllUsers();
-      try {
-        const payload = JSON.parse(atob(aToken.split(".")[1]));
-        setAdminInfo({ email: payload.email || "", isYou: payload.role === "admin" });
-      } catch {
-        setAdminInfo({ email: "", isYou: false });
-      }
     }
-  }, [aToken, getAllUsers]);
+  }, [aToken]); // Removed getAllUsers from dependency to avoid potential infinite loops if not memoized
+
+  useEffect(() => {
+      console.log("Current allUsers State:", allUsers); // Check what data actually exists
+  }, [allUsers]);
+
+  // 2. TOKEN DECODING
+  useEffect(() => {
+    if (aToken) {
+        try {
+            const payload = JSON.parse(atob(aToken.split(".")[1]));
+            setAdminInfo({ email: payload.email || "", isYou: payload.role === "admin" });
+        } catch (e) {
+            console.error("Token decode error:", e);
+            setAdminInfo({ email: "", isYou: false });
+        }
+    }
+  }, [aToken]);
 
   const adminUser = {
     _id: "system-root",
@@ -115,13 +127,17 @@ const Users = () => {
   };
 
   const filteredUsers = useMemo(() => {
+    // Ensure users is always an array
     const users = Array.isArray(allUsers) ? allUsers : [];
+    
+    // Merge system admin with fetched users
+    // Filter out the system admin if they happen to be in the database list to avoid duplicates
     const merged = [adminUser, ...users.filter((u) => u.email !== adminUser.email)];
     
     return merged.filter((u) => {
       const matchSearch = !search || 
-        u.name?.toLowerCase().includes(search.toLowerCase()) || 
-        u.email?.toLowerCase().includes(search.toLowerCase());
+        (u.name && u.name.toLowerCase().includes(search.toLowerCase())) || 
+        (u.email && u.email.toLowerCase().includes(search.toLowerCase()));
 
       const matchRole = roleFilter === "all" || u.role === roleFilter;
 
@@ -133,7 +149,6 @@ const Users = () => {
     });
   }, [allUsers, search, roleFilter, statusFilter, adminUser]);
 
-  // 📝 Options for Dropdowns
   const roleOptions = [
     { value: "all", label: "All" },
     { value: "staff", label: "Staff", icon: User },
@@ -147,10 +162,10 @@ const Users = () => {
   ];
 
   return (
-    <div className="lg: min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4 lg:p-8">
       
-      {/* 🟢 TOP BAR */}
-      <div className="max-w-7xl mx-auto mb-6">
+      {/* TOP BAR */}
+      <div className="max-w-7xl mx-auto mb-6 flex justify-between items-center">
         <div className="flex items-center gap-3">
             <div className="p-3 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
                 <UsersIcon className="text-white" size={24} />
@@ -160,9 +175,18 @@ const Users = () => {
                 <p className="text-slate-500 text-sm font-medium">Manage system access, roles, and statuses.</p>
             </div>
         </div>
+        
+        {/* REFRESH BUTTON */}
+        <button 
+            onClick={() => getAllUsers()} 
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
+        >
+            <RefreshCcw size={16} />
+            <span className="text-sm font-semibold">Refresh List</span>
+        </button>
       </div>
 
-      {/* 🛠️ CONTROL BAR */}
+      {/* CONTROL BAR */}
       <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
           
@@ -197,10 +221,9 @@ const Users = () => {
               icon={CircleDot} 
             />
 
-            {/* Clear Filters Button */}
-            {(roleFilter !== "all" || statusFilter !== "all") && (
+            {(roleFilter !== "all" || statusFilter !== "all" || search) && (
               <button 
-                onClick={() => {setRoleFilter("all"); setStatusFilter("all");}}
+                onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}
                 className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-full transition-colors"
               >
                 Clear
@@ -211,7 +234,7 @@ const Users = () => {
         </div>
       </div>
 
-      {/* 📊 THE DATA TABLE */}
+      {/* THE DATA TABLE */}
       <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden z-0">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -224,112 +247,111 @@ const Users = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredUsers.map((u) => (
-              <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}>
-                
-                {/* 1. Identity */}
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="relative shrink-0">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-slate-200 ${u.disabled ? 'grayscale opacity-70' : ''}`}>
-                          {u.isSystem ? (
-                            <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white"><Command size={14}/></div>
-                          ) : u.image ? (
-                            <img src={u.image} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><User size={16}/></div>
-                          )}
-                      </div>
-                      {u.isYou && <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></div>}
-                    </div>
-                    <div>
-                      <div className={`font-bold text-sm ${u.disabled ? 'text-slate-500' : 'text-slate-900'}`}>
-                        {u.name} {u.isYou && <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-
-                {/* 2. Email (Hidden for System Admin - No dash) */}
-                <td className="px-6 py-4">
-                   {!u.isSystem ? (
-                       <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
-                            <Mail size={14} className="text-slate-400 opacity-70"/> 
-                            <span className="truncate max-w-[200px]">{u.email}</span>
-                       </div>
-                   ) : null}
-                </td>
-
-                {/* 3. Role */}
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                    u.role === 'admin' ? 'bg-red-50 text-red-500 border-red-100' :
-                    u.role === 'staff' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                    'bg-slate-100 text-slate-600 border-slate-200'
-                  }`}>
-                    {u.role === 'admin' && <Shield size={12} />}
-                    {u.role === 'staff' && <User size={12} />}
-                    {u.role === 'user' && <User size={12} />}
+            {filteredUsers.length > 0 ? (
+                filteredUsers.map((u) => (
+                <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}>
                     
-                    {u.role === 'user' ? 'Guest' : u.role}
-                  </span>
-                </td>
+                    {/* 1. Identity */}
+                    <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                        <div className="relative shrink-0">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-slate-200 ${u.disabled ? 'grayscale opacity-70' : ''}`}>
+                            {u.isSystem ? (
+                                <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white"><Command size={14}/></div>
+                            ) : u.image ? (
+                                <img src={u.image} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><User size={16}/></div>
+                            )}
+                        </div>
+                        {u.isYou && <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></div>}
+                        </div>
+                        <div>
+                        <div className={`font-bold text-sm ${u.disabled ? 'text-slate-500' : 'text-slate-900'}`}>
+                            {u.name || "Unknown User"} {u.isYou && <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
+                        </div>
+                        </div>
+                    </div>
+                    </td>
 
-                {/* 4. Status */}
-                <td className="px-6 py-4">
-                  {u.disabled ? (
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold">
-                        <XCircle size={12} /> Frozen
-                      </div>
-                  ) : (
-                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
-                        <CircleDot size={12} className="animate-pulse" /> Active
-                      </div>
-                  )}
-                </td>
+                    {/* 2. Email */}
+                    <td className="px-6 py-4">
+                    {!u.isSystem ? (
+                        <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <Mail size={14} className="text-slate-400 opacity-70"/> 
+                                <span className="truncate max-w-[200px]">{u.email}</span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-slate-400 italic">System Protected</span>
+                    )}
+                    </td>
 
-                {/* 5. Actions */}
-                <td className="px-6 py-4 text-right">
-                   <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                      {!u.isYou && !u.isSystem && (
-                         <button 
-                           onClick={() => changeUserStatus(u._id)}
-                           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                              u.disabled 
-                              ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                              : 'bg-white border-slate-200 text-rose-600 hover:bg-rose-50 hover:border-rose-200'
-                           }`}
-                         >
-                           {u.disabled ? <Unlock size={14}/> : <Lock size={14}/>}
-                           {u.disabled ? "Enable" : "Disable"}
-                         </button>
-                      )}
-                   </div>
-                </td>
+                    {/* 3. Role */}
+                    <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                        u.role === 'admin' ? 'bg-red-50 text-red-500 border-red-100' :
+                        u.role === 'staff' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                        'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}>
+                        {u.role === 'admin' && <Shield size={12} />}
+                        {u.role === 'staff' && <User size={12} />}
+                        {u.role === 'user' && <User size={12} />}
+                        
+                        {u.role === 'user' ? 'Guest' : u.role || 'User'}
+                    </span>
+                    </td>
 
-              </tr>
-            ))}
+                    {/* 4. Status */}
+                    <td className="px-6 py-4">
+                    {u.disabled ? (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold">
+                            <XCircle size={12} /> Frozen
+                        </div>
+                    ) : (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
+                            <CircleDot size={12} className="animate-pulse" /> Active
+                        </div>
+                    )}
+                    </td>
+
+                    {/* 5. Actions */}
+                    <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!u.isYou && !u.isSystem && (
+                            <button 
+                            onClick={() => changeUserStatus(u._id)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                                u.disabled 
+                                ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                                : 'bg-white border-slate-200 text-rose-600 hover:bg-rose-50 hover:border-rose-200'
+                            }`}
+                            >
+                            {u.disabled ? <Unlock size={14}/> : <Lock size={14}/>}
+                            {u.disabled ? "Enable" : "Disable"}
+                            </button>
+                        )}
+                    </div>
+                    </td>
+
+                </tr>
+                ))
+            ) : (
+                 <tr>
+                    <td colSpan="5" className="p-12 text-center">
+                        <div className="flex flex-col items-center">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+                            <Filter className="text-slate-300" size={24} />
+                            </div>
+                            <h3 className="text-slate-900 font-bold">No users found</h3>
+                            <p className="text-slate-500 text-sm mt-1 max-w-xs mx-auto">
+                            We couldn't find any users matching your filters.
+                            </p>
+                        </div>
+                    </td>
+                 </tr>
+            )}
           </tbody>
         </table>
-
-        {/* EMPTY STATE */}
-        {filteredUsers.length === 0 && (
-          <div className="p-12 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-              <Filter className="text-slate-300" size={24} />
-            </div>
-            <h3 className="text-slate-900 font-bold">No users found</h3>
-            <p className="text-slate-500 text-sm mt-1 max-w-xs mx-auto">
-              Try adjusting your role or status filters to find what you are looking for.
-            </p>
-            <button 
-              onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}
-              className="mt-4 text-indigo-600 text-xs font-bold uppercase hover:underline"
-            >
-              Reset all filters
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

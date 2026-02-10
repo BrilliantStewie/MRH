@@ -213,7 +213,7 @@ const AddStaff = ({ onClose, getAllUsers }) => {
 
             {/* Email (Auto-Generated & Read-Only) */}
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 flex items-center gap-2">
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 items-center gap-2">
                 Email Address 
                 <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-normal normal-case flex items-center gap-1">
                   <Info size={10} /> Auto-Generated

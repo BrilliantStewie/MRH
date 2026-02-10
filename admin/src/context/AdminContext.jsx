@@ -18,14 +18,15 @@ const AdminContextProvider = ({ children }) => {
   const [allPackages, setAllPackages] = useState([]);
 
   const getAuthHeaders = () => ({
-    headers: { token: aToken }, // Ensure this matches your middleware (some use 'token', some 'atoken')
+    headers: { token: aToken }, 
   });
 
   // ==============================
-  // 🔐 AUTH
+  // 🔐 AUTH (STRICTLY EMAIL)
   // ==============================
   const adminLogin = async (email, password) => {
     try {
+      // Admin API expects strictly 'email' and 'password'
       const { data } = await axios.post(`${backendUrl}/api/admin/login`, {
         email,
         password,
@@ -41,7 +42,7 @@ const AdminContextProvider = ({ children }) => {
         return false;
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
       return false;
     }
   };
@@ -106,7 +107,6 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
-  // 👇👇👇 NEW FUNCTION ADDED HERE 👇👇👇
   const changeUserStatus = async (userId) => {
     if (!aToken) return;
     try {
@@ -117,7 +117,7 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllUsers(); // Refresh the list so the UI updates immediately
+        getAllUsers(); 
       } else {
         toast.error(data.message);
       }
@@ -125,7 +125,6 @@ const AdminContextProvider = ({ children }) => {
       toast.error(error.message);
     }
   };
-  // 👆👆👆 END NEW FUNCTION 👆👆👆
 
   // ==============================
   // 🛏️ ROOMS
@@ -378,7 +377,7 @@ const AdminContextProvider = ({ children }) => {
     allUsers,
     getAllUsers,
     createStaff,
-    changeUserStatus, // ✅ ADDED HERE: This exposes the function to your components
+    changeUserStatus, 
   };
 
   return (

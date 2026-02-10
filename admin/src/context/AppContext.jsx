@@ -1,147 +1,126 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
-import { toast } from 'react-toastify';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 const AppContext = createContext();
-
 export const useAppContext = () => useContext(AppContext);
 
 const AppProvider = ({ children }) => {
-  // ------------------------------------------------
-  // 1. CONFIGURATION & STATE
-  // ------------------------------------------------
-  const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-  const currencySymbol = '₱';
-  
-  const [token, setToken] = useState(localStorage.getItem('token') || false);
+  // ==============================
+  // CONFIG
+  // ==============================
+  const backendUrl = import.meta.env.VITE_BACKEND_URL; // ✅ NO fallback
+  const currencySymbol = "₱";
+
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Room State (Required for Rooms.jsx & Booking Flow)
+  // Rooms
   const [rooms, setRooms] = useState([]);
   const [selectedRooms, setSelectedRooms] = useState([]);
 
-  // ------------------------------------------------
-  // 2. AUTHENTICATION FUNCTIONS
-  // ------------------------------------------------
-  
-  // Load user profile
+  // ==============================
+  // AUTH
+  // ==============================
   const loadUserProfileData = async () => {
     if (!token) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
+
     try {
-      const { data } = await axios.get(`${backendUrl}/api/user/profile`, {
-        headers: { token } // Using custom header 'token' to match your middleware
-      });
-      
+      const { data } = await axios.get(
+        `${backendUrl}/api/user/profile`,
+        {
+          headers: { token },
+        }
+      );
+
       if (data.success) {
-        setUserData(data.userData); 
+        setUserData(data.userData);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      console.log('Profile load error:', error);
-      // If token is invalid (expired/manipulated), clear it to prevent loops
-      if (error.response?.status === 401 || error.response?.status === 403) {
-          logout(); 
+      if (error.response?.status === 401) {
+        logout();
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ ADDED: Logout Function
   const logout = () => {
-      setToken(false);
-      setUserData(null);
-      localStorage.removeItem('token');
-      // Optional: Clear selected rooms on logout
-      setSelectedRooms([]); 
-      toast.info("Logged out successfully");
+    localStorage.removeItem("token");
+    setToken("");
+    setUserData(null);
+    setSelectedRooms([]);
+    toast.info("Logged out");
   };
 
-  // ------------------------------------------------
-  // 3. ROOM MANAGEMENT FUNCTIONS
-  // ------------------------------------------------
-
-  // Fetch all rooms (Publicly accessible)
+  // ==============================
+  // ROOMS (PUBLIC)
+  // ==============================
   const getRoomsData = async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/room/list`);
+      const { data } = await axios.get(
+        `${backendUrl}/api/room/list`
+      );
+
       if (data.success) {
         setRooms(data.rooms);
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      console.log(error);
       toast.error("Failed to load rooms");
     }
   };
 
-  // Add room to selection (for booking)
   const addRoom = (room) => {
-    const isAlreadySelected = selectedRooms.some((r) => r._id === room._id);
-    if (isAlreadySelected) {
-        toast.warning("Room already added!");
-        return;
+    if (selectedRooms.some((r) => r._id === room._id)) {
+      toast.warning("Room already added");
+      return;
     }
     setSelectedRooms((prev) => [...prev, room]);
-    toast.success("Room added to selection");
   };
 
-  // Remove room from selection
   const removeRoom = (roomId) => {
-    setSelectedRooms((prev) => prev.filter((r) => r._id !== roomId));
-    toast.info("Room removed");
+    setSelectedRooms((prev) =>
+      prev.filter((r) => r._id !== roomId)
+    );
   };
 
-  // ------------------------------------------------
-  // 4. INITIALIZATION EFFECTS
-  // ------------------------------------------------
-
+  // ==============================
+  // EFFECTS
+  // ==============================
   useEffect(() => {
-    getRoomsData(); // Fetch rooms immediately when app loads
+    getRoomsData();
   }, []);
 
   useEffect(() => {
-    if (token) {
-      loadUserProfileData();
-    } else {
-      setUserData(null);
-      setLoading(false);
-    }
+    if (token) loadUserProfileData();
+    else setLoading(false);
   }, [token]);
 
-  // ------------------------------------------------
-  // 5. EXPORTED VALUES
-  // ------------------------------------------------
-
-  const value = {
-    // Config
-    backendUrl,
-    currencySymbol,
-    loading,
-
-    // Auth
-    token, setToken,
-    userData, setUserData,
-    loadUserProfileData,
-    logout, // ✅ Exported logout so Navbar can use it
-
-    // Room Logic
-    rooms, 
-    getRoomsData,
-    selectedRooms, 
-    setSelectedRooms,
-    addRoom, 
-    removeRoom
-  };
-
   return (
-    <AppContext.Provider value={value}>
+    <AppContext.Provider
+      value={{
+        backendUrl,
+        currencySymbol,
+        loading,
+        token,
+        setToken,
+        userData,
+        logout,
+        rooms,
+        getRoomsData,
+        selectedRooms,
+        addRoom,
+        removeRoom,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
