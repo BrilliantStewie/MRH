@@ -4,17 +4,30 @@ import validator from "validator";
 import axios from "axios"; 
 import userModel from "../models/userModel.js";
 import bookingModel from "../models/bookingModel.js";
-import { v2 as cloudinary } from "cloudinary";
+import cloudinary from "../config/cloudinary.js"; 
 
 const createToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+};
+
+// --- HELPER: Stream Upload ---
+const streamUpload = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: "image" },
+      (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      }
+    );
+    stream.end(fileBuffer);
+  });
 };
 
 // --- AUTHENTICATION ---
 const registerUser = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-    const imageFile = req.file;
 
     if (!name || !email || !password || !phone) return res.json({ success: false, message: "Missing details" });
     if (!validator.isEmail(email)) return res.json({ success: false, message: "Invalid email" });
@@ -24,9 +37,9 @@ const registerUser = async (req, res) => {
     if (exists) return res.json({ success: false, message: "User already exists" });
 
     let imageUrl = "";
-    if (imageFile) {
-      const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" });
-      imageUrl = imageUpload.secure_url;
+    if (req.file) {
+      const result = await streamUpload(req.file.buffer);
+      imageUrl = result.secure_url;
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -61,10 +74,9 @@ const loginUser = async (req, res) => {
   }
 };
 
-// ✅ FIXED: Using req.userId from auth middleware
 const getUserData = async (req, res) => {
   try {
-    const userId = req.userId; 
+    const userId = req.userId || req.body.userId; 
     const userData = await userModel.findById(userId).select("-password");
     res.json({ success: true, userData });
   } catch (error) {
@@ -73,12 +85,11 @@ const getUserData = async (req, res) => {
   }
 };
 
-// ✅ FIXED: Using req.userId
 const updateUserProfile = async (req, res) => {
   try {
-    const userId = req.userId;
-    const { name, phone, email, oldPassword, newPassword } = req.body;
-    const imageFile = req.file;
+    const userId = req.userId || req.body.userId;
+    // ✅ ADDED: removeImage parameter
+    const { name, phone, email, oldPassword, newPassword, removeImage } = req.body;
 
     const user = await userModel.findById(userId);
     if (!user) {
@@ -89,45 +100,37 @@ const updateUserProfile = async (req, res) => {
     if (name) user.name = name;
     if (phone) user.phone = phone;
 
-    // ---- EMAIL UPDATE (with validation) ----
+    // ---- EMAIL UPDATE ----
     if (email && email !== user.email) {
-      if (!validator.isEmail(email)) {
-        return res.json({ success: false, message: "Invalid email format" });
-      }
-
+      if (!validator.isEmail(email)) return res.json({ success: false, message: "Invalid email format" });
       const emailExists = await userModel.findOne({ email });
       if (emailExists && emailExists._id.toString() !== userId.toString()) {
         return res.json({ success: false, message: "Email already in use" });
       }
-
       user.email = email;
     }
 
     // ---- PASSWORD CHANGE ----
     if (newPassword) {
-      if (!oldPassword) {
-        return res.json({ success: false, message: "Current password is required" });
-      }
-
+      if (!oldPassword) return res.json({ success: false, message: "Current password is required" });
       const isMatch = await bcrypt.compare(oldPassword, user.password);
-      if (!isMatch) {
-        return res.json({ success: false, message: "Current password is incorrect" });
-      }
-
-      if (newPassword.length < 8) {
-        return res.json({ success: false, message: "Password must be at least 8 characters" });
-      }
-
+      if (!isMatch) return res.json({ success: false, message: "Current password is incorrect" });
+      if (newPassword.length < 8) return res.json({ success: false, message: "Password must be at least 8 characters" });
+      
       const salt = await bcrypt.genSalt(10);
       user.password = await bcrypt.hash(newPassword, salt);
     }
 
-    // ---- IMAGE UPLOAD ----
-    if (imageFile) {
-      const upload = await cloudinary.uploader.upload(imageFile.path, {
-        resource_type: "image",
-      });
-      user.image = upload.secure_url;
+    // ---- IMAGE LOGIC ----
+    // 1. Remove Image if requested
+    if (removeImage === 'true' || removeImage === true) {
+        user.image = ""; 
+    }
+
+    // 2. Upload New Image (Overrides removal if both are sent)
+    if (req.file) {
+      const result = await streamUpload(req.file.buffer);
+      user.image = result.secure_url;
     }
 
     await user.save();
@@ -152,7 +155,7 @@ const updateUserProfile = async (req, res) => {
 // --- BOOKING LOGIC ---
 const createBooking = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ Fixed
+    const userId = req.userId || req.body.userId;
     const { roomId, checkIn, checkOut, participants, totalPrice } = req.body;
     
     const bookingData = {
@@ -178,7 +181,7 @@ const createBooking = async (req, res) => {
 
 const getUserBookings = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ Fixed
+    const userId = req.userId || req.body.userId;
     const bookings = await bookingModel.find({ user_id: userId }).populate("room_ids").sort({ createdAt: -1 });
     res.json({ success: true, bookings });
   } catch (error) {
@@ -189,7 +192,6 @@ const getUserBookings = async (req, res) => {
 
 const cancelBooking = async (req, res) => {
   try {
-    const userId = req.userId; // ✅ Fixed
     const { bookingId } = req.body;
     await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
     res.json({ success: true, message: "Booking Cancelled" });
@@ -247,7 +249,7 @@ const verifyPayment = async (req, res) => {
     const { bookingId } = req.body;
     await bookingModel.findByIdAndUpdate(bookingId, { 
         payment: true, 
-        paymentStatus: 'paid',
+        paymentStatus: 'paid', 
         paymentMethod: 'online' 
     });
     res.json({ success: true, message: "Payment Verified" });

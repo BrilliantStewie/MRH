@@ -1,33 +1,37 @@
 import jwt from "jsonwebtoken";
+import User from "../models/userModel.js";
 
-const authStaff = (req, res, next) => {
+const authStaff = async (req, res, next) => {
   try {
-    const token =
-      req.headers.token ||
-      req.headers.authorization?.split(" ")[1];
+    const token = req.headers.token;
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Not Authorized",
+        message: "No token provided",
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (decoded.role !== "staff") {
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user || user.role !== "staff") {
       return res.status(403).json({
         success: false,
-        message: "Staff access only",
+        message: "Access denied",
       });
     }
 
-    req.staff = decoded;
+    // ✅ THIS IS THE IMPORTANT LINE
+    req.user = { id: user._id };
+
     next();
   } catch (error) {
+    console.error("❌ authStaff error:", error);
     return res.status(401).json({
       success: false,
-      message: "Session expired",
+      message: "Unauthorized",
     });
   }
 };
