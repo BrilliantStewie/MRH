@@ -351,7 +351,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
                     disabled={loading}
                     className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"
                 >
-                    {loading ? "Saving..." : (editRoom ? "Update Room" : "Create Room")}
+                    {loading ? "Saving..." : (editRoom ? "Update Room" : "Add Room")}
                 </button>
             </div>
         </div>

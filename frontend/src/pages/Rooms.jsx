@@ -419,7 +419,7 @@ const Rooms = () => {
                           e.stopPropagation(); 
                           !isUnavailable && (selected ? removeRoom(room._id) : addRoom(room))
                         }}
-                        className={`w-full mt-10 py-3 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 transition-all ${isUnavailable
+                        className={`w-full py-3 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 transition-all ${isUnavailable
                             ? "bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-100"
                             : selected
                               ? "bg-red-50 text-red-600 border border-red-50 hover:bg-red-100"
