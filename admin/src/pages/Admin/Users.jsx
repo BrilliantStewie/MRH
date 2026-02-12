@@ -13,12 +13,13 @@ import {
   Check,
   RefreshCcw,
   PenBox, 
-  Ban,    
+  Ban,     
   UserPlus,
   Phone,
   Lock,
   X
 } from "lucide-react";
+import { toast } from "react-toastify";
 
 // --- CustomDropdown Component ---
 const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
@@ -84,7 +85,7 @@ const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
 };
 
 const Users = () => {
-  const { aToken, allUsers, getAllUsers, changeUserStatus } = useContext(AdminContext);
+  const { aToken, allUsers, getAllUsers, changeUserStatus, addGuestUser, updateStaff } = useContext(AdminContext);
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -144,7 +145,7 @@ const Users = () => {
 
       let matchStatus = true;
       if (statusFilter === "active") matchStatus = !u.disabled;
-      if (statusFilter === "frozen") matchStatus = u.disabled;
+      if (statusFilter === "disabled") matchStatus = u.disabled; // Updated from frozen
 
       return matchSearch && matchRole && matchStatus;
     });
@@ -164,7 +165,7 @@ const Users = () => {
   const statusOptions = [
     { value: "all", label: "All Status" },
     { value: "active", label: "Active", icon: CircleDot },
-    { value: "frozen", label: "Frozen", icon: XCircle },
+    { value: "disabled", label: "Disabled", icon: XCircle }, // Updated from frozen
   ];
 
   return (
@@ -289,7 +290,7 @@ const Users = () => {
                     <td className="px-6 py-4">
                       {u.disabled ? (
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
-                          <XCircle size={12} /> Frozen
+                          <XCircle size={12} /> Disabled
                         </div>
                       ) : (
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold uppercase tracking-wider">
@@ -341,6 +342,9 @@ const Users = () => {
         <AddGuestModal 
             onClose={() => { setShowAddModal(false); setEditData(null); }} 
             editData={editData} 
+            addGuestUser={addGuestUser}
+            updateStaff={updateStaff}
+            getAllUsers={getAllUsers}
         />
       )}
     </div>
@@ -348,7 +352,40 @@ const Users = () => {
 };
 
 // --- AddGuestModal Component ---
-const AddGuestModal = ({ onClose, editData }) => {
+const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUsers }) => {
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        firstName: editData?.firstName || "",
+        lastName: editData?.lastName || "",
+        middleName: editData?.middleName || "",
+        email: editData?.email || "",
+        phone: editData?.phone || "",
+        password: ""
+    });
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            let success = false;
+            if (editData) {
+                // We use updateStaff for editing because it handles name rebuilding and optional fields
+                success = await updateStaff({ userId: editData._id, ...formData });
+            } else {
+                success = await addGuestUser(formData);
+            }
+
+            if (success) {
+                getAllUsers();
+                onClose();
+            }
+        } catch (error) {
+            toast.error("An error occurred");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -362,46 +399,88 @@ const AddGuestModal = ({ onClose, editData }) => {
                     </button>
                 </div>
 
-                <form className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                             <label className="text-xs font-black uppercase text-slate-500 tracking-wider">First Name *</label>
-                            <input required type="text" defaultValue={editData?.firstName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" />
+                            <input 
+                                required 
+                                type="text" 
+                                value={formData.firstName}
+                                onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" 
+                            />
                         </div>
                         <div className="space-y-1">
                             <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Last Name *</label>
-                            <input required type="text" defaultValue={editData?.lastName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" />
+                            <input 
+                                required 
+                                type="text" 
+                                value={formData.lastName}
+                                onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" 
+                            />
                         </div>
                     </div>
 
                     <div className="space-y-1">
                         <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Middle Name (Optional)</label>
-                        <input type="text" defaultValue={editData?.middleName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                        <input 
+                            type="text" 
+                            value={formData.middleName}
+                            onChange={(e) => setFormData({...formData, middleName: e.target.value})}
+                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                        />
                     </div>
 
                     <div className="border-t border-slate-100 pt-4 space-y-3">
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input type="email" placeholder="Email (Optional)" defaultValue={editData?.email} className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                            <input 
+                                type="email" 
+                                placeholder="Email (Optional)" 
+                                value={formData.email}
+                                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                            />
                         </div>
                         <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input type="text" placeholder="Phone (Optional)" defaultValue={editData?.phone} className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                            <input 
+                                type="text" 
+                                placeholder="Phone (Optional)" 
+                                value={formData.phone}
+                                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                            />
                         </div>
-                        {!editData && (
-                            <div className="relative">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                <input type="password" placeholder="Password (Optional)" className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
-                            </div>
-                        )}
+                        <div className="relative">
+                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input 
+                                type="password" 
+                                placeholder={editData ? "New Password (Leave blank to keep)" : "Password (Optional)"}
+                                value={formData.password}
+                                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                            />
+                        </div>
                     </div>
 
                     <div className="pt-4 flex gap-3">
-                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all">
+                        <button 
+                            type="button" 
+                            disabled={loading}
+                            onClick={onClose} 
+                            className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all disabled:opacity-50"
+                        >
                             Cancel
                         </button>
-                        <button type="submit" className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200">
-                            {editData ? "Save Changes" : "Create Profile"}
+                        <button 
+                            type="submit" 
+                            disabled={loading}
+                            className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200 disabled:bg-slate-400"
+                        >
+                            {loading ? "Processing..." : editData ? "Save Changes" : "Create Profile"}
                         </button>
                     </div>
                 </form>

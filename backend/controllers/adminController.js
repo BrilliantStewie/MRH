@@ -9,7 +9,7 @@ import roomModel from "../models/roomModel.js";
 import bookingModel from "../models/bookingModel.js";
 
 // ----------------------------------------------------------------------
-// 🛠️ CLOUD HELPER (Memory Storage Stream)
+// 🛠️ CLOUD HELPER
 // ----------------------------------------------------------------------
 const streamUpload = (fileBuffer, folderName = "general") => {
     return new Promise((resolve, reject) => {
@@ -38,7 +38,6 @@ const loginAdmin = async (req, res) => {
             res.json({ success: false, message: "Invalid credentials" });
         }
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -52,7 +51,6 @@ const adminDashboard = async (req, res) => {
         const users = await userModel.find({});
         const rooms = await roomModel.find({});
         const bookings = await bookingModel.find({})
-            // ✅ FIX: Fetch all name parts to ensure dashboard displays correctly
             .populate("user_id", "name firstName lastName middleName images")
             .populate("room_ids", "name")
             .sort({ createdAt: -1 });
@@ -124,7 +122,6 @@ const adminDashboard = async (req, res) => {
             },
         });
     } catch (error) {
-        console.log("ADMIN DASHBOARD ERROR:", error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -137,6 +134,49 @@ const getAllUsers = async (req, res) => {
     try {
         const users = await userModel.find({});
         res.json({ success: true, users });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+/**
+ * NEW: Create Guest Account 
+ * Designed for non-tech users (Email, Phone, Password are optional)
+ */
+const addGuestUser = async (req, res) => {
+    try {
+        const { firstName, middleName, lastName, email, phone, password } = req.body;
+
+        if (!firstName || !lastName) {
+            return res.json({ success: false, message: "First and Last names are required" });
+        }
+
+        // Check uniqueness only if email is provided
+        if (email && email.trim() !== "") {
+            const exists = await userModel.findOne({ email });
+            if (exists) return res.json({ success: false, message: "Email already registered" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        // If no password provided, use a random one (they can reset later or admin handles it)
+        const finalPassword = password || Math.random().toString(36).slice(-10);
+        const hashedPassword = await bcrypt.hash(finalPassword, salt);
+
+        const fullName = `${firstName} ${middleName || ""} ${lastName}`.replace(/\s+/g, " ").trim();
+
+        const newUser = new userModel({
+            name: fullName,
+            firstName,
+            middleName: middleName || "",
+            lastName,
+            email: email || "", 
+            password: hashedPassword,
+            phone: phone || "",
+            role: 'user'
+        });
+
+        await newUser.save();
+        res.json({ success: true, message: "Guest account created successfully!" });
     } catch (error) {
         console.log(error);
         res.json({ success: false, message: error.message });
@@ -162,7 +202,6 @@ const createStaff = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // ✅ FIX: Ensure composite name includes middleName
         const fullName = `${firstName} ${middleName || ""} ${lastName}`.replace(/\s+/g, " ").trim();
 
         const newStaff = new userModel({
@@ -180,7 +219,6 @@ const createStaff = async (req, res) => {
         await newStaff.save();
         res.json({ success: true, message: "Staff account created successfully!" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -191,15 +229,20 @@ const updateStaff = async (req, res) => {
         if (!userId) return res.json({ success: false, message: "User ID is required" });
 
         const user = await userModel.findById(userId);
-        if (!user) return res.json({ success: false, message: "Staff member not found" });
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        // Email conflict check (if email is being changed)
+        if (email && email !== user.email) {
+            const emailExists = await userModel.findOne({ email, _id: { $ne: userId } });
+            if (emailExists) return res.json({ success: false, message: "Email already taken" });
+            user.email = email;
+        }
 
         if (firstName) user.firstName = firstName;
         if (lastName) user.lastName = lastName;
         if (middleName !== undefined) user.middleName = middleName;
         if (phone) user.phone = phone;
-        if (email) user.email = email;
 
-        // ✅ FIX: Rebuild composite name with middleName
         const f = user.firstName || "";
         const m = user.middleName || "";
         const l = user.lastName || "";
@@ -218,9 +261,8 @@ const updateStaff = async (req, res) => {
         }
 
         await user.save();
-        res.json({ success: true, message: "Staff profile updated", userData: user });
+        res.json({ success: true, message: "Profile updated successfully" });
     } catch (error) {
-        console.error("UPDATE STAFF ERROR:", error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -235,7 +277,6 @@ const changeUserStatus = async (req, res) => {
         await user.save();
         res.json({ success: true, message: user.disabled ? "Account Frozen" : "Account Activated" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -272,7 +313,6 @@ const addRoom = async (req, res) => {
         await newRoom.save();
         res.json({ success: true, message: "Room Added" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -300,7 +340,6 @@ const updateRoom = async (req, res) => {
         await roomModel.findByIdAndUpdate(recordId, updateData);
         res.json({ success: true, message: "Room Updated" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -310,7 +349,6 @@ const getAllRooms = async (req, res) => {
         const rooms = await roomModel.find({});
         res.json({ success: true, rooms });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -323,7 +361,6 @@ const changeAvailability = async (req, res) => {
         await room.save();
         res.json({ success: true, message: "Availability Changed" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -335,7 +372,6 @@ const deleteRoom = async (req, res) => {
         const deletedRoom = await roomModel.findByIdAndDelete(id);
         res.json({ success: !!deletedRoom, message: deletedRoom ? "Room deleted successfully" : "Room not found" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -347,14 +383,12 @@ const deleteRoom = async (req, res) => {
 const allBookings = async (req, res) => {
     try {
         const bookings = await bookingModel.find({})
-            // ✅ FIX: Fetching all fields (-password) ensures firstName, middleName, and lastName are available
             .populate('user_id', '-password') 
             .populate('room_ids') 
             .sort({ createdAt: -1 });
 
         res.json({ success: true, bookings });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -365,7 +399,6 @@ const approveBooking = async (req, res) => {
         await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' });
         res.json({ success: true, message: "Booking Approved" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -376,7 +409,6 @@ const declineBooking = async (req, res) => {
         await bookingModel.findByIdAndUpdate(bookingId, { status: 'declined' });
         res.json({ success: true, message: "Booking Declined" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -387,7 +419,6 @@ const paymentConfirmed = async (req, res) => {
         await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid', paymentMethod: 'cash' });
         res.json({ success: true, message: "Payment status updated to PAID" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -398,7 +429,6 @@ const resolveCancellation = async (req, res) => {
         await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled', paymentStatus: 'refunded' });
         res.json({ success: true, message: "Cancellation Resolved" });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -410,7 +440,6 @@ const approveCancellationRequest = async (req, res) => {
         await bookingModel.findByIdAndUpdate(bookingId, { status });
         res.json({ success: true, message: `Cancellation ${action === 'approve' ? 'Approved' : 'Rejected'}.` });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -424,7 +453,6 @@ const checkExpiredCancellations = async (req, res) => {
         );
         res.json({ success: true, message: `Processed expired requests.` });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -436,7 +464,8 @@ const checkExpiredCancellations = async (req, res) => {
 export {
     loginAdmin, 
     adminDashboard, 
-    getAllUsers,       
+    getAllUsers, 
+    addGuestUser, // Added for your guest creation      
     createStaff,
     updateStaff,
     changeUserStatus,       
