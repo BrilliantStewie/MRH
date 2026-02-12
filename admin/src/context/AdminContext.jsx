@@ -26,7 +26,6 @@ const AdminContextProvider = ({ children }) => {
   // ==============================
   const adminLogin = async (email, password) => {
     try {
-      // Admin API expects strictly 'email' and 'password'
       const { data } = await axios.post(`${backendUrl}/api/admin/login`, {
         email,
         password,
@@ -74,7 +73,7 @@ const AdminContextProvider = ({ children }) => {
   };
 
   // ==============================
-  // 👥 USERS
+  // 👥 USERS (FIXED RETURNS)
   // ==============================
   const getAllUsers = async () => {
     if (!aToken) return;
@@ -90,8 +89,9 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
+  // ✅ FIXED: Now returns TRUE on success
   const createStaff = async (formData) => {
-    if (!aToken) return;
+    if (!aToken) return false;
     try {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/create-staff`,
@@ -100,10 +100,43 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllUsers();
-      } else toast.error(data.message);
+        getAllUsers(); // Refresh list
+        return true;   // Tell component to close
+      } else {
+        toast.error(data.message);
+        return false;
+      }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
+      return false;
+    }
+  };
+
+  // ✅ ADDED: Missing updateStaff function
+  const updateStaff = async (userId, formData) => {
+    if (!aToken) return false;
+    try {
+      // Append ID to formData if not already there, or send as query param/body
+      // NOTE: Since we use FormData for images, we usually put ID inside FormData
+      formData.append("userId", userId);
+
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/update-staff`, // Ensure this matches your route
+        formData,
+        getAuthHeaders()
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+        getAllUsers();
+        return true;
+      } else {
+        toast.error(data.message);
+        return false;
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+      return false;
     }
   };
 
@@ -195,7 +228,7 @@ const AdminContextProvider = ({ children }) => {
     if (!aToken) return;
     try {
       const { data } = await axios.get(
-        `${backendUrl}/api/admin/bookings`,
+        `${backendUrl}/api/admin/all-bookings`,
         getAuthHeaders()
       );
       if (data.success) setAllBookings(data.bookings);
@@ -209,7 +242,7 @@ const AdminContextProvider = ({ children }) => {
     if (!aToken) return;
     try {
       const { data } = await axios.put(
-        `${backendUrl}/api/admin/bookings/${bookingId}/approve`,
+        `${backendUrl}/api/admin/all-bookings/${bookingId}/approve`,
         {},
         getAuthHeaders()
       );
@@ -226,7 +259,7 @@ const AdminContextProvider = ({ children }) => {
     if (!aToken) return;
     try {
       const { data } = await axios.put(
-        `${backendUrl}/api/admin/bookings/${bookingId}/decline`,
+        `${backendUrl}/api/admin/all-bookings/${bookingId}/decline`,
         {},
         getAuthHeaders()
       );
@@ -377,6 +410,7 @@ const AdminContextProvider = ({ children }) => {
     allUsers,
     getAllUsers,
     createStaff,
+    updateStaff, // ✅ Exported here
     changeUserStatus, 
   };
 

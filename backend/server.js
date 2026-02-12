@@ -8,6 +8,7 @@ import cron from "node-cron";
 // 📦 MODELS
 // =======================
 import bookingModel from "./models/bookingModel.js";
+import userModel from "./models/userModel.js"
 
 // =======================
 // ☁️ CLOUDINARY

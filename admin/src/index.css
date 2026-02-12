@@ -6,6 +6,10 @@
 
 @layer base {
   * {
+    font-family: 'Outfit', sans-serif;
+  }
+  /* Default scrollbar for the main page */
+  * {
     scrollbar-width: thin;
     scrollbar-color: rgb(125 125 125) #f3f4f6;
   }
@@ -20,14 +24,27 @@
   }
 }
 
-/* Add this at the very bottom of your file */
-.scrollbar-hide {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+@layer components {
+  .form-input-pro {
+    @apply w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm transition-all duration-200 outline-none;
+    @apply focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 placeholder:text-slate-300 text-slate-700;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  /* 🚫 HIDDEN SCROLLBAR UTILITY */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari and Opera */
+  }
 }
 
-.scrollbar-hide::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }

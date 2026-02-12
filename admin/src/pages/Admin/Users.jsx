@@ -6,18 +6,21 @@ import {
   Users as UsersIcon, 
   Mail, 
   Command, 
-  Lock, 
-  Unlock,
-  Filter,
   Shield,
   CircleDot,
   XCircle,
   ChevronDown,
   Check,
-  RefreshCcw // Added Refresh Icon
+  RefreshCcw,
+  PenBox, 
+  Ban,    
+  UserPlus,
+  Phone,
+  Lock,
+  X
 } from "lucide-react";
 
-// ... [Keep CustomDropdown Component as is] ...
+// --- CustomDropdown Component ---
 const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -79,7 +82,6 @@ const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
     </div>
   );
 };
-// ... [End CustomDropdown] ...
 
 const Users = () => {
   const { aToken, allUsers, getAllUsers, changeUserStatus } = useContext(AdminContext);
@@ -87,33 +89,35 @@ const Users = () => {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); 
-
   const [adminInfo, setAdminInfo] = useState({ email: "", isYou: false });
-
-  // 1. DEBUGGING LOGS & FETCH
-  useEffect(() => {
-    if (aToken) {
-      console.log("Fetching users..."); // Check console to see if this runs
-      getAllUsers();
-    }
-  }, [aToken]); // Removed getAllUsers from dependency to avoid potential infinite loops if not memoized
+  
+  // Modal States
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editData, setEditData] = useState(null);
 
   useEffect(() => {
-      console.log("Current allUsers State:", allUsers); // Check what data actually exists
-  }, [allUsers]);
+    if (aToken) getAllUsers();
+  }, [aToken]); 
 
-  // 2. TOKEN DECODING
   useEffect(() => {
     if (aToken) {
         try {
             const payload = JSON.parse(atob(aToken.split(".")[1]));
             setAdminInfo({ email: payload.email || "", isYou: payload.role === "admin" });
         } catch (e) {
-            console.error("Token decode error:", e);
             setAdminInfo({ email: "", isYou: false });
         }
     }
   }, [aToken]);
+
+  const getFullName = (u) => {
+    if (u.isSystem) return "MRH Admin";
+    if (u.firstName) {
+      const middle = u.middleName ? `${u.middleName} ` : '';
+      return `${u.firstName} ${middle}${u.lastName}`.trim();
+    }
+    return u.name || "Unknown User";
+  };
 
   const adminUser = {
     _id: "system-root",
@@ -127,16 +131,13 @@ const Users = () => {
   };
 
   const filteredUsers = useMemo(() => {
-    // Ensure users is always an array
     const users = Array.isArray(allUsers) ? allUsers : [];
-    
-    // Merge system admin with fetched users
-    // Filter out the system admin if they happen to be in the database list to avoid duplicates
     const merged = [adminUser, ...users.filter((u) => u.email !== adminUser.email)];
     
     return merged.filter((u) => {
+      const fullName = getFullName(u).toLowerCase();
       const matchSearch = !search || 
-        (u.name && u.name.toLowerCase().includes(search.toLowerCase())) || 
+        fullName.includes(search.toLowerCase()) || 
         (u.email && u.email.toLowerCase().includes(search.toLowerCase()));
 
       const matchRole = roleFilter === "all" || u.role === roleFilter;
@@ -149,14 +150,19 @@ const Users = () => {
     });
   }, [allUsers, search, roleFilter, statusFilter, adminUser]);
 
+  const handleEdit = (user) => {
+    setEditData(user);
+    setShowAddModal(true);
+  };
+
   const roleOptions = [
-    { value: "all", label: "All" },
-    { value: "staff", label: "Staff", icon: User },
+    { value: "all", label: "All Roles" },
+    { value: "staff", label: "Staff", icon: Shield },
     { value: "user", label: "Guest", icon: User },
   ];
 
   const statusOptions = [
-    { value: "all", label: "All" },
+    { value: "all", label: "All Status" },
     { value: "active", label: "Active", icon: CircleDot },
     { value: "frozen", label: "Frozen", icon: XCircle },
   ];
@@ -165,32 +171,38 @@ const Users = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4 lg:p-8">
       
       {/* TOP BAR */}
-      <div className="max-w-7xl mx-auto mb-6 flex justify-between items-center">
+      <div className="max-w-7xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
             <div className="p-3 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
                 <UsersIcon className="text-white" size={24} />
             </div>
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">Users</h1>
-                <p className="text-slate-500 text-sm font-medium">Manage system access, roles, and statuses.</p>
+                <p className="text-slate-500 text-sm font-medium">Manage system access and roles.</p>
             </div>
         </div>
         
-        {/* REFRESH BUTTON */}
-        <button 
-            onClick={() => getAllUsers()} 
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
-        >
-            <RefreshCcw size={16} />
-            <span className="text-sm font-semibold">Refresh List</span>
-        </button>
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={() => { setEditData(null); setShowAddModal(true); }}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-black transition-all shadow-md shadow-slate-200"
+            >
+                <UserPlus size={16} />
+                <span className="text-sm font-bold">Add Guest</span>
+            </button>
+            <button 
+                onClick={() => getAllUsers()} 
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
+            >
+                <RefreshCcw size={16} />
+                <span className="text-sm font-semibold sm:inline hidden">Refresh</span>
+            </button>
+        </div>
       </div>
 
       {/* CONTROL BAR */}
       <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
-          
-          {/* Left: Search */}
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
             <input
@@ -202,159 +214,200 @@ const Users = () => {
             />
           </div>
 
-          {/* Right: Custom Dropdown Filters */}
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end z-10">
-            
-            <CustomDropdown 
-              label="Role" 
-              options={roleOptions} 
-              value={roleFilter} 
-              onChange={setRoleFilter} 
-              icon={Shield}
-            />
-
-            <CustomDropdown 
-              label="Status" 
-              options={statusOptions} 
-              value={statusFilter} 
-              onChange={setStatusFilter}
-              icon={CircleDot} 
-            />
-
+            <CustomDropdown label="Role" options={roleOptions} value={roleFilter} onChange={setRoleFilter} icon={Shield} />
+            <CustomDropdown label="Status" options={statusOptions} value={statusFilter} onChange={setStatusFilter} icon={CircleDot} />
             {(roleFilter !== "all" || statusFilter !== "all" || search) && (
               <button 
                 onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}
                 className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-full transition-colors"
               >
-                Clear
+                Clear Filters
               </button>
             )}
-
           </div>
         </div>
       </div>
 
-      {/* THE DATA TABLE */}
-      <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden z-0">
-        <table className="w-full text-left border-collapse">
+      {/* DATA TABLE */}
+      <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
+        <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 w-[25%]">Identity</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 w-[30%]">Email Address</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 w-[15%]">Role</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 w-[15%]">Status</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 w-[15%] text-right">Actions</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Identity</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Address</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredUsers.length > 0 ? (
                 filteredUsers.map((u) => (
-                <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}>
-                    
-                    {/* 1. Identity */}
+                <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50/80' : 'hover:bg-slate-50/60'}`}>
                     <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                        <div className="relative shrink-0">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-slate-200 ${u.disabled ? 'grayscale opacity-70' : ''}`}>
-                            {u.isSystem ? (
-                                <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white"><Command size={14}/></div>
-                            ) : u.image ? (
-                                <img src={u.image} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><User size={16}/></div>
-                            )}
-                        </div>
-                        {u.isYou && <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-indigo-500 border-2 border-white rounded-full"></div>}
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-slate-200 relative ${u.disabled ? 'grayscale opacity-70' : ''}`}>
+                          {u.isSystem ? (
+                            <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white"><Command size={14}/></div>
+                          ) : u.image ? (
+                            <img src={u.image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><User size={16}/></div>
+                          )}
                         </div>
                         <div>
-                        <div className={`font-bold text-sm ${u.disabled ? 'text-slate-500' : 'text-slate-900'}`}>
-                            {u.name || "Unknown User"} {u.isYou && <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
+                          <div className={`font-bold text-sm ${u.disabled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                            {getFullName(u)} 
+                            {u.isYou && <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
+                          </div>
                         </div>
-                        </div>
-                    </div>
+                      </div>
                     </td>
 
-                    {/* 2. Email */}
                     <td className="px-6 py-4">
-                    {!u.isSystem ? (
+                      {!u.isSystem ? (
                         <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
-                                <Mail size={14} className="text-slate-400 opacity-70"/> 
-                                <span className="truncate max-w-[200px]">{u.email}</span>
+                          <Mail size={14} className="text-slate-400 opacity-70"/> 
+                          <span className="truncate max-w-[200px]">{u.email || <span className="italic text-slate-300">No Email</span>}</span>
                         </div>
-                    ) : (
+                      ) : (
                         <span className="text-xs text-slate-400 italic">System Protected</span>
-                    )}
+                      )}
                     </td>
 
-                    {/* 3. Role */}
                     <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                        u.role === 'admin' ? 'bg-red-50 text-red-500 border-red-100' :
-                        u.role === 'staff' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
+                        u.role === 'admin' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                        u.role === 'staff' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                         'bg-slate-100 text-slate-600 border-slate-200'
-                    }`}>
-                        {u.role === 'admin' && <Shield size={12} />}
-                        {u.role === 'staff' && <User size={12} />}
-                        {u.role === 'user' && <User size={12} />}
-                        
+                      }`}>
                         {u.role === 'user' ? 'Guest' : u.role || 'User'}
-                    </span>
+                      </span>
                     </td>
 
-                    {/* 4. Status */}
                     <td className="px-6 py-4">
-                    {u.disabled ? (
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold">
-                            <XCircle size={12} /> Frozen
+                      {u.disabled ? (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                          <XCircle size={12} /> Frozen
                         </div>
-                    ) : (
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold">
-                            <CircleDot size={12} className="animate-pulse" /> Active
+                      ) : (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold uppercase tracking-wider">
+                          <CircleDot size={12} className="animate-pulse" /> Active
                         </div>
-                    )}
+                      )}
                     </td>
 
-                    {/* 5. Actions */}
                     <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
                         {!u.isYou && !u.isSystem && (
+                          <>
                             <button 
-                            onClick={() => changeUserStatus(u._id)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                                u.disabled 
-                                ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                                : 'bg-white border-slate-200 text-rose-600 hover:bg-rose-50 hover:border-rose-200'
-                            }`}
+                                onClick={() => changeUserStatus(u._id)}
+                                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                    u.disabled 
+                                    ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+                                    : 'bg-white border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'
+                                }`}
                             >
-                            {u.disabled ? <Unlock size={14}/> : <Lock size={14}/>}
-                            {u.disabled ? "Enable" : "Disable"}
+                                {u.disabled ? <RefreshCcw size={14}/> : <Ban size={14}/>}
+                                {u.disabled ? "Enable" : "Disable"}
                             </button>
-                        )}
-                    </div>
-                    </td>
 
+                            <button 
+                                onClick={() => handleEdit(u)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[11px] font-bold hover:bg-black hover:text-white transition-all border border-indigo-100 shadow-sm"
+                            >
+                                <PenBox size={14} />
+                                Edit
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                 </tr>
                 ))
             ) : (
-                 <tr>
-                    <td colSpan="5" className="p-12 text-center">
-                        <div className="flex flex-col items-center">
-                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                            <Filter className="text-slate-300" size={24} />
-                            </div>
-                            <h3 className="text-slate-900 font-bold">No users found</h3>
-                            <p className="text-slate-500 text-sm mt-1 max-w-xs mx-auto">
-                            We couldn't find any users matching your filters.
-                            </p>
-                        </div>
-                    </td>
-                 </tr>
+              <tr>
+                <td colSpan="5" className="p-12 text-center text-slate-500 font-medium">No users found match your criteria.</td>
+              </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* ADD GUEST MODAL */}
+      {showAddModal && (
+        <AddGuestModal 
+            onClose={() => { setShowAddModal(false); setEditData(null); }} 
+            editData={editData} 
+        />
+      )}
     </div>
   );
+};
+
+// --- AddGuestModal Component ---
+const AddGuestModal = ({ onClose, editData }) => {
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <UserPlus size={20} className="text-indigo-400" />
+                        <h2 className="text-xl font-bold">{editData ? "Edit Profile" : "Add Guest Profile"}</h2>
+                    </div>
+                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded-full transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <form className="p-6 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-black uppercase text-slate-500 tracking-wider">First Name *</label>
+                            <input required type="text" defaultValue={editData?.firstName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Last Name *</label>
+                            <input required type="text" defaultValue={editData?.lastName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Middle Name (Optional)</label>
+                        <input type="text" defaultValue={editData?.middleName} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4 space-y-3">
+                        <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input type="email" placeholder="Email (Optional)" defaultValue={editData?.email} className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                        <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input type="text" placeholder="Phone (Optional)" defaultValue={editData?.phone} className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                        </div>
+                        {!editData && (
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                <input type="password" placeholder="Password (Optional)" className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" />
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="pt-4 flex gap-3">
+                        <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all">
+                            Cancel
+                        </button>
+                        <button type="submit" className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200">
+                            {editData ? "Save Changes" : "Create Profile"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 };
 
 export default Users;

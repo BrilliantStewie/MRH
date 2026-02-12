@@ -1,27 +1,65 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
-import { Search, UserPlus, Shield, User, Phone, Mail } from "lucide-react";
-import AddStaff from "./AddStaff"; // 👈 Import the new file
+import { 
+  Search, 
+  UserPlus, 
+  Shield, 
+  User, 
+  Phone, 
+  Mail, 
+  PenBox, 
+  Ban,    
+  UserCheck 
+} from "lucide-react";
+import AddStaff from "./AddStaff";
 
 const StaffList = () => {
-  const { aToken, allUsers, getAllUsers } = useContext(AdminContext);
+  const { aToken, allUsers, getAllUsers, changeUserStatus } = useContext(AdminContext);
 
   const [search, setSearch] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false); // Controls the popup
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editData, setEditData] = useState(null);
 
   useEffect(() => {
     if (aToken) getAllUsers();
   }, [aToken]);
 
-  // Filter only staff members
+  const getFullName = (u) => {
+    if (u.firstName) {
+      const middle = u.middleName ? `${u.middleName} ` : '';
+      return `${u.firstName} ${middle}${u.lastName}`.trim();
+    }
+    return u.name || "Unknown Staff";
+  };
+
+  const handleEdit = (staffMember) => {
+    setEditData(staffMember);
+    setShowAddModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setEditData(null);
+  };
+
+  const toggleStatus = async (userId) => {
+    const result = await changeUserStatus(userId);
+    if (result) {
+      getAllUsers();
+    }
+  };
+
   const staffList = useMemo(() => {
-    return allUsers.filter(
-      (u) =>
-        u.role === "staff" &&
-        (!search ||
-          u.name?.toLowerCase().includes(search.toLowerCase()) ||
-          u.email?.toLowerCase().includes(search.toLowerCase()))
-    );
+    const users = Array.isArray(allUsers) ? allUsers : [];
+    return users.filter((u) => {
+      const fullName = getFullName(u).toLowerCase();
+      const matchRole = u.role === "staff"; 
+      const matchSearch = !search || 
+        fullName.includes(search.toLowerCase()) || 
+        u.email?.toLowerCase().includes(search.toLowerCase());
+      
+      return matchRole && matchSearch;
+    });
   }, [allUsers, search]);
 
   return (
@@ -42,7 +80,7 @@ const StaffList = () => {
           className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
         >
           <UserPlus size={18} />
-          Add New Staff
+          Add New
         </button>
       </div>
 
@@ -68,20 +106,34 @@ const StaffList = () => {
               <tr>
                 <th className="px-6 py-4 font-semibold">Staff Member</th>
                 <th className="px-6 py-4 font-semibold">Contact Info</th>
-                <th className="px-6 py-4 font-semibold">Role</th>
-                <th className="px-6 py-4 font-semibold">Joined Date</th>
+                <th className="px-6 py-4 font-semibold text-center">Status</th>
+                <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100">
               {staffList.map((s) => (
-                <tr key={s._id} className="hover:bg-slate-50/80 transition-colors">
+                <tr key={s._id} className={`hover:bg-slate-50 transition-colors group ${s.disabled ? 'bg-slate-50/50' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-200">
-                        {s.name ? s.name.charAt(0).toUpperCase() : <User size={20}/>}
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-200 overflow-hidden relative">
+                        {s.image ? (
+                           <img src={s.image} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                           s.firstName ? s.firstName.charAt(0).toUpperCase() : <User size={20}/>
+                        )}
+                        {s.disabled && (
+                             <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+                                 <Ban size={14} className="text-white"/>
+                             </div>
+                        )}
                       </div>
-                      <span className="font-semibold text-slate-800">{s.name}</span>
+                      <div>
+                          <span className={`font-semibold ${s.disabled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                              {getFullName(s)}
+                          </span>
+                          <div className="text-xs text-slate-500 capitalize">{s.role}</div>
+                      </div>
                     </div>
                   </td>
                   
@@ -96,14 +148,44 @@ const StaffList = () => {
                     </div>
                   </td>
 
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                      Staff Access
-                    </span>
+                  <td className="px-6 py-4 text-center">
+                    {s.disabled ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100">
+                           Disabled
+                        </span>
+                    ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
+                           Active
+                        </span>
+                    )}
                   </td>
 
-                  <td className="px-6 py-4 text-slate-500">
-                     {new Date(s.created_at || Date.now()).toLocaleDateString()}
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                      
+                      {/* DISABLE/ENABLE BUTTON */}
+                      <button 
+                        onClick={() => toggleStatus(s._id)}
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                          ${s.disabled 
+                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white' 
+                            : 'bg-white border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'}`}
+                        title={s.disabled ? "Enable Account" : "Disable Account"}
+                      >
+                        {s.disabled ? <UserCheck size={16} /> : <Ban size={16} />}
+                        <span className="hidden lg:inline">{s.disabled ? "Enable" : "Disable"}</span>
+                      </button>
+
+                      {/* EDIT BUTTON - BLACK ON HOVER */}
+                      <button 
+                          onClick={() => handleEdit(s)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-900 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all border border-blue-100 shadow-sm"
+                          title="Edit Details"
+                      >
+                          <PenBox size={16} />
+                          <span className="hidden lg:inline">Edit</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -113,7 +195,7 @@ const StaffList = () => {
                   <td colSpan="4" className="py-12 text-center text-slate-400">
                     <div className="flex flex-col items-center gap-2">
                        <User size={40} className="opacity-20"/>
-                       <p>No staff members found.</p>
+                       <p>No staff members found matching your search.</p>
                     </div>
                   </td>
                 </tr>
@@ -123,11 +205,10 @@ const StaffList = () => {
         </div>
       </div>
 
-      {/* 👇 RENDER THE ADD STAFF COMPONENT HERE */}
       {showAddModal && (
         <AddStaff 
-          onClose={() => setShowAddModal(false)} 
-          getAllUsers={getAllUsers}
+          onClose={handleCloseModal} 
+          editData={editData}
         />
       )}
 

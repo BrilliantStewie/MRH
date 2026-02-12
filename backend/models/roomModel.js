@@ -7,47 +7,37 @@ const roomSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
     room_type: {
       type: String,
       required: true,
-      enum: ["Individual", "Individual with pullout", "Dormitory"],
+      enum: ["Individual", "Individual with Pullout", "Dormitory"],
     },
-
     building: {
       type: String,
       required: true,
       enum: ["Margarita", "Nolasco"],
     },
-
     capacity: {
       type: Number,
       required: true,
       min: 1,
     },
-
     description: {
       type: String,
       required: true,
     },
-
     amenities: {
       type: [String],
       default: [],
     },
-
-    // 🔥 MULTIPLE IMAGES (Gallery)
     images: {
-      type: [String], // Cloudinary URLs
+      type: [String],
       default: [],
     },
-
-    // ⭐ MAIN IMAGE (for cards/listing)
     cover_image: {
-      type: String, // Cloudinary URL
+      type: String,
       default: "",
     },
-
     available: {
       type: Boolean,
       default: true,
@@ -58,5 +48,6 @@ const roomSchema = new mongoose.Schema(
   }
 );
 
-const roomModel = mongoose.model("Room", roomSchema);
+const roomModel = mongoose.models.Room || mongoose.model("Room", roomSchema);
+
 export default roomModel;

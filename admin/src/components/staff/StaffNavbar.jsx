@@ -7,26 +7,36 @@ import { User, LogOut, UserCircle } from "lucide-react";
 const StaffNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logoutStaff, staffData } = useContext(StaffContext);
+  
+  // ✅ Get data from the updated StaffContext
+  const { sToken, staffData, staffLogout } = useContext(StaffContext);
   
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [imgError, setImgError] = useState(false); // Track if image fails to load
 
   // Close dropdown automatically when changing pages
   useEffect(() => {
     setShowProfileMenu(false);
   }, [location.pathname]);
 
+  // Reset image error state when staffData changes
+  useEffect(() => {
+    setImgError(false);
+  }, [staffData]);
+
   const handleLogout = () => {
-    logoutStaff();
+    staffLogout(); // call the context function
     navigate("/");
   };
 
+  // If not logged in (no token), you might want to hide the profile section or show nothing
+  if (!sToken) return null; 
+
   return (
     <nav className="sticky top-0 z-50 w-full bg-white border-b border-slate-200 py-3 shadow-sm">
-      {/* Container with "px-4" instead of "max-w-7xl" to keep items at the far edges */}
       <div className="flex items-center justify-between px-4 sm:px-8">
         
-        {/* --- LEFT MOST: BRANDING --- */}
+        {/* --- LEFT: BRANDING --- */}
         <div 
           className="flex items-center gap-3 cursor-pointer group select-none" 
           onClick={() => navigate('/Staff-dashboard')}
@@ -46,38 +56,46 @@ const StaffNavbar = () => {
           </div>
         </div>
 
-        {/* --- RIGHT SIDE: NAME & PROFILE BUTTON --- */}
+        {/* --- RIGHT: PROFILE SECTION --- */}
         <div className="flex items-center gap-4">
           
           {/* Staff Name & Status */}
           <div className="hidden sm:block text-right">
             <p className="text-sm font-bold text-slate-700 leading-none mb-1">
-              {staffData?.name || "Staff Member"}
+              {staffData && staffData.name ? staffData.name : "Staff Member"}
             </p>
             <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">
-              Staff Logged in
+              Active Now
             </p>
           </div>
 
           <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
 
-          {/* Profile Button (Trigger) */}
+          {/* Profile Circle Button */}
           <div className="relative">
             <button
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex items-center justify-center rounded-full transition-all active:scale-90"
+              className="flex items-center justify-center rounded-full transition-all active:scale-95 outline-none"
             >
-              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center overflow-hidden border-2 border-emerald-500 ring-2 ring-emerald-50 shadow-md">
-                {/* Image check: fallback to Person Icon if no image */}
-                {staffData?.image ? (
+              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center overflow-hidden border-2 border-emerald-500 ring-2 ring-emerald-50 shadow-md">
+                
+                {/* ✅ IMAGE LOGIC: 
+                    1. Check if staffData exists
+                    2. Check if image URL exists
+                    3. Check if we haven't encountered a load error (!imgError)
+                */}
+                {staffData && staffData.image && !imgError ? (
                   <img 
                     src={staffData.image} 
                     alt="profile" 
                     className="w-full h-full object-cover"
+                    onError={() => setImgError(true)} // ✅ If 404/Error, switch to Icon
                   />
                 ) : (
-                  <User size={22} className="text-emerald-600" />
+                  // ✅ Fallback Icon
+                  <User size={20} className="text-emerald-600" strokeWidth={2} />
                 )}
+
               </div>
             </button>
 
@@ -88,7 +106,16 @@ const StaffNavbar = () => {
                 <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
                 
                 <div className="absolute right-0 mt-3 w-52 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="px-5 py-2 border-b border-slate-50 mb-1 bg-slate-50/50">
+                  
+                  {/* Mobile Name View */}
+                  <div className="sm:hidden px-5 py-3 border-b border-slate-50 mb-1">
+                     <p className="text-sm font-bold text-slate-800">
+                        {staffData?.name || "Staff Member"}
+                     </p>
+                     <p className="text-[10px] text-emerald-600 uppercase font-bold">Logged In</p>
+                  </div>
+
+                  <div className="hidden sm:block px-5 py-2 border-b border-slate-50 mb-1 bg-slate-50/50">
                     <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-none">Account</p>
                   </div>
 

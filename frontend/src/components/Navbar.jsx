@@ -23,6 +23,12 @@ const Navbar = () => {
 
   const userProfileImage = userData?.image;
 
+  // --- LOGIC TO GET ONLY THE FIRST NAME ---
+  // This takes "John Quincy Doe" and returns "John"
+  const firstName = userData?.firstName 
+    ? userData.firstName 
+    : userData?.name?.split(' ')[0] || "User";
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
@@ -60,7 +66,7 @@ const Navbar = () => {
             <img src={assets.logo} alt="logo" className="w-10 object-contain" />
           </div>
 
-          {/* --- CENTER LINKS (Classic Style) --- */}
+          {/* --- CENTER LINKS --- */}
           <ul className="hidden lg:flex items-center gap-10">
             {navLinks.map((link) => (
               <li key={link.name}>
@@ -81,7 +87,6 @@ const Navbar = () => {
           {/* --- RIGHT SIDE ACTIONS --- */}
           <div className="flex items-center gap-5">
             
-            {/* CTA BUTTON */}
             <button 
               onClick={() => navigate("/retreat-booking")}
               className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all shadow-lg active:scale-95"
@@ -107,12 +112,12 @@ const Navbar = () => {
                   )}
                 </button>
 
-                {/* Dropdown */}
                 {showProfileMenu && (
                   <div className="absolute right-0 mt-4 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 animate-in fade-in zoom-in-95 duration-200">
                     <div className="px-4 py-2 border-b border-slate-50 mb-1">
                       <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Signed in as</p>
-                      <p className="text-sm font-bold truncate text-slate-900">{userData?.name}</p>
+                      {/* UPDATED TO DISPLAY ONLY FIRST NAME */}
+                      <p className="text-sm font-bold truncate text-slate-900">{firstName}</p>
                     </div>
                     
                     <button onClick={() => navigate("/my-profile")} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
@@ -135,11 +140,10 @@ const Navbar = () => {
                  onClick={() => navigate("/login")}
                  className="px-6 py-2.5 bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-50 transition-all"
               >
-                 Login
+                  Login
               </button>
             )}
 
-            {/* MOBILE TOGGLE */}
             <button
               onClick={() => setShowMobileMenu(!showMobileMenu)}
               className="lg:hidden text-slate-900"
@@ -149,7 +153,7 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* --- MOBILE MENU --- */}
+        {/* MOBILE MENU */}
         {showMobileMenu && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-2">
              {navLinks.map((link) => (
@@ -166,12 +170,6 @@ const Navbar = () => {
                   {link.name}
                 </NavLink>
               ))}
-              <button 
-                 onClick={() => { navigate("/rooms"); setShowMobileMenu(false); }}
-                 className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg text-xs font-black uppercase tracking-widest"
-              >
-                 Book Retreat <ArrowRight size={14}/>
-              </button>
           </div>
         )}
       </nav>

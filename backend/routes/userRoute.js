@@ -2,20 +2,17 @@ import express from "express";
 import {
   registerUser, 
   loginUser, 
+  googleAuth, 
   getUserData, 
-  updateUserProfile
-} from "../controllers/userController.js";
-
-// ✅ Import Booking functions from the correct controller
-import { 
-  userBookings,          // Was getUserBookings
+  updateUserProfile,
+  getUserBookings,
   createBooking, 
   cancelBooking,
   createCheckoutSession,
   verifyPayment,
-  markCash,              // Was markCashPayment
+  markCashPayment,
   rateBooking
-} from "../controllers/bookingController.js";
+} from "../controllers/userController.js";
 
 import authUser from "../middlewares/authUser.js";
 import upload from "../middlewares/multer.js";
@@ -23,45 +20,48 @@ import upload from "../middlewares/multer.js";
 const userRouter = express.Router();
 
 // ------------------------------------------------
-// 👤 AUTH & PROFILE
+// 👤 AUTHENTICATION & PROFILE
 // ------------------------------------------------
+
+// Regular Email/Password Auth
 userRouter.post("/register", upload.single('image'), registerUser);
 userRouter.post("/login", loginUser);
+
+// ✅ Google Authentication (New)
+userRouter.post("/google-auth", googleAuth); 
+
+// User Profile (Protected)
 userRouter.get("/profile", authUser, getUserData);
 userRouter.post("/update-profile", authUser, upload.single("image"), updateUserProfile);
 
 // ------------------------------------------------
-// 📅 BOOKING MANAGEMENT
+// 📅 BOOKING MANAGEMENT (Protected)
 // ------------------------------------------------
 
 // Get all bookings for the logged-in user
-userRouter.get("/bookings", authUser, userBookings);
+userRouter.get("/bookings", authUser, getUserBookings);
 
 // Create a new booking
 userRouter.post("/book", authUser, createBooking);
 
-// Cancel (or request cancellation of) a booking
+// Cancel a booking
 userRouter.post("/cancel-booking", authUser, cancelBooking);
 
 // ------------------------------------------------
-// 💳 PAYMENT
+// 💳 PAYMENT & CHECKOUT (Protected)
 // ------------------------------------------------
 
-// Initialize Stripe/Online Payment
+// PayMongo Checkout Session
 userRouter.post("/create-checkout-session", authUser, createCheckoutSession);
 
-// Verify Online Payment success
+// Verify Online Payment
 userRouter.post("/verify-payment", authUser, verifyPayment);
 
-// User signals they want to pay Cash at Hotel
-userRouter.post("/mark-cash", authUser, markCash);
-
-// 🛑 REMOVED: userRouter.post("/confirm-cash") 
-// Reason: Only Admins can confirm that cash was received. 
-// Users use "/mark-cash" to say "I will pay cash".
+// Signal intent to pay Cash at property
+userRouter.post("/mark-cash", authUser, markCashPayment);
 
 // ------------------------------------------------
-// ⭐ RATINGS
+// ⭐ FEEDBACK (Protected)
 // ------------------------------------------------
 userRouter.post("/rate-booking", authUser, rateBooking);
 

@@ -1,296 +1,314 @@
 import React, { useContext, useState, useEffect } from "react";
 import { AdminContext } from "../../context/AdminContext";
-import { X, User, Mail, Phone, Lock, BadgeCheck, Info, Camera } from "lucide-react";
+import { 
+  X, 
+  User, 
+  Mail, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
+  CheckCircle2, 
+  AlertCircle 
+} from "lucide-react";
 import { toast } from "react-toastify";
 
-const AddStaff = ({ onClose, getAllUsers }) => {
-  const { createStaff } = useContext(AdminContext);
+const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
+  const { createStaff, updateStaff } = useContext(AdminContext);
   const [loading, setLoading] = useState(false);
+  const isEdit = !!editData;
 
-  // --- STATE MANAGEMENT ---
+  // Form State
   const [firstName, setFirstName] = useState("");
+  const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   
-  // Image State
-  const [image, setImage] = useState(false);
+  const [image, setImage] = useState(null); 
   const [previewUrl, setPreviewUrl] = useState("");
+  const [isImageRemoved, setIsImageRemoved] = useState(false);
+
+  // Password Visibility State
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState({
-    email: "", // Auto-generated
+    email: "",
     phone: "",
     password: "",
+    confirmPassword: "",
   });
 
-  // --- HANDLERS ---
+  // Load Data on Edit
+  useEffect(() => {
+    if (editData) {
+      setFirstName(editData.firstName || "");
+      setMiddleName(editData.middleName || "");
+      setLastName(editData.lastName || "");
+      setFormData(prev => ({ ...prev, email: editData.email || "", phone: editData.phone || "" }));
+      
+      if (editData.image) {
+        setPreviewUrl(editData.image);
+        setIsImageRemoved(false);
+      }
+    }
+  }, [editData]);
 
-  // 1. Handle Image Upload & Preview
+  // Name Formatter
+  const handleNameChange = (e) => {
+    const { name, value } = e.target;
+    const formatted = value.replace(/[^a-zA-Z-\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
+    
+    if (name === "firstName") {
+      setFirstName(formatted);
+      if (!isEdit) {
+        const prefix = formatted.toLowerCase().replace(/[\s-]/g, "_");
+        setFormData(p => ({ ...p, email: prefix ? `${prefix}.staff@mrh.com` : "" }));
+      }
+    } else if (name === "middleName") setMiddleName(formatted);
+    else if (name === "lastName") setLastName(formatted);
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setImage(file);
       setPreviewUrl(URL.createObjectURL(file));
+      setIsImageRemoved(false);
     }
   };
 
-  // 2. Handle Name Changes & Auto-Email Generation
-  const handleNameChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === "firstName") {
-      setFirstName(value);
-      
-      // LOGIC: Lowercase + Trim + Replace spaces with "_"
-      // Example: "Juan Pedro" -> "juan_pedro"
-      const cleanName = value
-          .trim()
-          .toLowerCase()
-          .replace(/\s+/g, "_")          
-          .replace(/[^a-z0-9_]/g, "");   
-
-      setFormData(prev => ({
-        ...prev,
-        email: cleanName ? `${cleanName}.mrh_staff@gmail.com` : ""
-      }));
-    } else {
-      setLastName(value);
-    }
+  const handleRemoveImage = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setImage(null);
+    setPreviewUrl("");
+    setIsImageRemoved(true);
   };
 
-  // 3. Handle Other Inputs (Phone, Password)
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  // 4. Submit Form
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!firstName || !lastName || !formData.phone) return toast.error("Please fill all required fields");
+    if (!isEdit && formData.password !== formData.confirmPassword) return toast.error("Passwords do not match");
+
     setLoading(true);
     
-    // Validations
-    if (!firstName || !lastName) {
-      toast.error("Please enter both First and Last name.");
-      setLoading(false);
-      return;
-    }
-
-    if (!formData.email.includes("@")) {
-       toast.error("Invalid Email generation.");
-       setLoading(false);
-       return;
-    }
-
-    // Prepare FormData (Required for File Uploads)
-    const formDataToSend = new FormData();
-    formDataToSend.append("name", `${firstName} ${lastName}`.trim());
-    formDataToSend.append("email", formData.email);
-    formDataToSend.append("phone", formData.phone);
-    formDataToSend.append("password", formData.password);
-    formDataToSend.append("role", "staff"); // Hardcoded role
+    const data = new FormData();
+    data.append("firstName", firstName.trim());
+    data.append("lastName", lastName.trim());
+    data.append("middleName", middleName.trim());
+    data.append("phone", formData.phone);
+    data.append("email", formData.email);
+    data.append("role", "staff");
     
     if (image) {
-      formDataToSend.append("image", image);
+        data.append("image", image);
+    } else if (isImageRemoved) {
+        data.append("removeImage", "true");
     }
-
-    // Call API
-    const success = await createStaff(formDataToSend);
     
-    if (success) {
-      toast.success("Staff member added successfully!");
-      getAllUsers();
-      onClose();
-    } else {
+    if (!isEdit) data.append("password", formData.password);
+
+    try {
+      const success = isEdit 
+        ? await updateStaff(editData._id, data) 
+        : await createStaff(data);
+      
+      if (success) onClose(); 
+    } catch (error) {
+      toast.error(error.message || "Something went wrong");
+    } finally {
       setLoading(false);
     }
   };
-
-  // Cleanup Preview URL to avoid memory leaks
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
+  
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      {/* Dimmed Backdrop */}
-      <div 
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
-        onClick={onClose}
-      ></div>
-
-      {/* Main Card */}
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
+      
+      {/* 🌟 Split Card Container */}
+      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
         
-        {/* Header */}
-        <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">New Staff Registration</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Enter details. Profile picture is optional.</p>
-          </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-          >
+        {/* LEFT COLUMN: Identity & Visuals */}
+        <div className="w-full md:w-[320px] bg-slate-900 text-white p-8 flex flex-col items-center justify-center text-center relative shrink-0">
+          
+          <button onClick={onClose} className="absolute top-4 left-4 md:hidden p-2 bg-white/10 rounded-full">
             <X size={20} />
           </button>
-        </div>
 
-        {/* Form Content */}
-        <div className="p-8">
-          <form id="staff-form" onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold tracking-tight">{isEdit ? "Edit Profile" : "New Account"}</h2>
+            <p className="text-slate-400 text-sm mt-1">Staff Access Control</p>
+          </div>
+
+          {/* ✅ AVATAR SECTION */}
+          <div className="mb-6 relative group">
             
-            {/* 📸 PROFILE PICTURE UPLOAD AREA */}
-            <div className="md:col-span-2 flex justify-center mb-2">
-              <div className="relative group">
-                <input 
-                  type="file" 
-                  id="profile-pic" 
-                  accept="image/*" 
-                  onChange={handleImageChange} 
-                  className="hidden" 
-                />
+            <label className="cursor-pointer block w-40 h-40 rounded-full border-4 border-slate-700 bg-slate-800 overflow-hidden shadow-2xl hover:border-slate-500 transition-colors relative">
+                {previewUrl ? (
+                  <img src={previewUrl} className="w-full h-full object-cover" alt="Profile" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 group-hover:text-slate-400 transition-colors">
+                      <User size={48} className="mb-2" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Upload</span>
+                  </div>
+                )}
                 
-                {/* Image Preview or Placeholder */}
-                <div className="w-24 h-24 rounded-full border-4 border-slate-100 shadow-sm overflow-hidden bg-slate-50 flex items-center justify-center relative">
-                  {previewUrl ? (
-                    <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                  ) : (
-                    <User size={40} className="text-slate-300" />
-                  )}
-                  
-                  {/* Overlay on Hover */}
-                  <label 
-                    htmlFor="profile-pic" 
-                    className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-medium"
-                  >
-                    Change
-                  </label>
-                </div>
+                <input type="file" hidden accept="image/*" onChange={handleImageChange} />
+            </label>
 
-                {/* Camera Badge */}
-                <label 
-                  htmlFor="profile-pic"
-                  className="absolute bottom-0 right-0 bg-blue-600 text-white p-1.5 rounded-full shadow-md cursor-pointer hover:bg-blue-700 transition-colors border-2 border-white"
+            {/* ✅ TRASH BUTTON */}
+            {previewUrl && (
+                <button 
+                    onClick={handleRemoveImage}
+                    className="absolute top-0 right-0 translate-x-1 -translate-y-1 bg-red-500 text-white p-2.5 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all z-10 border-2 border-slate-900"
+                    title="Remove Picture"
+                    type="button"
                 >
-                  <Camera size={14} />
-                </label>
-              </div>
-            </div>
+                    <Trash2 size={16} />
+                </button>
+            )}
+            
+            <p className="text-xs text-slate-500 mt-3">
+                {previewUrl ? "Click image to change" : "Click circle to upload"}
+            </p>
+          </div>
 
-            {/* First Name */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">First Name</label>
-              <div className="relative group">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-                <input 
-                  type="text" 
-                  name="firstName" 
-                  required 
-                  value={firstName} 
-                  onChange={handleNameChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                  placeholder="e.g. Juan Pedro"
-                />
-              </div>
-            </div>
+          <div className="bg-slate-800/50 px-4 py-3 rounded-xl w-full border border-slate-700">
+             <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">
+                <Mail size={12} /> Generated Email
+             </div>
+             <p className="text-sm font-mono text-indigo-300 truncate">
+                {formData.email || "..."}
+             </p>
+          </div>
+        </div>
 
-            {/* Last Name */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Last Name</label>
-              <div className="relative group">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-                <input 
-                  type="text" 
-                  name="lastName" 
-                  required 
-                  value={lastName} 
-                  onChange={handleNameChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                  placeholder="e.g. Dela Cruz"
-                />
-              </div>
-            </div>
+        {/* RIGHT COLUMN: Form Data */}
+        <div className="flex-1 bg-white flex flex-col relative">
+          
+          <button onClick={onClose} className="absolute top-5 right-5 text-slate-300 hover:text-slate-600 transition-colors hidden md:block">
+             <X size={24} />
+          </button>
 
-            {/* Email (Auto-Generated & Read-Only) */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2 items-center gap-2">
-                Email Address 
-                <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-normal normal-case flex items-center gap-1">
-                  <Info size={10} /> Auto-Generated
-                </span>
-              </label>
-              <div className="relative group">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <input 
-                  type="email" 
-                  name="email" 
-                  readOnly 
-                  value={formData.email} 
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 cursor-not-allowed rounded-lg outline-none transition-all text-sm font-medium"
-                  placeholder="First name required..."
-                />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Lock size={14} />
+          <div className="p-8 md:p-10 overflow-y-auto scrollbar-hide flex-1">
+             <form id="split-form" onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* 1. Names */}
+                <div className="space-y-4">
+                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Personal Details</h3>
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                         <label className="text-xs font-semibold text-slate-600">First Name <span className="text-red-500">*</span></label>
+                         <input name="firstName" value={firstName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all" placeholder="John" />
+                      </div>
+                      <div className="space-y-1">
+                         <label className="text-xs font-semibold text-slate-600">Last Name <span className="text-red-500">*</span></label>
+                         <input name="lastName" value={lastName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Doe" />
+                      </div>
+                   </div>
+                   <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">Middle Name</label>
+                      <input name="middleName" value={middleName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all" placeholder="Optional" />
+                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Phone */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Contact Number</label>
-              <div className="relative group">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-                <input 
-                  type="text" 
-                  name="phone" 
-                  required 
-                  value={formData.phone} 
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                  placeholder="+63 900 000 0000"
-                />
-              </div>
-            </div>
+                {/* 2. Contact */}
+                <div className="space-y-4">
+                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Contact Info</h3>
+                   <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-600">Mobile Number <span className="text-red-500">*</span></label>
+                      <div className="relative">
+                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">+63</span>
+                         <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})} className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all" placeholder="912 345 6789" />
+                      </div>
+                   </div>
+                </div>
 
-            {/* Password */}
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Temporary Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={18} />
-                <input 
-                  type="password" 
-                  name="password" 
-                  required 
-                  value={formData.password} 
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all text-sm font-medium"
-                  placeholder="Create password"
-                />
-              </div>
-            </div>
+                {/* 3. Security (Only if New) */}
+                {!isEdit && (
+                   <div className="space-y-4">
+                      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Security</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                         
+                         {/* PASSWORD FIELD */}
+                         <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-600">Password <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                                <input 
+                                    type={showPassword ? "text" : "password"} 
+                                    value={formData.password} 
+                                    onChange={(e) => setFormData({...formData, password: e.target.value})} 
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all pr-10" 
+                                    placeholder="••••••"
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                         </div>
 
-          </form>
+                         {/* CONFIRM PASSWORD FIELD */}
+                         <div className="space-y-1">
+                            <label className="text-xs font-semibold text-slate-600 flex justify-between">
+                                <span>Confirm <span className="text-red-500">*</span></span>
+                                
+                                {/* Status Indicator Text */}
+                                {formData.confirmPassword && (
+                                    <span className={`text-[10px] uppercase font-bold flex items-center gap-1 ${formData.password === formData.confirmPassword ? "text-emerald-500" : "text-rose-500"}`}>
+                                        {formData.password === formData.confirmPassword ? (
+                                            <>Match <CheckCircle2 size={10} /></>
+                                        ) : (
+                                            <>Mismatch <AlertCircle size={10} /></>
+                                        )}
+                                    </span>
+                                )}
+                            </label>
+
+                            <div className="relative">
+                                <input 
+                                    type={showConfirmPassword ? "text" : "password"} 
+                                    value={formData.confirmPassword} 
+                                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} 
+                                    className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm outline-none transition-all pr-10
+                                        ${!formData.confirmPassword 
+                                            ? "border-slate-200 focus:border-indigo-500" 
+                                            : formData.password === formData.confirmPassword 
+                                                ? "border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-emerald-50/30" // GREEN STYLE
+                                                : "border-rose-500 focus:ring-2 focus:ring-rose-500/20 bg-rose-50/30" // RED STYLE
+                                        }
+                                    `}
+                                    placeholder="••••••"
+                                />
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                >
+                                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                         </div>
+
+                      </div>
+                   </div>
+                )}
+             </form>
+          </div>
+
+          {/* Action Footer */}
+          <div className="p-6 border-t bg-slate-50 flex justify-end gap-3">
+             <button onClick={onClose} className="px-5 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors">Cancel</button>
+             <button type="submit" form="split-form" disabled={loading} className={`px-8 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg active:scale-95 transition-all flex items-center gap-2 ${isEdit ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                {loading ? "Processing..." : (
+                  <>
+                    {isEdit ? "Save Changes" : "Create Account"}
+                  </>
+                )}
+             </button>
+          </div>
         </div>
-
-        {/* Footer */}
-        <div className="px-8 py-5 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-          <button 
-            type="button" 
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-600 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 transition-all"
-          >
-            Cancel
-          </button>
-          <button 
-            type="submit" 
-            form="staff-form"
-            disabled={loading}
-            className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all flex items-center gap-2 shadow-md shadow-blue-500/20"
-          >
-            {loading ? "Processing..." : <><BadgeCheck size={18} /> Confirm Registration</>}
-          </button>
-        </div>
-
       </div>
     </div>
   );

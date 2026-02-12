@@ -3,8 +3,9 @@ import {
   loginAdmin,
   adminDashboard,
   getAllUsers,
-  changeUserStatus, // ✅ Added this
+  changeUserStatus,
   createStaff,
+  updateStaff,
   addRoom,
   updateRoom,
   getAllRooms,
@@ -40,18 +41,21 @@ adminRouter.get("/dashboard", authAdmin, adminDashboard);
 // 👥 USERS
 adminRouter.get("/users", authAdmin, getAllUsers);
 adminRouter.post("/create-staff", authAdmin, upload.single("image"), createStaff);
-adminRouter.post("/change-user-status", authAdmin, changeUserStatus); // ✅ Added this route
+adminRouter.post("/update-staff", authAdmin, upload.single("image"), updateStaff);
+adminRouter.post("/change-user-status", authAdmin, changeUserStatus);
 
 // 🛏️ ROOMS
 adminRouter.post("/add-room", authAdmin, upload.array("image"), addRoom);
 adminRouter.post("/update-room", authAdmin, upload.array("image"), updateRoom);
-
 adminRouter.get("/all-rooms", authAdmin, getAllRooms);
 adminRouter.post("/change-availability", authAdmin, changeAvailability);
 adminRouter.post("/delete-room", authAdmin, deleteRoom);
 
 // 📅 BOOKINGS
-adminRouter.get("/bookings", authAdmin, allBookings);
+// ✅ FIX: Changed "/bookings" to "/all-bookings"
+// This matches your frontend's API call.
+adminRouter.get("/all-bookings", authAdmin, allBookings);
+
 adminRouter.put("/bookings/:bookingId/approve", authAdmin, approveBooking);
 adminRouter.put("/bookings/:bookingId/decline", authAdmin, declineBooking);
 adminRouter.post("/confirm-payment", authAdmin, paymentConfirmed);
@@ -63,8 +67,9 @@ adminRouter.post("/resolve-cancellation", authAdmin, resolveCancellation);
 
 // 📦 PACKAGES
 adminRouter.get("/packages", authAdmin, getAllPackages);
-adminRouter.post("/packages", authAdmin, addPackage); 
-adminRouter.put("/packages/:id", authAdmin, updatePackage);
-adminRouter.delete("/packages/:id", authAdmin, deletePackage);
+// ✅ ADDED: Image upload middleware for packages
+adminRouter.post("/add-package", authAdmin, upload.single("image"), addPackage); 
+adminRouter.post("/update-package", authAdmin, upload.single("image"), updatePackage);
+adminRouter.post("/delete-package", authAdmin, deletePackage);
 
 export default adminRouter;
