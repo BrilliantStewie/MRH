@@ -104,10 +104,10 @@ const RoomsList = () => {
             <div className="relative w-full md:w-48">
                 <button onClick={() => toggleDropdown('building')} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium flex justify-between items-center text-slate-600">
                     <span>{filterBuilding || "All Buildings"}</span>
-                    <ChevronDown size={16} className={`transition-transform duration-200 ${activeDropdown === 'building' ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} />
                 </button>
                 {activeDropdown === 'building' && (
-                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1 animate-in fade-in slide-in-from-top-1">
+                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1">
                          <div onClick={() => { setFilterBuilding(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">All Buildings</div>
                         {["Nolasco", "Margarita"].map((bldg) => (
                             <div key={bldg} onClick={() => { setFilterBuilding(bldg); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">{bldg}</div>
@@ -119,10 +119,10 @@ const RoomsList = () => {
             <div className="relative w-full md:w-60">
                 <button onClick={() => toggleDropdown('type')} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium flex justify-between items-center text-slate-600">
                     <span>{filterType || "All Room Types"}</span>
-                    <ChevronDown size={16} className={`transition-transform duration-200 ${activeDropdown === 'type' ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} />
                 </button>
                 {activeDropdown === 'type' && (
-                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1 animate-in fade-in slide-in-from-top-1">
+                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1">
                          <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">All Room Types</div>
                         {["Individual", "Individual with Pull-out", "Dormitory"].map((type) => (
                             <div key={type} onClick={() => { setFilterType(type); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">{type}</div>
@@ -134,10 +134,10 @@ const RoomsList = () => {
             <div className="relative w-full md:w-48">
                 <button onClick={() => toggleDropdown('status')} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium flex justify-between items-center text-slate-600">
                     <span>{filterStatus || "All Status"}</span>
-                    <ChevronDown size={16} className={`transition-transform duration-200 ${activeDropdown === 'status' ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} />
                 </button>
                 {activeDropdown === 'status' && (
-                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1 animate-in fade-in slide-in-from-top-1">
+                    <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl p-1">
                         <div onClick={() => { setFilterStatus(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">All Status</div>
                         <div onClick={() => { setFilterStatus("Available"); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">Available</div>
                         <div onClick={() => { setFilterStatus("Unavailable"); setActiveDropdown(null); }} className="px-4 py-2.5 text-sm rounded-lg cursor-pointer hover:bg-slate-100">Unavailable</div>
@@ -165,14 +165,12 @@ const RoomsList = () => {
                 className={`w-full h-full object-cover transition-all duration-700 ${!room.available ? 'grayscale opacity-40 blur-[1px]' : 'group-hover:scale-110'}`} 
               />
               
-              {/* TOP RIGHT STATUS BADGE - BLACK THEME */}
+              {/* TOP RIGHT: AVAILABILITY (BLACK) */}
               {room.available && (
                 <div className="absolute top-3 right-3">
                     <div className="px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 bg-slate-900 text-white border border-slate-800">
                     <CheckCircle2 size={12} className="text-emerald-400" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">
-                        Available
-                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">Available</span>
                     </div>
                 </div>
               )}
@@ -188,22 +186,23 @@ const RoomsList = () => {
             </div>
 
             {/* CONTENT AREA */}
-            <div className="px-5 py-4 flex-1 flex flex-col">
-              <div className="flex flex-col mb-4">
-                {/* ROOM NAME AT TOP */}
-                <h3 className={`text-[18px] font-bold leading-tight mb-2 ${room.available ? 'text-slate-800' : 'text-slate-500'}`}>
-                    {room.name}
+            <div className="px-5 py-5 flex-1 flex flex-col">
+              
+              {/* HEADER ROW: Name (Left) and Building (Right) */}
+              <div className="flex justify-between items-start mb-1">
+                <h3 className={`text-[17px] font-bold leading-tight max-w-[70%] ${room.available ? 'text-slate-800' : 'text-slate-500'}`}>
+                  {room.name}
                 </h3>
-                
-                {/* BUILDING & TYPE SIDE BY SIDE */}
-                <div className="flex items-center gap-2">
-                    <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-tight flex items-center gap-1 border border-slate-100">
-                        <MapPin size={10} className="text-slate-400" /> {room.building}
-                    </span>
-                    <span className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">
-                        • {room.room_type || room.type}
-                    </span>
-                </div>
+                <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight flex items-center gap-1 whitespace-nowrap">
+                  <MapPin size={10} className="text-slate-400" /> {room.building}
+                </span>
+              </div>
+
+              {/* BELOW NAME: Room Type */}
+              <div className="mb-5">
+                <span className="text-slate-400 font-bold uppercase text-[9px] tracking-widest">
+                  {room.room_type || room.type}
+                </span>
               </div>
 
               {/* CAPACITY TAG */}
@@ -239,7 +238,7 @@ const RoomsList = () => {
         ))}
       </div>
 
-      {/* --- ADD/EDIT MODAL --- */}
+      {/* --- MODAL --- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
           <div className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden bg-white rounded-3xl shadow-2xl">
