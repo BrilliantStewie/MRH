@@ -12,14 +12,15 @@ import {
 } from "lucide-react"; 
 
 const RetreatBooking = () => {
-  const { backendUrl, token, selectedRooms, removeRoom, setSelectedRooms, currencySymbol } = useContext(AppContext);
+  // 👇 FIXED: Changed 'clearSelectedRooms' to 'clearRooms' to match your AppContext
+  const { backendUrl, token, selectedRooms, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
   const navigate = useNavigate();
 
   // --- 1. STATE VARIABLES ---
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [participants, setParticipants] = useState(1);
-  const [selectedPackageId, setSelectedPackageId] = useState(null); // No default 'venue_only'
+  const [selectedPackageId, setSelectedPackageId] = useState(null); 
   
   // Database Packages State
   const [dbPackages, setDbPackages] = useState([]);
@@ -48,7 +49,6 @@ const RetreatBooking = () => {
     fetchPackages();
   }, [backendUrl]);
 
-  // ✅ CHANGED: No hardcoded 'venue_only' option
   const allPackages = [...dbPackages];
 
   // --- 3. AUTO-CALCULATE PARTICIPANTS ---
@@ -192,11 +192,15 @@ const RetreatBooking = () => {
 
         if (data.success) {
             toast.success("Request Sent!");
+            
             setStartDate(null);
             setEndDate(null);
             setParticipants(1);
             setSelectedPackageId(null);
-            if (setSelectedRooms) setSelectedRooms([]); 
+            
+            // 👇 FIXED: Calling the correct function name 'clearRooms'
+            if (clearRooms) clearRooms(); 
+            
             navigate('/my-bookings'); 
         } else {
             toast.error(data.message);

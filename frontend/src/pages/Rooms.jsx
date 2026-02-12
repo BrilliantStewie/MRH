@@ -5,7 +5,7 @@ import axios from "axios";
 import {
   Users, Wind, Plus, X, ArrowRight, Filter, Building2,
   BedDouble, Layers, User, Ban, CalendarX, Sun, CheckCircle,
-  CircleDashed, ChevronLeft, ChevronRight, Check
+  CircleDashed, ChevronLeft, ChevronRight, Trash2 // 👈 Added Trash2 icon
 } from "lucide-react";
 
 const Rooms = () => {
@@ -14,6 +14,7 @@ const Rooms = () => {
     selectedRooms,
     addRoom,
     removeRoom,
+    clearRooms, // 👈 Import the clear function
     getRoomsData,
     backendUrl
   } = useContext(AppContext);
@@ -23,7 +24,7 @@ const Rooms = () => {
   // --- STATE ---
   const [filteredRooms, setFilteredRooms] = useState([]);
   const [occupiedRooms, setOccupiedRooms] = useState([]);
-  const [viewingRoom, setViewingRoom] = useState(null); // <--- NEW: Tracks the room being viewed
+  const [viewingRoom, setViewingRoom] = useState(null); 
 
   // Filter States
   const [filterStatus, setFilterStatus] = useState("all");
@@ -120,7 +121,6 @@ const Rooms = () => {
   const RoomDetailsModal = ({ room, onClose }) => {
     if (!room) return null;
 
-    // Handle multiple images if 'room.image' is an array, otherwise just wrap the single one
     const images =
       Array.isArray(room.images) && room.images.length > 0
         ? room.images
@@ -138,7 +138,6 @@ const Rooms = () => {
     }
 
     const [activeImgIndex, setActiveImgIndex] = useState(0);
-
     const isRoomSelected = isSelected(room._id);
 
     return (
@@ -152,8 +151,6 @@ const Rooms = () => {
               alt={room.name}
               className="w-full h-64 md:h-full object-cover"
             />
-
-            {/* Navigation Arrows (only if multiple images) */}
             {images.length > 1 && (
               <>
                 <button
@@ -168,7 +165,6 @@ const Rooms = () => {
                 >
                   <ChevronRight size={20} />
                 </button>
-                {/* Dots */}
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
                   {images.map((_, idx) => (
                     <div key={idx} className={`w-2 h-2 rounded-full ${idx === activeImgIndex ? "bg-white" : "bg-white/50"}`} />
@@ -220,7 +216,7 @@ const Rooms = () => {
                 onClick={() => {
                   if (isRoomSelected) removeRoom(room._id);
                   else addRoom(room);
-                  onClose(); // Close modal after selection? Optional.
+                  onClose(); 
                 }}
                 className={`w-full py-4 rounded-xl font-bold uppercase tracking-wide flex items-center justify-center gap-2 transition-all ${isRoomSelected
                     ? "bg-red-50 text-red-600 hover:bg-red-100"
@@ -248,7 +244,7 @@ const Rooms = () => {
 
         {/* SIDEBAR */}
         <aside className="w-full lg:w-72 h-full overflow-y-auto pb-20 pr-2">
-          {/* ... (Same Sidebar Code as before) ... */}
+          {/* ... Filter Logic ... */}
           <div className="space-y-6">
             <div className="bg-white border p-6 rounded-2xl shadow-sm">
               <h2 className="text-xs font-bold uppercase mb-6 tracking-wider text-slate-900 flex items-center gap-2">
@@ -290,7 +286,7 @@ const Rooms = () => {
               </div>
             </div>
 
-            {/* PREVIEW */}
+            {/* PREVIEW & CLEAR SELECTION */}
             {selectedRooms.length > 0 ? (
               <div className="bg-white border rounded-2xl shadow-lg overflow-hidden ring-1 ring-slate-900/5">
                 <div className="h-36 bg-slate-900 relative">
@@ -306,6 +302,13 @@ const Rooms = () => {
                 <div className="p-4">
                   <button onClick={() => navigate("/retreat-booking")} className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 shadow-lg shadow-slate-200">
                     Review & Book <ArrowRight size={14} />
+                  </button>
+                  {/* 👇 ADDED CLEAR BUTTON HERE */}
+                  <button 
+                    onClick={clearRooms}
+                    className="w-full mt-2 py-2.5 rounded-xl text-[10px] font-bold uppercase flex items-center justify-center gap-2 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  >
+                    Clear Selection <Trash2 size={12} />
                   </button>
                 </div>
               </div>
@@ -337,7 +340,6 @@ const Rooms = () => {
                 return (
                   <div
                     key={room._id}
-                    // CLICK CARD to select (unless unavailable)
                     onClick={() => !isUnavailable && (selected ? removeRoom(room._id) : addRoom(room))}
                     className={`relative bg-white rounded-3xl overflow-hidden border-2 transition-all duration-300 ${isUnavailable
                         ? "border-slate-100 shadow-none"
@@ -346,12 +348,11 @@ const Rooms = () => {
                           : "cursor-pointer border-transparent hover:border-slate-200 hover:shadow-lg"
                       }`}
                   >
-                    {/* IMAGE SECTION - Click to Open Modal */}
                     <div
                       className="h-44 bg-slate-200 relative group overflow-hidden cursor-zoom-in"
                       onClick={(e) => {
-                        e.stopPropagation(); // <--- STOP THE CLICK FROM SELECTING THE ROOM
-                        setViewingRoom(room); // <--- OPEN MODAL INSTEAD
+                        e.stopPropagation();
+                        setViewingRoom(room);
                       }}
                     >
                       <img
@@ -362,7 +363,6 @@ const Rooms = () => {
                         onError={(e) => { e.target.src = "https://via.placeholder.com/400x300?text=No+Image"; }}
                       />
 
-                      {/* Overlays */}
                       {isBookedToday && !isUnderMaintenance && (
                         <div className="absolute inset-0 bg-white/50 flex flex-col items-center justify-center z-10 pointer-events-none">
                           <CalendarX size={28} className="text-slate-500 mb-1" />
@@ -380,7 +380,6 @@ const Rooms = () => {
                           <CheckCircle size={10} strokeWidth={3} /> SELECTED
                         </div>
                       )}
-                      {/* Hover Hint */}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span className="bg-white/90 text-slate-900 text-[10px] font-bold uppercase px-3 py-1.5 rounded-full shadow-sm">
                           View Details
@@ -388,7 +387,6 @@ const Rooms = () => {
                       </div>
                     </div>
 
-                    {/* DETAILS SECTION */}
                     <div className="p-5">
                       <div className="mb-4">
                         <div className="flex items-center justify-between gap-2 mb-1">
@@ -413,24 +411,15 @@ const Rooms = () => {
                           <Users size={14} className={isUnavailable ? "text-slate-300" : "text-slate-900"} />
                           {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
                         </span>
-
-                        <span className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${isUnavailable ? "bg-white border-slate-100" : "bg-slate-50 border-slate-100"
-                          }`}>
-                          <Wind size={14} className={isUnavailable ? "text-slate-300" : "text-slate-900"} />
-                          {room.amenities?.some(a => a.toLowerCase().includes("air"))
-                            ? "AC"
-                            : "Fan"
-                          }
-                        </span>
                       </div>
 
                       <button
                         disabled={isUnavailable}
                         onClick={(e) => {
-                          e.stopPropagation(); // Stop propagation to avoid double triggering if the card has onClick too
+                          e.stopPropagation(); 
                           !isUnavailable && (selected ? removeRoom(room._id) : addRoom(room))
                         }}
-                        className={`w-full py-3 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 transition-all ${isUnavailable
+                        className={`w-full mt-10 py-3 rounded-xl text-xs font-bold uppercase flex items-center justify-center gap-2 transition-all ${isUnavailable
                             ? "bg-slate-50 text-slate-300 cursor-not-allowed border border-slate-100"
                             : selected
                               ? "bg-red-50 text-red-600 border border-red-50 hover:bg-red-100"

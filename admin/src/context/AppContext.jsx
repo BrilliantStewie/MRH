@@ -3,20 +3,21 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const AppContext = createContext();
+
 export const useAppContext = () => useContext(AppContext);
 
 const AppProvider = ({ children }) => {
   // ==============================
   // CONFIG
   // ==============================
-  const backendUrl = import.meta.env.VITE_BACKEND_URL; // ✅ NO fallback
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const currencySymbol = "₱";
 
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Rooms
+  // Rooms State
   const [rooms, setRooms] = useState([]);
   const [selectedRooms, setSelectedRooms] = useState([]);
 
@@ -32,9 +33,7 @@ const AppProvider = ({ children }) => {
     try {
       const { data } = await axios.get(
         `${backendUrl}/api/user/profile`,
-        {
-          headers: { token },
-        }
+        { headers: { token } }
       );
 
       if (data.success) {
@@ -55,7 +54,7 @@ const AppProvider = ({ children }) => {
     localStorage.removeItem("token");
     setToken("");
     setUserData(null);
-    setSelectedRooms([]);
+    setSelectedRooms([]); // Clear selection on logout
     toast.info("Logged out");
   };
 
@@ -64,10 +63,7 @@ const AppProvider = ({ children }) => {
   // ==============================
   const getRoomsData = async () => {
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/room/list`
-      );
-
+      const { data } = await axios.get(`${backendUrl}/api/room/list`);
       if (data.success) {
         setRooms(data.rooms);
       } else {
@@ -87,9 +83,12 @@ const AppProvider = ({ children }) => {
   };
 
   const removeRoom = (roomId) => {
-    setSelectedRooms((prev) =>
-      prev.filter((r) => r._id !== roomId)
-    );
+    setSelectedRooms((prev) => prev.filter((r) => r._id !== roomId));
+  };
+
+  // 👇 NEW FUNCTION: Clears all selected rooms
+  const clearSelectedRooms = () => {
+    setSelectedRooms([]);
   };
 
   // ==============================
@@ -119,6 +118,7 @@ const AppProvider = ({ children }) => {
         selectedRooms,
         addRoom,
         removeRoom,
+        clearSelectedRooms, // 👈 Added to export
       }}
     >
       {children}
