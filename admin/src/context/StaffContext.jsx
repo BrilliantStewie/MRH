@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
@@ -11,6 +11,31 @@ const StaffContextProvider = ({ children }) => {
     localStorage.getItem("sToken") || null
   );
 
+  // =====================================================
+  // 🛡️ AUTOMATIC LOGOUT INTERCEPTOR
+  // =====================================================
+  // This watches for 401 errors (Unauthorized) which are sent 
+  // by the middleware when a password version mismatch is detected.
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          localStorage.removeItem("sToken");
+          setSToken(null);
+          toast.error(error.response.data.message || "Session expired. Please login again.");
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Eject interceptor on unmount to prevent memory leaks
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
+
+  /* =====================================================
+     STAFF LOGIN
+  ===================================================== */
   const staffLogin = async (identifier, password) => {
     try {
       const { data } = await axios.post(
@@ -22,18 +47,14 @@ const StaffContextProvider = ({ children }) => {
         localStorage.setItem("sToken", data.token);
         setSToken(data.token);
         toast.success("Staff Login Successful");
-        // ✅ Return the whole object so Login.jsx can see success: true
-        return data; 
+        return data;
       } else {
-        // This covers cases where the server sends success: false with a message
         toast.error(data.message);
-        return data; 
+        return data;
       }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Login failed";
       
-      // ✅ Critical: If the error is specifically about being disabled, 
-      // we return it so the Login component can trigger the "Frozen" UI.
       if (errorMessage.toLowerCase().includes("disabled") || errorMessage.toLowerCase().includes("frozen")) {
          return { success: false, message: errorMessage };
       }
@@ -43,6 +64,9 @@ const StaffContextProvider = ({ children }) => {
     }
   };
 
+  /* =====================================================
+     STAFF LOGOUT
+  ===================================================== */
   const staffLogout = () => {
     localStorage.removeItem("sToken");
     setSToken(null);
@@ -56,7 +80,7 @@ const StaffContextProvider = ({ children }) => {
         setSToken,
         staffLogin,
         staffLogout,
-        backendUrl,
+        backendUrl
       }}
     >
       {children}

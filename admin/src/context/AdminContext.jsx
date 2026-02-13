@@ -8,22 +8,23 @@ const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
 
-  // ==============================
-  // 📊 STATE
-  // ==============================
+  // ============================================================
+  // 📊 STATE MANAGEMENT
+  // ============================================================
+  const [dashboardData, setDashboardData] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
   const [allBookings, setAllBookings] = useState([]);
-  const [dashboardData, setDashboardData] = useState(null);
   const [allPackages, setAllPackages] = useState([]);
+  const [allStaff, setAllStaff] = useState([]); 
 
-  const getAuthHeaders = () => ({
-    headers: { token: aToken }, 
-  });
+  // ⚙️ Settings State (For Dynamic Dropdowns)
+  const [buildings, setBuildings] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
 
-  // ==============================
-  // 🔐 AUTH (STRICTLY EMAIL)
-  // ==============================
+  // ============================================================
+  // 🔐 AUTHENTICATION
+  // ============================================================
   const adminLogin = async (email, password) => {
     try {
       const { data } = await axios.post(`${backendUrl}/api/admin/login`, {
@@ -35,14 +36,11 @@ const AdminContextProvider = ({ children }) => {
         localStorage.setItem("aToken", data.token);
         setAToken(data.token);
         toast.success("Welcome back, Admin!");
-        return true;
       } else {
         toast.error(data.message);
-        return false;
       }
     } catch (error) {
       toast.error(error.response?.data?.message || error.message);
-      return false;
     }
   };
 
@@ -52,16 +50,14 @@ const AdminContextProvider = ({ children }) => {
     toast.info("Logged out successfully");
   };
 
-  // ==============================
+  // ============================================================
   // 📊 DASHBOARD
-  // ==============================
+  // ============================================================
   const getDashboardData = async () => {
-    if (!aToken) return;
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/dashboard`,
-        getAuthHeaders()
-      );
+      const { data } = await axios.get(`${backendUrl}/api/admin/dashboard`, {
+        headers: { token: aToken },
+      });
       if (data.success) {
         setDashboardData(data.dashData);
       } else {
@@ -72,346 +68,369 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
-  // ==============================
-  // 👥 USERS (FIXED RETURNS)
-  // ==============================
+  // ============================================================
+  // 👥 USERS & STAFF MANAGEMENT
+  // ============================================================
+  
+  // Fetches Guests/Users
   const getAllUsers = async () => {
-    if (!aToken) return;
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/users`,
-        getAuthHeaders()
-      );
-      if (data.success) setAllUsers(data.users);
-      else toast.error(data.message);
+      const { data } = await axios.get(`${backendUrl}/api/admin/users`, {
+        headers: { token: aToken },
+      });
+      if (data.success) {
+        setAllUsers(data.users);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // ✅ FIXED: Now returns TRUE on success
+  // ✅ FIXED: Fetches from the correct users endpoint and filters for staff
+  const getAllStaff = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/admin/users`, {
+        headers: { token: aToken },
+      });
+      if (data.success) {
+        // Filter by role to ensure only staff members are stored in allStaff state
+        const staffOnly = data.users.filter(user => user.role === "staff" || user.role === "admin");
+        setAllStaff(staffOnly);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error("Failed to fetch staff list");
+      console.error(error.message);
+    }
+  };
+
+  const changeUserStatus = async (userId, status) => {
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/change-user-status`,
+        { userId, status },
+        { headers: { token: aToken } }
+      );
+      if (data.success) {
+        toast.success(data.message);
+        getAllUsers(); 
+        getAllStaff(); // Refresh both lists to keep UI in sync
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
   const createStaff = async (formData) => {
-    if (!aToken) return false;
     try {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/create-staff`,
         formData,
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
+
       if (data.success) {
         toast.success(data.message);
-        getAllUsers(); // Refresh list
-        return true;   // Tell component to close
+        getAllStaff(); // Refresh staff list
+        return true; 
       } else {
         toast.error(data.message);
         return false;
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+      toast.error(error.message);
       return false;
     }
   };
 
-  // ✅ ADDED: Missing updateStaff function
-  const updateStaff = async (userId, formData) => {
-    if (!aToken) return false;
+  const updateStaff = async (id, formData) => {
     try {
-      // Append ID to formData if not already there, or send as query param/body
-      // NOTE: Since we use FormData for images, we usually put ID inside FormData
-      formData.append("userId", userId);
-
+      formData.append('id', id); 
       const { data } = await axios.post(
-        `${backendUrl}/api/admin/update-staff`, // Ensure this matches your route
+        `${backendUrl}/api/admin/update-staff`,
         formData,
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
 
       if (data.success) {
         toast.success(data.message);
-        getAllUsers();
+        getAllStaff(); // Refresh staff list
         return true;
       } else {
         toast.error(data.message);
         return false;
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+      toast.error(error.message);
       return false;
     }
   };
 
-  const changeUserStatus = async (userId) => {
-    if (!aToken) return;
+  // ============================================================
+  // ⚙️ SETTINGS (BUILDINGS & ROOM TYPES)
+  // ============================================================
+  const getBuildings = async () => {
     try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/admin/change-user-status`,
-        { userId },
-        getAuthHeaders()
-      );
+      const { data } = await axios.get(`${backendUrl}/api/admin/buildings`, {
+        headers: { token: aToken },
+      });
       if (data.success) {
-        toast.success(data.message);
-        getAllUsers(); 
-      } else {
-        toast.error(data.message);
+        setBuildings(data.buildings);
       }
     } catch (error) {
-      toast.error(error.message);
+      console.error(error);
     }
   };
 
-  // ==============================
-  // 🛏️ ROOMS
-  // ==============================
-  const getAllRooms = async () => {
-    if (!aToken) return;
+  const getRoomTypes = async () => {
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/all-rooms`,
-        getAuthHeaders()
-      );
-      if (data.success) setAllRooms(data.rooms);
-      else toast.error(data.message);
+      const { data } = await axios.get(`${backendUrl}/api/admin/room-types`, {
+        headers: { token: aToken },
+      });
+      if (data.success) {
+        setRoomTypes(data.types);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // ============================================================
+  // 🛏️ ROOM MANAGEMENT
+  // ============================================================
+  const getAllRooms = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/admin/all-rooms`, {
+        headers: { token: aToken },
+      });
+      if (data.success) {
+        setAllRooms(data.rooms);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
   const changeAvailability = async (roomId) => {
-    if (!aToken) return;
     try {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/change-availability`,
         { roomId },
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
       if (data.success) {
         toast.success(data.message);
-        getAllRooms();
-      } else toast.error(data.message);
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const deleteRoom = async (roomId) => {
-    if (!aToken) return;
-    if (!roomId) {
-      toast.error("Room ID required");
-      return;
-    }
-
-    if (!window.confirm("Delete this room?")) return;
-
-    try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/admin/delete-room`,
-        { id: roomId },
-        getAuthHeaders()
-      );
-
-      if (data.success) {
-        toast.success("Room deleted successfully");
         getAllRooms();
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      console.error("Delete Room Error:", error);
-      toast.error(error.response?.data?.message || "Failed to delete room");
+      toast.error(error.message);
     }
   };
 
-  // ==============================
-  // 📅 BOOKINGS
-  // ==============================
-  const getAllBookings = async () => {
-    if (!aToken) return;
+  const deleteRoom = async (id) => {
     try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/all-bookings`,
-        getAuthHeaders()
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/delete-room`,
+        { id },
+        { headers: { token: aToken } }
       );
-      if (data.success) setAllBookings(data.bookings);
-      else toast.error(data.message);
+      if (data.success) {
+        toast.success(data.message);
+        getAllRooms();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  };
+
+  // ============================================================
+  // 📅 BOOKING MANAGEMENT
+  // ============================================================
+  const getAllBookings = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/admin/all-bookings`, {
+        headers: { token: aToken },
+      });
+      if (data.success) {
+        setAllBookings(data.bookings);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
   const approveBooking = async (bookingId) => {
-    if (!aToken) return;
     try {
       const { data } = await axios.put(
-        `${backendUrl}/api/admin/all-bookings/${bookingId}/approve`,
+        `${backendUrl}/api/admin/bookings/${bookingId}/approve`,
         {},
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
       if (data.success) {
         toast.success(data.message);
         getAllBookings();
-      } else toast.error(data.message);
+        getDashboardData(); 
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
   const declineBooking = async (bookingId) => {
-    if (!aToken) return;
     try {
       const { data } = await axios.put(
-        `${backendUrl}/api/admin/all-bookings/${bookingId}/decline`,
+        `${backendUrl}/api/admin/bookings/${bookingId}/decline`,
         {},
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
       if (data.success) {
         toast.success(data.message);
         getAllBookings();
-      } else toast.error(data.message);
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const approveCancellation = async (bookingId, action) => {
-    if (!aToken) return;
-    try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/admin/approve-cancellation`,
-        { bookingId, action },
-        getAuthHeaders()
-      );
-      if (data.success) {
-        toast.success(data.message);
-        getAllBookings();
-      } else toast.error(data.message);
+        getDashboardData();
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
   const paymentConfirmed = async (bookingId) => {
-    if (!aToken) return;
     try {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/confirm-payment`,
         { bookingId },
-        getAuthHeaders()
+        { headers: { token: aToken } }
       );
       if (data.success) {
         toast.success(data.message);
         getAllBookings();
-      } else toast.error(data.message);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // ==============================
-  // 📦 PACKAGES
-  // ==============================
-  const getAllPackages = async () => {
-    if (!aToken) return;
-    try {
-      const { data } = await axios.get(
-        `${backendUrl}/api/admin/packages`,
-        getAuthHeaders()
-      );
-      if (data.success) setAllPackages(data.packages);
-      else toast.error(data.message);
-    } catch (error) {
-      toast.error(error.message);
-    }
-  };
-
-  const addPackage = async (pkg) => {
-    if (!aToken) return;
+  const approveCancellation = async (bookingId) => {
     try {
       const { data } = await axios.post(
-        `${backendUrl}/api/admin/packages`,
-        pkg,
-        getAuthHeaders()
+        `${backendUrl}/api/admin/approve-cancellation`,
+        { bookingId },
+        { headers: { token: aToken } }
       );
       if (data.success) {
-        toast.success("Package added");
-        getAllPackages();
-      } else toast.error(data.message);
+        toast.success(data.message);
+        getAllBookings();
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  const updatePackage = async (id, pkg) => {
-    if (!aToken) return;
+  // ============================================================
+  // 📦 PACKAGES MANAGEMENT
+  // ============================================================
+  const getAllPackages = async () => {
     try {
-      const { data } = await axios.put(
-        `${backendUrl}/api/admin/packages/${id}`,
-        pkg,
-        getAuthHeaders()
-      );
+      const { data } = await axios.get(`${backendUrl}/api/admin/packages`, {
+        headers: { token: aToken },
+      });
       if (data.success) {
-        toast.success("Package updated");
-        getAllPackages();
-      } else toast.error(data.message);
+        setAllPackages(data.packages);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
   const deletePackage = async (id) => {
-    if (!aToken) return;
-    if (!window.confirm("Delete this package?")) return;
-
+    if (!window.confirm("Are you sure you want to delete this package?")) return;
+    
     try {
-      const { data } = await axios.delete(
-        `${backendUrl}/api/admin/packages/${id}`,
-        getAuthHeaders()
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/delete-package`,
+        { id },
+        { headers: { token: aToken } }
       );
       if (data.success) {
-        toast.success("Package deleted");
+        toast.success("Package deleted successfully");
         getAllPackages();
-      } else toast.error(data.message);
+      } else {
+        toast.error(data.message);
+      }
     } catch (error) {
       toast.error(error.message);
     }
   };
 
-  // ==============================
-  // 📤 CONTEXT VALUE
-  // ==============================
+  // ============================================================
+  // 📤 EXPORT CONTEXT VALUE
+  // ============================================================
   const value = {
     backendUrl,
     aToken,
     setAToken,
-
     adminLogin,
     logoutAdmin,
 
+    // Dashboard
     dashboardData,
     getDashboardData,
 
+    // Users & Staff
+    allUsers,
+    getAllUsers,
+    getAllStaff, 
+    changeUserStatus,
+    createStaff, 
+    updateStaff, 
+    allStaff,   
+
+    // Settings
+    buildings,
+    getBuildings,
+    roomTypes,
+    getRoomTypes,
+
+    // Rooms
     allRooms,
     getAllRooms,
     changeAvailability,
     deleteRoom,
 
+    // Bookings
     allBookings,
     getAllBookings,
     approveBooking,
     declineBooking,
-    approveCancellation,
     paymentConfirmed,
+    approveCancellation,
 
+    // Packages
     allPackages,
     getAllPackages,
-    addPackage,
-    updatePackage,
-    deletePackage,
-
-    allUsers,
-    getAllUsers,
-    createStaff,
-    updateStaff, // ✅ Exported here
-    changeUserStatus, 
+    deletePackage
   };
 
   return (

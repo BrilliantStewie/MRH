@@ -53,8 +53,14 @@ export const staffLogin = async (req, res) => {
       });
     }
 
+    // ✅ UPDATED: Added tokenVersion to the JWT payload
+    // This allows the middleware to verify if this specific session is still valid
     const token = jwt.sign(
-      { id: user._id, role: "staff" },
+      { 
+        id: user._id, 
+        role: "staff",
+        tokenVersion: user.tokenVersion || 0 
+      },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -79,7 +85,6 @@ export const staffLogin = async (req, res) => {
 ===================================================== */
 export const getStaffProfile = async (req, res) => {
   try {
-    // req.userId usually comes from your auth middleware
     const staffId = req.userId || req.user?.id; 
     const staff = await userModel.findById(staffId).select("-password");
 
@@ -109,7 +114,6 @@ export const getStaffProfile = async (req, res) => {
 ===================================================== */
 export const updateStaffProfile = async (req, res) => {
   try {
-    // ✅ ADDED: middleName to destructuring
     const { firstName, lastName, middleName, email, phone, oldPassword, newPassword } = req.body;
     
     const staffId = req.userId || req.user?.id;
@@ -122,18 +126,17 @@ export const updateStaffProfile = async (req, res) => {
       });
     }
 
-    // ✅ Update fields including Middle Name
+    // Update fields including Middle Name
     if (firstName) staff.firstName = firstName.trim();
     if (lastName) staff.lastName = lastName.trim();
     if (middleName) staff.middleName = middleName.trim();
     if (phone !== undefined) staff.phone = phone.trim();
 
-    // ✅ Update 'name' composite field with Middle Name logic
+    // Update 'name' composite field with Middle Name logic
     if (firstName || lastName || middleName) {
         const f = firstName || staff.firstName || "";
         const m = middleName || staff.middleName || "";
         const l = lastName || staff.lastName || "";
-        // Removes extra spaces if middle name is missing
         staff.name = `${f} ${m} ${l}`.replace(/\s+/g, " ").trim();
     }
 
@@ -163,6 +166,11 @@ export const updateStaffProfile = async (req, res) => {
        }
        const salt = await bcrypt.genSalt(10);
        staff.password = await bcrypt.hash(newPassword, salt);
+
+       // ✅ UPDATED: Increment tokenVersion
+       // This ensures that if the staff member changes their own password, 
+       // they are logged out of all other devices (like a tablet or phone) for security.
+       staff.tokenVersion = (staff.tokenVersion || 0) + 1;
     }
 
     // CLOUDINARY IMAGE UPLOAD
@@ -207,7 +215,6 @@ export const updateStaffProfile = async (req, res) => {
 export const getStaffBookings = async (req, res) => {
   try {
     const bookings = await bookingModel.find({})
-      // ✅ FIX: Added 'middleName' to populated fields
       .populate("user_id", "name firstName middleName lastName email phone image") 
       .populate("room_ids") 
       .sort({ createdAt: -1 });

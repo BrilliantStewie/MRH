@@ -13,19 +13,22 @@ const AppProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const currencySymbol = "₱";
 
+  // Auth State
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Initial loading state
 
   // Rooms State
   const [rooms, setRooms] = useState([]);
   const [selectedRooms, setSelectedRooms] = useState([]);
 
   // ==============================
-  // AUTH
+  // 🔐 AUTH & PROFILE
   // ==============================
   const loadUserProfileData = async () => {
+    // If no token exists, stop loading and return
     if (!token) {
+      setUserData(null);
       setLoading(false);
       return;
     }
@@ -39,27 +42,27 @@ const AppProvider = ({ children }) => {
       if (data.success) {
         setUserData(data.userData);
       } else {
+        // If token is invalid (e.g., expired), clear it to reset state
         toast.error(data.message);
+        if (data.message === "Invalid token" || data.message === "Authentication failed") {
+            setToken("");
+            localStorage.removeItem("token");
+        }
       }
     } catch (error) {
-      if (error.response?.status === 401) {
-        logout();
+      console.error("Profile Load Error:", error);
+      // Optional: Clear token on 401 Unauthorized
+      if (error.response && error.response.status === 401) {
+         setToken("");
+         localStorage.removeItem("token");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setToken("");
-    setUserData(null);
-    setSelectedRooms([]); // Clear selection on logout
-    toast.info("Logged out");
-  };
-
   // ==============================
-  // ROOMS (PUBLIC)
+  // 🛏️ DATA FETCHING
   // ==============================
   const getRoomsData = async () => {
     try {
@@ -70,11 +73,16 @@ const AppProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
+      console.error(error);
       toast.error("Failed to load rooms");
     }
   };
 
+  // ==============================
+  // 🛒 ROOM SELECTION LOGIC
+  // ==============================
   const addRoom = (room) => {
+    // Prevent duplicates
     if (selectedRooms.some((r) => r._id === room._id)) {
       toast.warning("Room already added");
       return;
@@ -86,41 +94,57 @@ const AppProvider = ({ children }) => {
     setSelectedRooms((prev) => prev.filter((r) => r._id !== roomId));
   };
 
-  // 👇 NEW FUNCTION: Clears all selected rooms
   const clearSelectedRooms = () => {
     setSelectedRooms([]);
   };
 
   // ==============================
-  // EFFECTS
+  // 🔄 EFFECTS
   // ==============================
+  
+  // 1. Load Rooms on Mount
   useEffect(() => {
     getRoomsData();
   }, []);
 
+  // 2. Load Profile when Token Changes
   useEffect(() => {
-    if (token) loadUserProfileData();
-    else setLoading(false);
+    if (token) {
+        loadUserProfileData();
+    } else {
+        setUserData(null);
+        setLoading(false);
+    }
   }, [token]);
 
+  // ==============================
+  // 📤 EXPORT
+  // ==============================
+  const value = {
+    backendUrl,
+    currencySymbol,
+    loading,
+    
+    // Auth
+    token,
+    setToken,
+    userData,
+    setUserData,
+    loadUserProfileData,
+    
+    // Data
+    rooms,
+    getRoomsData,
+    
+    // Selection
+    selectedRooms,
+    addRoom,
+    removeRoom,
+    clearSelectedRooms
+  };
+
   return (
-    <AppContext.Provider
-      value={{
-        backendUrl,
-        currencySymbol,
-        loading,
-        token,
-        setToken,
-        userData,
-        logout,
-        rooms,
-        getRoomsData,
-        selectedRooms,
-        addRoom,
-        removeRoom,
-        clearSelectedRooms, // 👈 Added to export
-      }}
-    >
+    <AppContext.Provider value={value}>
       {children}
     </AppContext.Provider>
   );

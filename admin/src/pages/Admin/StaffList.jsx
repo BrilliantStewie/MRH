@@ -8,7 +8,7 @@ import {
   Phone, 
   Mail, 
   PenBox, 
-  Ban,    
+  Ban,     
   UserCheck 
 } from "lucide-react";
 import AddStaff from "./AddStaff";
@@ -30,7 +30,7 @@ const StaffList = () => {
       return `${u.firstName} ${middle}${u.lastName}`.trim();
     }
     return u.name || "Unknown Staff";
-  };
+  }
 
   const handleEdit = (staffMember) => {
     setEditData(staffMember);
@@ -116,18 +116,26 @@ const StaffList = () => {
                 <tr key={s._id} className={`hover:bg-slate-50 transition-colors group ${s.disabled ? 'bg-slate-50/50' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg border border-blue-200 overflow-hidden relative">
-                        {s.image ? (
-                           <img src={s.image} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                           s.firstName ? s.firstName.charAt(0).toUpperCase() : <User size={20}/>
-                        )}
-                        {s.disabled && (
-                             <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                                 <Ban size={14} className="text-white"/>
-                             </div>
-                        )}
-                      </div>
+                      {/* PROFILE IMAGE / DEFAULT ICON SECTION */}
+<div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 overflow-hidden relative shadow-inner">
+  {s.image && s.image.trim() !== "" ? (
+     <img 
+       src={s.image} 
+       alt="" 
+       className="w-full h-full object-cover" 
+       onError={(e) => { e.target.style.display = 'none'; }} // Extra safety: hides if URL is broken
+     />
+  ) : (
+     <User size={22} className="text-slate-400" />
+  )}
+  
+  {s.disabled && (
+       <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+           <Ban size={14} className="text-white"/>
+       </div>
+  )}
+</div>
+
                       <div>
                           <span className={`font-semibold ${s.disabled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
                               {getFullName(s)}
@@ -151,11 +159,11 @@ const StaffList = () => {
                   <td className="px-6 py-4 text-center">
                     {s.disabled ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100">
-                           Disabled
+                            Disabled
                         </span>
                     ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
-                           Active
+                            Active
                         </span>
                     )}
                   </td>
@@ -163,7 +171,6 @@ const StaffList = () => {
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
                       
-                      {/* DISABLE/ENABLE BUTTON */}
                       <button 
                         onClick={() => toggleStatus(s._id)}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
@@ -176,7 +183,6 @@ const StaffList = () => {
                         <span className="hidden lg:inline">{s.disabled ? "Enable" : "Disable"}</span>
                       </button>
 
-                      {/* EDIT BUTTON - BLACK ON HOVER */}
                       <button 
                           onClick={() => handleEdit(s)}
                           className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-900 rounded-lg text-xs font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all border border-blue-100 shadow-sm"
@@ -208,6 +214,7 @@ const StaffList = () => {
       {showAddModal && (
         <AddStaff 
           onClose={handleCloseModal} 
+          getAllUsers={getAllUsers} 
           editData={editData}
         />
       )}

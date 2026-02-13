@@ -10,12 +10,16 @@ const roomSchema = new mongoose.Schema(
     room_type: {
       type: String,
       required: true,
-      enum: ["Individual", "Individual with Pullout", "Dormitory"],
+      trim: true,
+      // Ensures "dormitory" becomes "Dormitory" for a clean UI
+      set: (v) => v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : v
     },
     building: {
       type: String,
       required: true,
-      enum: ["Margarita", "Nolasco"],
+      trim: true,
+      // Ensures consistency across your building names
+      set: (v) => v ? v.charAt(0).toUpperCase() + v.slice(1).toLowerCase() : v
     },
     capacity: {
       type: Number,
@@ -48,6 +52,7 @@ const roomSchema = new mongoose.Schema(
   }
 );
 
+// This ensures the model works in Next.js/Hot-reload environments
 const roomModel = mongoose.models.Room || mongoose.model("Room", roomSchema);
 
 export default roomModel;
