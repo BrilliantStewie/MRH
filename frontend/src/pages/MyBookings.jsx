@@ -5,8 +5,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Search, CalendarDays, MapPin, Loader2, CheckCircle2,
-  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight
-} from "lucide-react";
+  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight, Tag
+} from "lucide-react"; // 👈 Added Tag icon here
 import ReviewPage from "./ReviewPage"; // Ensure this path is correct
 
 // --- HELPER: Date Formatter ---
@@ -364,6 +364,17 @@ const MyBookings = () => {
                     {/* DETAILS SECTION */}
                     <div className="flex-1 flex flex-col justify-between py-1">
                       <div>
+                        {/* 👇 ADDED: BOOKING NAME DISPLAY */}
+                        {booking.bookingName && (
+                          <div className="flex items-center gap-2 mb-2">
+                            <Tag size={14} className="text-indigo-500" />
+                            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">
+                              {booking.bookingName}
+                            </span>
+                          </div>
+                        )}
+                        {/* End of Addition */}
+
                         <div className="flex justify-between items-start mb-2">
                           <h3 className="text-xl font-bold text-slate-900 line-clamp-1 pr-4">{mainRoom.name}</h3>
                           {getStatusBadge(booking.status)}
@@ -395,7 +406,7 @@ const MyBookings = () => {
                           </div>
                         )}
 
-                        {/* ✅ NEW: USER REVIEW DISPLAY SECTION */}
+                        {/* USER REVIEW DISPLAY SECTION */}
                         {hasRated && booking.review && (
                           <div className="w-full mt-2 mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in fade-in duration-500">
                              <div className="flex items-center gap-2 mb-2">

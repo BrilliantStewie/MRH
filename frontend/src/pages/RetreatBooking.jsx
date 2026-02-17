@@ -8,15 +8,15 @@ import { toast } from "react-toastify";
 import { 
   ArrowLeft, Calendar, User, Package, CheckCircle, 
   Trash2, Image as ImageIcon, Building2, Users,
-  Utensils, Wind 
+  Utensils, Wind, Tag 
 } from "lucide-react"; 
 
 const RetreatBooking = () => {
-  // 👇 FIXED: Changed 'clearSelectedRooms' to 'clearRooms' to match your AppContext
   const { backendUrl, token, selectedRooms, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
   const navigate = useNavigate();
 
   // --- 1. STATE VARIABLES ---
+  const [bookingName, setBookingName] = useState(""); // 👈 NEW STATE
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [participants, setParticipants] = useState(1);
@@ -36,7 +36,6 @@ const RetreatBooking = () => {
         const { data } = await axios.get(backendUrl + '/api/package/list'); 
         if (data.success) {
           setDbPackages(data.packages);
-          // Optional: Set default selection to the first package available
           if (data.packages.length > 0) {
              setSelectedPackageId(data.packages[0]._id);
           }
@@ -164,10 +163,15 @@ const RetreatBooking = () => {
         navigate('/login');
         return;
     }
-    // Prevent booking without a package if list exists
     if (allPackages.length > 0 && !selectedPackageId) {
        toast.error("Please select a package.");
        return;
+    }
+    
+    // 👇 CRITICAL FIX: Validate Booking Name
+    if (!bookingName.trim()) {
+      toast.error("Please enter an Event Name (e.g. Family Reunion)"); 
+      return;
     }
 
     const totalAmount = calculateTotal();
@@ -175,13 +179,14 @@ const RetreatBooking = () => {
 
     try {
         const bookingPayload = {
+            bookingName: bookingName, // 👈 SENDING TO BACKEND
             room_ids: selectedRooms.map(r => r._id),
             check_in: startDate,
             check_out: endDate,
             participants: Number(participants),
             package_id: selectedPackageId,
             total_price: totalAmount,
-            package_details: finalPackage // Store snapshot of package details
+            package_details: finalPackage,
         };
 
         const { data } = await axios.post(
@@ -197,8 +202,8 @@ const RetreatBooking = () => {
             setEndDate(null);
             setParticipants(1);
             setSelectedPackageId(null);
+            setBookingName(""); 
             
-            // 👇 FIXED: Calling the correct function name 'clearRooms'
             if (clearRooms) clearRooms(); 
             
             navigate('/my-bookings'); 
@@ -263,10 +268,28 @@ const RetreatBooking = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div className="flex items-center gap-3 mb-6">
                     <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">1</span>
-                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Dates & People</h2>
+                    <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Event Details</h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    
+                    {/* 👇 NEW INPUT FIELD FOR BOOKING NAME */}
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-bold uppercase text-slate-500 mb-2">
+                          Event Name / Group Name <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            <Tag size={18} className="absolute left-3.5 top-3 text-slate-400 z-10"/>
+                            <input 
+                                type="text" 
+                                value={bookingName}
+                                onChange={(e) => setBookingName(e.target.value)}
+                                className="custom-input"
+                                placeholder="e.g. HNU Retreat, Family Reunion, Youth Camp..."
+                            />
+                        </div>
+                    </div>
+
                     <div>
                         <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Check-in Date</label>
                         <div className="relative">
@@ -484,6 +507,14 @@ const RetreatBooking = () => {
             <div className="sticky top-6 bg-white p-6 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
                 <h3 className="text-lg font-bold text-slate-900 mb-6">Booking Summary</h3>
                 
+                {/* --- DISPLAY BOOKING NAME IN SUMMARY --- */}
+                {bookingName && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">Event Name</p>
+                    <p className="text-sm font-bold text-blue-900 break-words">{bookingName}</p>
+                  </div>
+                )}
+
                 <div className="space-y-4 text-sm text-slate-600 mb-8">
                     <div className="flex justify-between">
                         <span>Duration</span>

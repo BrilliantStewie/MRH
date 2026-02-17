@@ -390,10 +390,11 @@ const deleteRoom = async (req, res) => {
 
 const allBookings = async (req, res) => {
     try {
-        // ✅ The 'reviewChat' field is automatically included in the find({})
+        // ✅ UPDATED: Now populating 'package_id' so admin can see package info
         const bookings = await bookingModel.find({})
             .populate('user_id', 'firstName middleName lastName suffix email image') 
             .populate('room_ids')
+            .populate('package_id') // <--- NEW POPULATE
             .sort({ date: -1 });
 
         res.json({ success: true, bookings });

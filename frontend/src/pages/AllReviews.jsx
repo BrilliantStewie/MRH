@@ -84,8 +84,8 @@ const AllReviews = () => {
                       </h3>
                       <p className="text-sm text-gray-400 flex items-center gap-1.5 mt-1">
                         <Calendar size={14} className="opacity-70" />
-                        {/* Mock dates for design match - replace with real data if available */}
-                        Jan 28 — Feb 3, 2026
+                        {/* Mock stay dates - usually derived from check_in/check_out if available */}
+                        Stayed in {new Date(review.check_in || review.createdAt).toLocaleString('default', { month: 'short', year: 'numeric' })}
                       </p>
                     </div>
                   </div>
@@ -117,11 +117,12 @@ const AllReviews = () => {
 
                 {/* Review Content */}
                 <div className="mt-8 relative z-10">
-                  {/* Title (sliced comment) */}
-                  <h2 className="text-[26px] font-serif italic text-[#1E293B] leading-tight">
-                    "{review.comment?.slice(0, 50)}
-                    {review.comment?.length > 50 ? "..." : ""}"
+                  
+                  {/* 👇 UPDATED: BOOKING NAME HEADER (Replaced Quote) */}
+                  <h2 className="text-[26px] font-serif text-[#1E293B] leading-tight font-medium">
+                    {review.bookingName || "Retreat Experience"}
                   </h2>
+
                   {/* Full Comment */}
                   <p className="mt-5 text-[#64748B] leading-relaxed text-lg">
                     {review.comment}

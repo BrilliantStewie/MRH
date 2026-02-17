@@ -7,6 +7,13 @@ const bookingSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    // 👇 CHANGED: Made this field REQUIRED
+    bookingName: { 
+      type: String, 
+      required: [true, "Please provide a booking name (e.g. Group Retreat)"], 
+      trim: true   
+    },
+    
     room_ids: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -14,10 +21,23 @@ const bookingSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    
+    // Package Details
+    package_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Package", 
+      default: null
+    },
+    package_details: { 
+      type: Object, 
+      default: {} 
+    },
+
     check_in: { type: Date, required: true },
     check_out: { type: Date, required: true },
     participants: { type: Number, required: true, min: 1 },
     total_price: { type: Number, required: true, min: 0 },
+    
     payment: { type: Boolean, default: false },
     paymentStatus: {
       type: String,
@@ -40,11 +60,10 @@ const bookingSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
-    // --- RATING & INITIAL REVIEW ---
+    
     rating: { type: Number, min: 0, max: 5, default: 0 },
     review: { type: String, default: "" }, 
 
-    // --- NEW: THREADED CONVERSATION ---
     reviewChat: [
       {
         senderRole: { 
@@ -61,18 +80,14 @@ const bookingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ Improved Validation logic
+// ✅ Validation logic
 bookingSchema.pre("save", function (next) {
-  // 1. Date Validation
   if (this.check_out <= this.check_in) {
     return next(new Error("Check-out must be after check-in"));
   }
-  
-  // 2. Sync Payment Status with Payment Boolean
   if (this.paymentStatus === "paid") {
       this.payment = true;
   }
-
   next();
 });
 

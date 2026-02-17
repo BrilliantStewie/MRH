@@ -223,9 +223,11 @@ export const updateStaffProfile = async (req, res) => {
 ===================================================== */
 export const getStaffBookings = async (req, res) => {
   try {
+    // ✅ UPDATED: Added package_id population
     const bookings = await bookingModel.find({})
       .populate("user_id", "name firstName middleName lastName email phone image") 
       .populate("room_ids") 
+      .populate("package_id") // <--- NEW POPULATE
       .sort({ createdAt: -1 });
 
     return res.status(200).json({

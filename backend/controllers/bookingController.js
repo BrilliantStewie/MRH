@@ -16,11 +16,15 @@ const normalizeDate = (date) => {
 export const createBooking = async (req, res) => {
   try {
     const userId = req.userId;
+    // 👇 UPDATED: Added bookingName, package_id, and package_details
     const {
+      bookingName,
       room_ids = [],
       check_in,
       check_out,
       participants,
+      package_id,
+      package_details,
       total_price,
     } = req.body;
 
@@ -49,10 +53,13 @@ export const createBooking = async (req, res) => {
 
     const booking = await bookingModel.create({
       user_id: userId,
+      bookingName,      // <--- Saved here
       room_ids,
       check_in: start,
       check_out: end,
       participants,
+      package_id,       // <--- Saved here
+      package_details,  // <--- Saved here
       total_price,
       status: "pending",
       payment: false,
