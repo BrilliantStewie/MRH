@@ -1,9 +1,9 @@
 // src/components/Navbar.jsx
 import React, { useContext } from "react";
-import { assets } from "../assets/assets";
+import { assets } from "../../assets/assets.js";
 import { useNavigate } from "react-router-dom";
-import { AdminContext } from "../context/AdminContext.jsx";
-import { StaffContext } from "../context/StaffContext.jsx";
+import { AdminContext } from "../../context/AdminContext.jsx";
+import { StaffContext } from "../../context/StaffContext.jsx";
 
 const Navbar = () => {
   const navigate = useNavigate();

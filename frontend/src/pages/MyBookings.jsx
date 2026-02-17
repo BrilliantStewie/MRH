@@ -1,14 +1,13 @@
 import React, { useContext, useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Search, CalendarDays, MapPin, Loader2, CheckCircle2,
-  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, X, Home, Clock
+  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight
 } from "lucide-react";
-
-// NOTE: Uncomment this if you have created a BookingDetails.jsx file
-// import BookingDetails from "./BookingDetails";
+import ReviewPage from "./ReviewPage"; // Ensure this path is correct
 
 // --- HELPER: Date Formatter ---
 const formatDate = (dateInput) => {
@@ -80,18 +79,16 @@ const CustomDropdown = ({ icon: Icon, value, onChange, options, defaultText }) =
 
 // --- MAIN COMPONENT ---
 const MyBookings = () => {
-  const { backendUrl, token } = useContext(AppContext);
+  const { backendUrl, token, userData } = useContext(AppContext);
+  const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Logic for detailed view (Optional)
   const [selectedBooking, setSelectedBooking] = useState(null);
 
-  // Rating State
-  const [ratingModalOpen, setRatingModalOpen] = useState(false);
-  const [ratingBookingId, setRatingBookingId] = useState(null);
-  const [starValue, setStarValue] = useState(0);
-  const [reviewText, setReviewText] = useState("");
+  // --- REVIEW POPUP STATE ---
+  const [reviewBooking, setReviewBooking] = useState(null);
 
   // Filters State
   const [activeTab, setActiveTab] = useState('all');
@@ -104,7 +101,6 @@ const MyBookings = () => {
   // Fetch Data
   const fetchUserBookings = async () => {
     try {
-      // Ensure we prevent caching with timestamp
       const { data } = await axios.get(backendUrl + `/api/user/bookings?t=${Date.now()}`, { headers: { token } });
       if (data.success) setBookings(data.bookings);
     } catch (error) { toast.error(error.message); } finally { setLoading(false); }
@@ -184,24 +180,10 @@ const MyBookings = () => {
     }
   };
 
-  const openRatingModal = (bookingId) => {
-    setRatingBookingId(bookingId);
-    setStarValue(0);
-    setReviewText("");
-    setRatingModalOpen(true);
-  };
-
-  const submitRating = async () => {
-    if (starValue === 0) return toast.error("Please select a star rating");
-    const toastId = toast.loading("Submitting review...");
-    try {
-      const { data } = await axios.post(backendUrl + '/api/user/rate-booking', { bookingId: ratingBookingId, rating: starValue, review: reviewText }, { headers: { token } });
-      if (data.success) {
-        toast.update(toastId, { render: "Review Submitted!", type: "success", isLoading: false, autoClose: 2000 });
-        setRatingModalOpen(false);
-        fetchUserBookings();
-      } else { toast.update(toastId, { render: data.message, type: "error", isLoading: false, autoClose: 3000 }); }
-    } catch (error) { toast.dismiss(); toast.error("Error submitting review"); }
+  // --- REVIEW HANDLER ---
+  const handleOpenReview = (e, booking) => {
+    e.stopPropagation(); 
+    setReviewBooking(booking); 
   };
 
   const getImageUrl = (imagePath) => {
@@ -225,10 +207,7 @@ const MyBookings = () => {
   // Filters logic
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
-      // SAFETY CHECK: Ensure room_ids exists and has items
       const mainRoom = (b.room_ids && b.room_ids.length > 0) ? b.room_ids[0] : {};
-      
-      // Use b.date from your model (which is a Number/Timestamp)
       const date = new Date(b.date || Date.now());
 
       if (activeTab !== 'all' && b.status !== activeTab) return false;
@@ -249,7 +228,6 @@ const MyBookings = () => {
 
   const buildingOptions = [{ label: "Margarita", value: "Margarita" }, { label: "Nolasco", value: "Nolasco" }];
   
-  // Logic to get unique years from bookings
   const uniqueYears = useMemo(() => {
     const years = bookings.map(b => new Date(b.date).getFullYear());
     return [...new Set(years)].sort((a, b) => b - a).map(y => ({ label: y.toString(), value: y.toString() }));
@@ -270,43 +248,14 @@ const MyBookings = () => {
     return <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${styles[status] || "bg-slate-100"}`}>{label}</span>;
   };
 
-  // NOTE: If you have BookingDetails.jsx, uncomment this line:
-  // if (selectedBooking) return <BookingDetails booking={selectedBooking} onBack={() => setSelectedBooking(null)} />;
-
   return (
     <div className="min-h-screen bg-slate-50 relative p-4 md:p-8 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      
       {/* Background Decor */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-blue-100 rounded-full blur-[100px] opacity-60"></div>
         <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-purple-100 rounded-full blur-[100px] opacity-60"></div>
       </div>
-
-      {/* RATING MODAL */}
-      {ratingModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-[2rem] p-8 w-full max-w-sm shadow-2xl relative animate-in zoom-in-95 duration-200 border border-white/50">
-            <button onClick={() => setRatingModalOpen(false)} className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            <div className="text-center mb-6">
-              <h3 className="text-xl font-bold text-slate-800">Rate Your Stay</h3>
-              <p className="text-sm text-slate-500 mt-1">Share your experience with us</p>
-            </div>
-            <div className="flex justify-center gap-3 mb-8">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button key={star} onClick={() => setStarValue(star)} className={`transition-all duration-200 hover:scale-110 ${star <= starValue ? "text-amber-400 drop-shadow-sm" : "text-slate-200"}`}>
-                  <Star size={32} fill={star <= starValue ? "currentColor" : "none"} strokeWidth={1.5} />
-                </button>
-              ))}
-            </div>
-            <textarea
-              className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800 mb-4 resize-none h-32 placeholder:text-slate-400"
-              placeholder="Write your review here..."
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-            />
-            <button onClick={submitRating} className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5 transition-all">Submit Review</button>
-          </div>
-        </div>
-      )}
 
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
         {/* HEADER */}
@@ -371,12 +320,10 @@ const MyBookings = () => {
             </div>
           ) : (
             filteredBookings.map((booking) => {
-              // Safety: Ensure we don't crash if room_ids is empty
               const mainRoom = (booking.room_ids && booking.room_ids.length > 0) 
-                 ? booking.room_ids[0] 
-                 : { name: "Room Details Unavailable" };
+                  ? booking.room_ids[0] 
+                  : { name: "Room Details Unavailable" };
               
-              // ✅ CORRECT DATE FIELDS FROM DATABASE
               const checkInDate = booking.check_in ? new Date(booking.check_in) : new Date();
               const checkOutDate = booking.check_out ? new Date(booking.check_out) : new Date();
               
@@ -401,7 +348,6 @@ const MyBookings = () => {
                 >
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* IMAGE SECTION */}
-                    
                     <div className="w-full md:w-72 h-48 md:h-56 shrink-0 relative rounded-2xl overflow-hidden bg-slate-100">
                       {imageUrl ? (
                         <img
@@ -432,23 +378,31 @@ const MyBookings = () => {
                           <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-slate-500">
                             <span className="flex items-center gap-2"><MapPin size={16} className="text-slate-400" /> {mainRoom.building || "N/A"}</span>
                             <span className="hidden sm:block text-slate-300">•</span>
-                            {/* ✅ FIXED DATE DISPLAY */}
                             <span className="flex items-center gap-2">
                               <Clock size={16} className="text-slate-400" /> 
                               {formatDate(checkInDate)} — {formatDate(checkOutDate)}
                             </span>
                           </div>
                           
-                          {/* Booking ID for reference */}
                           <div className="text-xs text-slate-400 font-mono bg-slate-50 inline-block px-2 py-1 rounded-md">
                             ID: {booking._id.slice(-6).toUpperCase()}
                           </div>
                         </div>
+
+                        {/* STAFF REPLY DISPLAY */}
+                        {booking.adminReply && (
+                          <div className="w-full mt-2 mb-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 flex gap-3 animate-in slide-in-from-left-2 duration-300">
+                             <CornerDownRight className="text-indigo-300 mt-1 shrink-0" size={16} />
+                             <div>
+                               <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Response from Staff</p>
+                               <p className="text-sm text-indigo-900 italic font-medium">"{booking.adminReply}"</p>
+                             </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* FOOTER: Price & Actions */}
                       <div className="flex flex-col md:flex-row md:items-end justify-between gap-5 pt-5 border-t border-slate-100">
-                        {/* Financials */}
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
                           <div className="flex items-center gap-3 flex-wrap">
@@ -472,13 +426,14 @@ const MyBookings = () => {
                               </span>
                             )}
                           </div>
-                           {/* Star Rating Display */}
+                          
+                           {/* Review Display */}
                            {hasRated && (
                              <div className="flex items-center gap-1 mt-2">
-                               {[...Array(booking.rating)].map((_, i) => (
-                                 <Star key={i} size={14} className="text-amber-400 fill-amber-400" />
+                               {[...Array(5)].map((_, i) => (
+                                 <Star key={i} size={14} className={i < booking.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
                                ))}
-                               <span className="text-xs text-slate-400 ml-1 font-medium">Your Review</span>
+                               <span className="text-xs text-slate-500 ml-1 font-semibold">Your Rating</span>
                              </div>
                            )}
                         </div>
@@ -504,10 +459,20 @@ const MyBookings = () => {
 
                           {canRate && (
                             <button
-                              onClick={(e) => { e.stopPropagation(); openRatingModal(booking._id); }}
+                              onClick={(e) => handleOpenReview(e, booking)}
                               className="flex-1 md:flex-none px-6 py-2.5 bg-amber-400 text-amber-950 rounded-xl font-bold text-sm hover:bg-amber-300 hover:-translate-y-0.5 transition-all shadow-sm"
                             >
                               Rate Stay
+                            </button>
+                          )}
+
+                          {/* EDIT REVIEW BUTTON */}
+                          {hasRated && (
+                            <button
+                              onClick={(e) => handleOpenReview(e, booking)}
+                              className="flex-1 md:flex-none px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 hover:border-slate-300 transition-all"
+                            >
+                              Edit Review
                             </button>
                           )}
 
@@ -529,6 +494,20 @@ const MyBookings = () => {
           )}
         </div>
       </div>
+
+      {/* RENDER THE POPUP HERE */}
+      {reviewBooking && (
+  <ReviewPage 
+      booking={reviewBooking} 
+      onClose={() => setReviewBooking(null)} 
+      user={userData}
+      // Add this line below:
+      onSuccess={() => {
+          fetchUserBookings(); // Refresh the list to show the new rating
+      }}
+  />
+)}
+
     </div>
   );
 };

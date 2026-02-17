@@ -17,7 +17,7 @@ const authAdmin = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // ✅ CORRECT CHECK: role-based, not string comparison
+    // ✅ role-based check
     if (!decoded || decoded.role !== "admin") {
       return res.status(403).json({
         success: false,
@@ -25,8 +25,13 @@ const authAdmin = (req, res, next) => {
       });
     }
 
-    // Attach admin info for later use
+    // ✅ ATTACH DATA FOR CHAT & OTHER CONTROLLERS
+    // We attach these so the bookingController knows who is "talking"
     req.admin = decoded;
+    req.role = decoded.role; // This will be "admin"
+    
+    // Use the name from the token if available, otherwise fallback to "Admin"
+    req.adminName = decoded.name || "Administrator"; 
 
     next();
   } catch (error) {

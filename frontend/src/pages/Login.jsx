@@ -5,6 +5,10 @@ import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { User, Camera, Eye, EyeOff, Loader2, Lock } from 'lucide-react';
 
+// ✅ VALIDATION CONSTANTS
+const TEXT_SUFFIXES = ["Jr.", "Sr."];
+const ROMAN_REGEX = /^(X{0,3})(IX|IV|V?I{0,3})$|^XL[IXV]{0,3}$|^L[X]{0,3}[IXV]{0,3}$|^XC[IXV]{0,3}$|^C$/i;
+
 const Login = () => {
   const { backendUrl, token, setToken } = useContext(AppContext);
   const navigate = useNavigate();
@@ -21,6 +25,8 @@ const Login = () => {
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [suffix, setSuffix] = useState(''); // ✅ Added Suffix State
+  const [suffixError, setSuffixError] = useState(''); // ✅ Added Suffix Error State
   const [phone, setPhone] = useState('');
   const [image, setImage] = useState(null);
 
@@ -31,21 +37,35 @@ const Login = () => {
 
   // --- VALIDATION & FORMATTING HELPERS ---
 
-  // Auto-capitalize first letter/after space & allow only letters/hyphens
   const formatName = (val) => {
-    const cleaned = val.replace(/[^a-zA-Z\s-]/g, ''); // Block numbers/special chars
+    const cleaned = val.replace(/[^a-zA-Z\s-]/g, ''); 
     return cleaned
       .split(' ')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
   };
 
-  // Only allow digits 0-9
+  // ✅ Added Suffix Formatter & Validator
+  const handleSuffixChange = (val) => {
+    let formatted = val.replace(/[^a-zA-Z.]/g, "");
+    if (formatted.length > 0) {
+      const isRoman = /^[IVXLC]+$/i.test(formatted);
+      if (isRoman) formatted = formatted.toUpperCase();
+      else formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+    setSuffix(formatted);
+
+    if (formatted === "" || TEXT_SUFFIXES.includes(formatted) || ROMAN_REGEX.test(formatted)) {
+      setSuffixError("");
+    } else {
+      setSuffixError("Invalid Suffix");
+    }
+  };
+
   const formatPhone = (val) => {
     return val.replace(/\D/g, '');
   };
 
-  // Strict email regex
   const validateEmail = (email) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
@@ -55,13 +75,14 @@ const Login = () => {
   const onSubmitHandler = async (event) => {
     event.preventDefault();
 
-    // 1. Email Validation
     if (!validateEmail(email)) {
       return toast.error("Please enter a valid email address");
     }
 
-    // 2. Sign Up Specific Validations
     if (state === 'Sign Up') {
+      if (suffixError) {
+        return toast.error("Please provide a valid suffix (e.g., Jr., Sr., III)");
+      }
       if (password !== confirmPassword) {
         return toast.error("Passwords do not match!");
       }
@@ -81,6 +102,7 @@ const Login = () => {
         formData.append('firstName', firstName.trim());
         formData.append('middleName', middleName.trim());
         formData.append('lastName', lastName.trim());
+        formData.append('suffix', suffix.trim()); // ✅ Added to FormData
         formData.append('email', email);
         formData.append('password', password);
         formData.append('phone', phone);
@@ -90,7 +112,6 @@ const Login = () => {
         
         if (data.success) {
           toast.success("Account created! Please login with your credentials.");
-          // --- AUTOMATIC NAVIGATION TO LOGIN ---
           setState('Login');
           setPassword('');
           setConfirmPassword('');
@@ -98,7 +119,6 @@ const Login = () => {
           toast.error(data.message);
         }
       } else {
-        // Login Logic
         const { data } = await axios.post(backendUrl + '/api/user/login', { email, password });
         
         if (data.success) {
@@ -125,7 +145,6 @@ const Login = () => {
           <p className='text-zinc-500 mt-1'>Please {state === 'Sign Up' ? "sign up" : "log in"} to book an appointment</p>
         </div>
 
-        {/* Profile Picture Upload (Sign Up Only) */}
         {state === 'Sign Up' && (
           <div className="w-full flex justify-center mb-4">
             <label htmlFor="profile-pic" className="cursor-pointer relative group">
@@ -144,7 +163,6 @@ const Login = () => {
           </div>
         )}
 
-        {/* Form Fields */}
         <div className='w-full flex flex-col gap-4'>
           {state === 'Sign Up' && (
             <>
@@ -158,10 +176,26 @@ const Login = () => {
                   <input className='border border-zinc-200 rounded-lg w-full p-2.5 outline-blue-500' type="text" onChange={(e) => setLastName(formatName(e.target.value))} value={lastName} placeholder="Doe" required />
                 </div>
               </div>
-              <div className='flex flex-col gap-1'>
-                <label className='font-semibold ml-1'>Middle Name (Optional)</label>
-                <input className='border border-zinc-200 rounded-lg w-full p-2.5 outline-blue-500' type="text" onChange={(e) => setMiddleName(formatName(e.target.value))} value={middleName} placeholder="Quincy" />
+              
+              {/* ✅ Added Middle Name and Suffix Grid */}
+              <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+                <div className='md:col-span-2 flex flex-col gap-1'>
+                  <label className='font-semibold ml-1'>Middle Name (Optional)</label>
+                  <input className='border border-zinc-200 rounded-lg w-full p-2.5 outline-blue-500' type="text" onChange={(e) => setMiddleName(formatName(e.target.value))} value={middleName} placeholder="Quincy" />
+                </div>
+                <div className='flex flex-col gap-1'>
+                  <label className='font-semibold ml-1'>Suffix</label>
+                  <input 
+                    className={`border rounded-lg w-full p-2.5 outline-blue-500 ${suffixError ? 'border-red-500 bg-red-50' : 'border-zinc-200'}`} 
+                    type="text" 
+                    onChange={(e) => handleSuffixChange(e.target.value)} 
+                    value={suffix} 
+                    placeholder="Jr." 
+                    maxLength={8}
+                  />
+                </div>
               </div>
+
               <div className='flex flex-col gap-1'>
                 <label className='font-semibold ml-1'>Phone Number</label>
                 <input className='border border-zinc-200 rounded-lg w-full p-2.5 outline-blue-500' type="tel" onChange={(e) => setPhone(formatPhone(e.target.value))} value={phone} placeholder="09123456789" required />

@@ -7,27 +7,29 @@ import "react-toastify/dist/ReactToastify.css";
 import { AdminContext } from "./context/AdminContext";
 import { StaffContext } from "./context/StaffContext";
 
-// Admin Components
-import Sidebar from "./components/Sidebar";
-import Navbar from "./components/Navbar";
+// Admin Components - Matches folder "Admin"
+import Sidebar from "./components/Admin/Sidebar";
+import Navbar from "./components/Admin/Navbar";
 
-// Staff Components
-import StaffNavbar from "./components/staff/StaffNavbar";
-import StaffSidebar from "./components/staff/StaffSidebar";
+// Staff Components - Matches folder "Staff"
+import StaffNavbar from "./components/Staff/StaffNavbar";
+import StaffSidebar from "./components/Staff/StaffSidebar";
 
 // Pages
 import Login from "./pages/Login";
+// CHANGED: Match actual filename "Reviews.jsx" instead of "AllReviews"
+import AllReviews from "./pages/Reviews"; 
 
-// Admin Pages
-import Dashboard from "./pages/admin/Dashboard";
-import RoomsList from "./pages/admin/RoomsList";
-import AllBookings from "./pages/admin/AllBookings";
-import Users from "./pages/admin/Users";
-import StaffList from "./pages/admin/StaffList";
-import Packages from "./pages/admin/Packages";
-import Analytics from "./pages/admin/Analytics";
+// Admin Pages - Matches folder "pages/Admin"
+import Dashboard from "./pages/Admin/Dashboard";
+import RoomsList from "./pages/Admin/RoomsList";
+import AllBookings from "./pages/Admin/AllBookings";
+import Users from "./pages/Admin/Users";
+import StaffList from "./pages/Admin/StaffList";
+import Packages from "./pages/Admin/Packages";
+import Analytics from "./pages/Admin/Analytics";
 
-// Staff Pages
+// Staff Pages - Matches folder "pages/Staff"
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
@@ -62,6 +64,7 @@ const App = () => {
                   <Route path="/admin-users" element={<Users />} />
                   <Route path="/admin-staff-list" element={<StaffList />} />
                   <Route path="/admin-packages" element={<Packages />} />
+                  <Route path="/all-reviews" element={<AllReviews />} /> 
                   <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
                 </Routes>
               </div>
@@ -77,47 +80,52 @@ const App = () => {
             <StaffSidebar />
 
             <main className="flex-1 overflow-y-auto bg-slate-50 p-6">
-              <Routes>
-                <Route
-                  path="/staff-dashboard"
-                  element={
-                    <StaffProtectedRoute>
-                      <StaffDashboard />
-                    </StaffProtectedRoute>
-                  }
-                />
+              <div className="max-w-7xl mx-auto">
+                <Routes>
+                  <Route
+                    path="/staff-dashboard"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffDashboard />
+                      </StaffProtectedRoute>
+                    }
+                  />
 
-                <Route
-                  path="/staff-bookings"
-                  element={
-                    <StaffProtectedRoute>
-                      <StaffBookings />
-                    </StaffProtectedRoute>
-                  }
-                />
+                  <Route
+                    path="/staff-bookings"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffBookings />
+                      </StaffProtectedRoute>
+                    }
+                  />
 
-                <Route
-                  path="/staff-profile"
-                  element={
-                    <StaffProtectedRoute>
-                      <StaffProfile />
-                    </StaffProtectedRoute>
-                  }
-                />
+                  <Route
+                    path="/staff-profile"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffProfile />
+                      </StaffProtectedRoute>
+                    }
+                  />
+                  
+                  <Route path="/all-reviews" element={<AllReviews />} />
 
-                <Route
-                  path="*"
-                  element={<Navigate to="/staff-dashboard" replace />}
-                />
-              </Routes>
+                  <Route
+                    path="*"
+                    element={<Navigate to="/staff-dashboard" replace />}
+                  />
+                </Routes>
+              </div>
             </main>
           </div>
         </>
       ) : (
-        /* ================= LOGIN ================= */
+        /* ================= LOGIN & PUBLIC ================= */
         <div className="flex-1 flex items-center justify-center bg-slate-100">
           <Routes>
             <Route path="/" element={<Login />} />
+            <Route path="/all-reviews" element={<AllReviews />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

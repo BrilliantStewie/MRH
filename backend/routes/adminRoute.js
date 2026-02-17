@@ -3,7 +3,7 @@ import {
   loginAdmin,
   adminDashboard,
   getAllUsers,
-  addGuestUser, // Added this
+  addGuestUser,
   changeUserStatus,
   createStaff,
   updateStaff,
@@ -36,6 +36,9 @@ import {
   deletePackage
 } from "../controllers/packageController.js";
 
+// ✅ Import the chat controller from your booking controller file
+import { addReviewChat } from "../controllers/bookingController.js"; 
+
 import authAdmin from "../middlewares/authAdmin.js";
 import upload from "../middlewares/multer.js";
 
@@ -47,7 +50,7 @@ adminRouter.get("/dashboard", authAdmin, adminDashboard);
 
 // 👥 USERS & STAFF
 adminRouter.get("/users", authAdmin, getAllUsers);
-adminRouter.post("/add-guest", authAdmin, addGuestUser); // New Route
+adminRouter.post("/add-guest", authAdmin, addGuestUser);
 adminRouter.post("/create-staff", authAdmin, upload.single("image"), createStaff);
 adminRouter.post("/update-staff", authAdmin, upload.single("image"), updateStaff);
 adminRouter.post("/change-user-status", authAdmin, changeUserStatus);
@@ -77,6 +80,9 @@ adminRouter.post("/confirm-payment", authAdmin, paymentConfirmed);
 adminRouter.post("/approve-cancellation", authAdmin, approveCancellationRequest);
 adminRouter.post("/check-expired-cancellations", authAdmin, checkExpiredCancellations);
 adminRouter.post("/resolve-cancellation", authAdmin, resolveCancellation);
+
+// 💬 REVIEW CHAT (New Route for Admin/Staff replies)
+adminRouter.post("/add-review-chat", authAdmin, addReviewChat);
 
 // 📦 PACKAGES
 adminRouter.get("/packages", authAdmin, getAllPackages);

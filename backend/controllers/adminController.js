@@ -35,7 +35,17 @@ const loginAdmin = async (req, res) => {
         const { email, password } = req.body;
 
         if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-            const token = jwt.sign({ email, role: "admin" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+            // ✅ ADDED 'name' to the token. 
+            // This ensures your authAdmin middleware can pass req.adminName to the chat.
+            const token = jwt.sign(
+                { 
+                    email, 
+                    role: "admin", 
+                    name: "Administrator" // Or process.env.ADMIN_NAME
+                }, 
+                process.env.JWT_SECRET, 
+                { expiresIn: "1d" }
+            );
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });
@@ -173,7 +183,7 @@ const createStaff = async (req, res) => {
             phone,
             image: imageUrl,
             role: 'staff',
-            tokenVersion: 0 // Initialize token version
+            tokenVersion: 0 
         });
 
         await newStaff.save();
@@ -195,22 +205,18 @@ const updateStaff = async (req, res) => {
             return res.json({ success: false, message: "Staff not found" });
         }
 
-        // Update basic fields
         if (firstName) staff.firstName = firstName;
         if (lastName) staff.lastName = lastName;
         if (middleName !== undefined) staff.middleName = middleName; 
         if (suffix !== undefined) staff.suffix = suffix;
         if (phone) staff.phone = phone;
 
-        // ✅ HANDLE PASSWORD UPDATE & FORCE LOGOUT
         if (password && password.trim() !== "") {
             const salt = await bcrypt.genSalt(10);
             staff.password = await bcrypt.hash(password, salt);
-            // Increment tokenVersion to invalidate existing staff JWTs
             staff.tokenVersion = (staff.tokenVersion || 0) + 1;
         }
 
-        // Handle Image Update
         if (imageFile) {
             staff.image = await streamUpload(imageFile.buffer, "mrh_staff");
         } else if (removeImage === "true") {
@@ -322,7 +328,7 @@ const updateRoom = async (req, res) => {
 
         let finalImages = [];
         if (existingImages) {
-             try { finalImages = JSON.parse(existingImages); } catch { finalImages = []; }
+            try { finalImages = JSON.parse(existingImages); } catch { finalImages = []; }
         }
 
         const imageFiles = req.files || [];
@@ -384,7 +390,12 @@ const deleteRoom = async (req, res) => {
 
 const allBookings = async (req, res) => {
     try {
-        const bookings = await bookingModel.find({}).sort({ date: -1 });
+        // ✅ The 'reviewChat' field is automatically included in the find({})
+        const bookings = await bookingModel.find({})
+            .populate('user_id', 'firstName middleName lastName suffix email image') 
+            .populate('room_ids')
+            .sort({ date: -1 });
+
         res.json({ success: true, bookings });
     } catch (error) {
         res.json({ success: false, message: error.message });

@@ -7,8 +7,8 @@ import bookingModel from "../models/bookingModel.js";
 import cloudinary from "../config/cloudinary.js"; 
 
 // --- HELPERS ---
-const createToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
+const createToken = (id, name) => {
+    return jwt.sign({ id, name }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
 const streamUpload = (fileBuffer) => {
@@ -26,14 +26,12 @@ const streamUpload = (fileBuffer) => {
 
 // --- AUTHENTICATION ---
 
-// ✅ New: Google Authentication
 const googleAuth = async (req, res) => {
     try {
         const { email, displayName, photoURL } = req.body;
         let user = await userModel.findOne({ email });
 
         if (!user) {
-            // Split name (e.g., "Mary Joy Dela Cruz")
             const parts = displayName.split(" ");
             const firstName = parts[0];
             const lastName = parts.length > 1 ? parts[parts.length - 1] : "User";
@@ -49,12 +47,12 @@ const googleAuth = async (req, res) => {
                 email,
                 image: photoURL,
                 password: hashedPassword,
-                phone: "0000000000" // Placeholder for Google users
+                phone: "0000000000" 
             });
             await user.save();
         }
 
-        const token = createToken(user._id);
+        const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
         res.json({ success: true, token });
     } catch (error) {
         console.log(error);
@@ -95,7 +93,7 @@ const registerUser = async (req, res) => {
         });
 
         const user = await newUser.save();
-        const token = createToken(user._id);
+        const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
         res.json({ success: true, token });
     } catch (error) {
         console.log(error);
@@ -111,7 +109,7 @@ const loginUser = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
-            const token = createToken(user._id);
+            const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });
@@ -146,7 +144,6 @@ const updateUserProfile = async (req, res) => {
         if (typeof middleName !== 'undefined') user.middleName = middleName;
         if (phone) user.phone = phone;
 
-        // Password Update Logic
         if (newPassword) {
             if (!oldPassword) return res.json({ success: false, message: "Current password is required" });
             const isMatch = await bcrypt.compare(oldPassword, user.password);
@@ -155,7 +152,6 @@ const updateUserProfile = async (req, res) => {
             user.password = await bcrypt.hash(newPassword, salt);
         }
 
-        // Image Logic
         if (removeImage === 'true' || removeImage === true) user.image = "";
         if (req.file) {
             const result = await streamUpload(req.file.buffer);
@@ -298,12 +294,94 @@ const confirmCashPayment = async (req, res) => {
     }
 };
 
+// --- REVIEWS & CHAT LOGIC ---
+
 const rateBooking = async (req, res) => {
     try {
         const { bookingId, rating, review } = req.body;
-        await bookingModel.findByIdAndUpdate(bookingId, { rating, review });
+        const userId = req.userId;
+
+        const user = await userModel.findById(userId);
+        const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
+
+        await bookingModel.findByIdAndUpdate(bookingId, { 
+            rating, 
+            review,
+            $push: { 
+                reviewChat: {
+                    senderName: userName,
+                    senderRole: 'guest',
+                    message: review,
+                    createdAt: new Date()
+                }
+            }
+        });
         res.json({ success: true, message: "Thank you for your feedback!" });
     } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ NEW: Logic to add a follow-up reply
+const addReviewChat = async (req, res) => {
+    try {
+        const { bookingId, message } = req.body;
+        const userId = req.userId;
+
+        const user = await userModel.findById(userId);
+        const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
+
+        await bookingModel.findByIdAndUpdate(bookingId, {
+            $push: {
+                reviewChat: {
+                    senderName: userName,
+                    senderRole: 'guest',
+                    message: message,
+                    createdAt: new Date()
+                }
+            }
+        });
+
+        res.json({ success: true, message: "Reply added" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ NEW: Logic to delete a guest's own reply
+const deleteReviewReply = async (req, res) => {
+    try {
+        const { bookingId, chatId } = req.body;
+        const userId = req.userId;
+
+        await bookingModel.findOneAndUpdate(
+            { _id: bookingId, user_id: userId },
+            { 
+                $pull: { 
+                    reviewChat: { _id: chatId, senderRole: 'guest' } 
+                } 
+            }
+        );
+
+        res.json({ success: true, message: "Reply deleted successfully" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const getAllPublicReviews = async (req, res) => {
+    try {
+        const reviews = await bookingModel.find({ 
+            rating: { $gt: 0 },
+            review: { $ne: "" } 
+        })
+        .populate("user_id", "firstName lastName image")
+        .populate("room_ids", "name")
+        .sort({ createdAt: -1 });
+
+        res.json({ success: true, reviews });
+    } catch (error) {
+        console.error(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -311,5 +389,6 @@ const rateBooking = async (req, res) => {
 export {
     registerUser, loginUser, googleAuth, getUserData, updateUserProfile,
     getUserBookings, createBooking, cancelBooking,
-    createCheckoutSession, verifyPayment, markCashPayment, confirmCashPayment, rateBooking
+    createCheckoutSession, verifyPayment, markCashPayment, confirmCashPayment, 
+    rateBooking, addReviewChat, deleteReviewReply, getAllPublicReviews
 };

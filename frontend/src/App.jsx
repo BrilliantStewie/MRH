@@ -1,5 +1,5 @@
 import React from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom"; // 1. Import useLocation
 import Home from "./pages/Home";
 import Rooms from "./pages/Rooms";
 import Login from "./pages/Login";
@@ -11,23 +11,36 @@ import RoomBooking from "./pages/RoomBooking";
 import UploadPayment from "./pages/UploadPayment";
 import RetreatBooking from "./pages/RetreatBooking";
 import Payment from "./pages/Payment";
+import ReviewPage from "./pages/ReviewPage"; 
+import AllReviews from "./pages/AllReviews"; // 2. Import the new AllReviews page
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-// Note: BookingDetails is imported inside MyBookings.jsx now, not here.
-
 const App = () => {
+  const location = useLocation(); // 3. Get the current URL path
+
+  // 4. Logic to hide Navbar/Footer on specific pages
+  const isFullScreenPage = location.pathname === '/reviews';
+
   return (
     <div className="w-full overflow-hidden">
       <ToastContainer />
-      <Navbar />
+      
+      {/* 5. Only show Navbar if NOT on a full screen page */}
+      {!isFullScreenPage && <Navbar />}
 
-      <main className="min-h-screen pt-20">
+      {/* 6. Adjust main container: remove padding-top if on full screen page */}
+      <main className={isFullScreenPage ? "" : "min-h-screen pt-20"}>
         <Routes>
+          {/* --- PUBLIC / FULL WIDTH ROUTES --- */}
           <Route path="/" element={<Home />} />
           
+          {/* ✅ The All Reviews Page (No container, No Navbar) */}
+          <Route path="/reviews" element={<AllReviews />} />
+
+          {/* --- MAIN LAYOUT ROUTES (Wrapped in container) --- */}
           <Route path="/*" element={
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               <Routes>
@@ -40,7 +53,10 @@ const App = () => {
                 <Route path="/my-bookings" element={<MyBookings />} />
                 <Route path="/rooms/:roomId" element={<RoomBooking />} />
                 <Route path="/payment/:id" element={<Payment />} />
-                {/* REMOVED BookingDetails Route - It is now a Modal in MyBookings */}
+                
+                {/* Single Booking Review Popup */}
+                <Route path="/review/:bookingId" element={<ReviewPage />} />
+                
                 <Route path="/upload-payment" element={<UploadPayment />} />
               </Routes>
             </div>
@@ -48,7 +64,8 @@ const App = () => {
         </Routes>
       </main>
 
-      <Footer />
+      {/* 7. Only show Footer if NOT on a full screen page */}
+      {!isFullScreenPage && <Footer />}
     </div>
   );
 };

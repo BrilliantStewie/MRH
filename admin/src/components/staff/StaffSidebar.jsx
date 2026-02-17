@@ -3,14 +3,12 @@ import { NavLink } from "react-router-dom";
 import { 
   LayoutDashboard, 
   CalendarDays, 
-  ClipboardList 
+  ClipboardList,
+  Star // 1. Added Star icon
 } from "lucide-react";
 
 const StaffSidebar = () => {
-  // Matches the premium theme of the Navbar
   const baseStyle = "flex items-center gap-4 px-6 py-4 text-[13px] font-bold uppercase tracking-wider text-slate-500 transition-all border-r-4 border-transparent hover:bg-emerald-50/50 hover:text-emerald-700 group";
-  
-  // High-contrast emerald active state
   const activeStyle = "bg-emerald-50 border-emerald-600 text-emerald-700";
 
   const navItems = [
@@ -23,6 +21,12 @@ const StaffSidebar = () => {
       name: "Guest Bookings",
       path: "/Staff-bookings",
       icon: <CalendarDays size={20} />
+    },
+    // 2. Added the Reviews link here
+    {
+      name: "Reviews",
+      path: "/all-reviews",
+      icon: <Star size={20} />
     }
   ];
 
@@ -50,7 +54,6 @@ const StaffSidebar = () => {
           ))}
         </nav>
 
-        {/* Bottom decorative Staff Tip section */}
         <div className="mt-auto px-6 py-10">
             <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
                 <div className="flex items-center gap-2 mb-2">

@@ -121,7 +121,8 @@ const AllBookings = () => {
         const firstName = b.user_id?.firstName || "";
         const middleName = b.user_id?.middleName || "";
         const lastName = b.user_id?.lastName || "";
-        const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, " ");
+        const suffix = b.user_id?.suffix || ""; // Added suffix to filter logic
+        const fullName = `${firstName} ${middleName} ${lastName} ${suffix}`.replace(/\s+/g, " ");
         return fullName.toLowerCase().trim().includes(searchTerm.toLowerCase().trim());
       });
     }
@@ -193,7 +194,6 @@ const AllBookings = () => {
   };
 
   return (
-    // Main Container: Small padding to keep it tight to edges
     <div className="w-full p-4 bg-slate-50/50 min-h-screen font-sans overflow-y-auto scrollbar-hide">
       
       {/* HEADER SECTION */}
@@ -301,7 +301,6 @@ const AllBookings = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50/50 border-b border-slate-100">
             <tr>
-              {/* Header Text: Increased to text-xs (12px) */}
               <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest pl-6">Guest Profile</th>
               <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest w-[280px]">Room Selection</th>
               <th className="px-4 py-3 text-xs font-bold text-slate-400 uppercase tracking-widest">Stay Duration</th>
@@ -327,8 +326,9 @@ const AllBookings = () => {
                   ? (userImage.startsWith('http') ? userImage : `${backendUrl}/${userImage}`)
                   : null;
 
+                // ✅ Updated to include Suffix in the UI string
                 const guestName = b.user_id 
-                    ? `${b.user_id.firstName || ""} ${b.user_id.middleName || ""} ${b.user_id.lastName || ""}`.replace(/\s+/g, " ").trim()
+                    ? `${b.user_id.firstName || ""} ${b.user_id.middleName || ""} ${b.user_id.lastName || ""} ${b.user_id.suffix || ""}`.replace(/\s+/g, " ").trim()
                     : "Unknown Guest";
 
                 return (
@@ -350,11 +350,9 @@ const AllBookings = () => {
                           </div>
                         </div>
                         <div className="flex flex-col gap-0.5 mt-0.5">
-                          {/* Name increased to text-sm */}
                           <span className="text-sm font-black text-slate-800 leading-none mb-0.5 capitalize">{guestName}</span>
                           <div className="flex items-center gap-1.5 text-slate-400">
                              <Mail size={12} />
-                             {/* Email increased to text-xs */}
                              <span className="text-xs font-medium tracking-tight truncate max-w-[140px]">{b.user_id?.email || "No email"}</span>
                           </div>
                           {b.user_id?.phone && (
@@ -384,7 +382,6 @@ const AllBookings = () => {
                                     <div className="flex items-center justify-between mb-1 gap-2">
                                         <div className="flex items-center gap-1.5">
                                             <Home size={13} className="text-slate-400" />
-                                            {/* Room Name increased to text-xs */}
                                             <span className="text-xs font-bold text-slate-700 leading-tight">{room.name}</span>
                                         </div>
                                         <span className="text-[9px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-500 uppercase">
@@ -425,7 +422,6 @@ const AllBookings = () => {
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-col gap-1.5 mt-0.5">
                         <div className="flex items-center gap-1.5 text-slate-700 bg-white border border-slate-100 w-fit px-2.5 py-1.5 rounded-md shadow-sm">
-                           {/* Dates increased to text-xs */}
                            <span className="text-xs font-bold">{formatDatePHT(cin)}</span>
                            <ArrowRight size={12} className="text-slate-300" />
                            <span className="text-xs font-bold">{formatDatePHT(cout)}</span>
@@ -443,7 +439,6 @@ const AllBookings = () => {
                     {/* STATUS */}
                     <td className="px-4 py-4 text-center align-top">
                       <div className="mt-1 flex justify-center">
-                        {/* Status text increased to text-[10px] */}
                         <span className={`px-3 py-1.5 rounded-full text-[10px] font-bold uppercase border shadow-sm ${
                             b.status?.toLowerCase() === 'approved' 
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -461,7 +456,6 @@ const AllBookings = () => {
                     {/* BILLING */}
                     <td className="px-4 py-4 align-top">
                       <div className="flex flex-col mt-0.5">
-                        {/* Price increased to text-[15px] */}
                         <p className="text-[15px] font-black text-slate-800 tracking-tighter">
                             ₱{(b.total_price || 0).toLocaleString()}
                         </p>

@@ -12,7 +12,6 @@ const authStaff = async (req, res, next) => {
       });
     }
 
-    // 1. Decode the token to get the id and the version it was issued with
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     if (!decoded?.id) {
@@ -22,7 +21,6 @@ const authStaff = async (req, res, next) => {
       });
     }
 
-    // 2. Fetch the user from DB (we need the tokenVersion field)
     const user = await User.findById(decoded.id);
 
     if (!user || user.role !== "staff") {
@@ -32,8 +30,7 @@ const authStaff = async (req, res, next) => {
       });
     }
 
-    // 3. ✅ VALIDATION CHECK: Compare Token Version
-    // If an admin changed the password, user.tokenVersion will be higher than decoded.tokenVersion
+    // Security check: Match token version to database version
     if (user.tokenVersion !== decoded.tokenVersion) {
       return res.status(401).json({
         success: false,
@@ -41,7 +38,6 @@ const authStaff = async (req, res, next) => {
       });
     }
 
-    // 4. Check if account was disabled while they were logged in
     if (user.disabled) {
       return res.status(403).json({
         success: false,
@@ -49,7 +45,21 @@ const authStaff = async (req, res, next) => {
       });
     }
 
-    req.user = { id: user._id };
+    // ✅ ATTACH DATA FOR CHAT & OTHER CONTROLLERS
+    // 'req.user' for general profile/booking use
+    req.user = { id: user._id }; 
+    
+    // Specifically for our addReviewChat controller
+    // This allows the chat to log the sender as "Staff [Name]"
+    req.role = "staff"; 
+
+    // Handle pipe-string cleanup for chat display if necessary
+    if (user.name && user.name.includes('|')) {
+        req.userName = user.name.split('|')[0]; // Use first name if using composite string
+    } else {
+        req.userName = user.name; 
+    }
+
     next();
   } catch (error) {
     console.error("❌ authStaff error:", error.message);

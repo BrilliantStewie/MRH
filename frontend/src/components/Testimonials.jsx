@@ -1,7 +1,17 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 import { Star, Quote, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 const Testimonials = () => {
+  const navigate = useNavigate(); // 2. Initialize the hook
+
+  // 3. Create the navigation function
+  const handleViewAllReviews = () => {
+    navigate('/reviews'); 
+    // Scroll to top when navigating
+    window.scrollTo(0, 0);
+  };
+
   return (
     // Matching the Header background color: bg-[#F8F9FA]
     <section className="bg-[#F8F9FA] py-24 border-b border-slate-200 font-sans text-slate-900">
@@ -22,8 +32,12 @@ const Testimonials = () => {
             </h2>
           </div>
           
-          <button className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-blue-900 transition-colors group">
-             Read all 500+ Reviews <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+          {/* DESKTOP BUTTON - Added onClick */}
+          <button 
+            onClick={handleViewAllReviews}
+            className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-blue-900 transition-colors group"
+          >
+              Read all 500+ Reviews <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
@@ -35,7 +49,6 @@ const Testimonials = () => {
              <div className="relative pt-4">
                 <Quote size={80} className="text-blue-100/50 absolute -top-4 -left-6 -z-10" />
                 <blockquote className="space-y-8">
-                   {/* Font size adjusted as requested */}
                    <p className="text-xl md:text-3xl lg:text-4xl font-serif leading-tight text-slate-900">
                      "The silence here is exactly what I needed. It felt less like a retreat center and more like a spiritual home. The architecture itself invites you to pray."
                    </p>
@@ -45,8 +58,8 @@ const Testimonials = () => {
                          M
                       </div>
                       <div>
-                         <div className="text-sm font-bold uppercase tracking-wide text-slate-900">Maria Santos</div>
-                         <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Individual Retreatant</div>
+                          <div className="text-sm font-bold uppercase tracking-wide text-slate-900">Maria Santos</div>
+                          <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Individual Retreatant</div>
                       </div>
                    </div>
                 </blockquote>
@@ -62,7 +75,7 @@ const Testimonials = () => {
           {/* 2. RIGHT: DATA & RECENT FEED */}
           <div className="lg:col-span-5 space-y-10">
              
-             {/* The "Scorecard" - Using your deep Slate/Blue Brand Color */}
+             {/* The "Scorecard" */}
              <div className="bg-[#0f172a] text-white p-8 rounded-2xl flex items-center justify-between shadow-xl shadow-slate-200">
                 <div>
                    <div className="text-4xl font-bold tracking-tight mb-1">4.9<span className="text-slate-500 text-2xl font-light">/5</span></div>
@@ -79,7 +92,6 @@ const Testimonials = () => {
              {/* Recent Reviews List */}
              <div className="space-y-8">
                 
-                {/* Review Item 1 */}
                 <div className="pb-8 border-b border-slate-200 last:border-0 last:pb-0">
                    <div className="flex gap-1 text-amber-500 mb-3">
                       {[1,2,3,4,5].map(i => <Star key={i} size={10} fill="currentColor" strokeWidth={0} />)}
@@ -90,7 +102,6 @@ const Testimonials = () => {
                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">— John & Sarah Lee</p>
                 </div>
 
-                {/* Review Item 2 */}
                 <div className="pb-8 border-b border-slate-200 last:border-0 last:pb-0">
                    <div className="flex gap-1 text-amber-500 mb-3">
                       {[1,2,3,4,5].map(i => <Star key={i} size={10} fill="currentColor" strokeWidth={0} />)}
@@ -106,9 +117,12 @@ const Testimonials = () => {
 
         </div>
         
-        {/* Mobile View All Button */}
+        {/* MOBILE BUTTON - Added onClick */}
         <div className="mt-12 md:hidden">
-            <button className="w-full py-4 bg-white border border-slate-200 text-slate-900 text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-slate-50 transition-colors">
+            <button 
+                onClick={handleViewAllReviews}
+                className="w-full py-4 bg-white border border-slate-200 text-slate-900 text-xs font-bold uppercase tracking-widest rounded-lg hover:bg-slate-50 transition-colors"
+            >
                 Read all Reviews
             </button>
         </div>

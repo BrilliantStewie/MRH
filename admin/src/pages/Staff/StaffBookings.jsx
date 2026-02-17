@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+// FIX: Added the missing import for ReviewChat
+import ReviewChat from "../../components/Staff/ReviewChat"; 
+
 const StaffBookings = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
 
@@ -34,7 +37,19 @@ const StaffBookings = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOrder, setSortOrder] = useState("newest"); // 'newest' or 'oldest'
+  const [sortOrder, setSortOrder] = useState("newest");
+
+  const fetchBookings = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/staff/bookings`, {
+        headers: { token: sToken },
+      });
+      if (data.success) {
+        setBookings(data.bookings);
+        setFilteredBookings(data.bookings);
+      }
+    } catch (error) { toast.error("Failed to load bookings"); }
+  };
 
   const toggleRooms = (id) => {
     setExpandedBookings(prev => ({ ...prev, [id]: !prev[id] }));
@@ -83,17 +98,6 @@ const StaffBookings = () => {
   };
 
   useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        const { data } = await axios.get(`${backendUrl}/api/staff/bookings`, {
-          headers: { token: sToken },
-        });
-        if (data.success) {
-          setBookings(data.bookings);
-          setFilteredBookings(data.bookings);
-        }
-      } catch (error) { toast.error("Failed to load bookings"); }
-    };
     if (sToken) fetchBookings();
   }, [sToken, backendUrl]);
 
@@ -219,7 +223,6 @@ const StaffBookings = () => {
             />
           </div>
           
-          {/* SORT ARROW BUTTON */}
           <button 
             onClick={toggleSort}
             className="flex items-center gap-2 ml-4 text-[10px] font-bold text-slate-400 hover:text-emerald-500 transition-colors uppercase tracking-widest"
@@ -274,6 +277,7 @@ const StaffBookings = () => {
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stay Duration</th>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Status</th>
               <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Billing</th>
+              <th className="px-8 py-5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Guest Review & Reply</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -338,11 +342,11 @@ const StaffBookings = () => {
                             )}
                             
                             {visibleRooms?.map((room, idx) => (
-                                <div key={idx} className="flex flex-col p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 shadow-sm relative animate-in fade-in slide-in-from-top-1">
+                                <div key={idx} className="flex flex-col p-2.5 bg-slate-50/80 rounded-xl border border-slate-100 shadow-sm relative">
                                     <div className="flex items-center justify-between mb-1.5 gap-4">
                                         <div className="flex items-center gap-2">
                                             <Home size={13} className="text-slate-400" />
-                                            <span className="text-[11px] font-bold text-slate-700 leading-tight">{room.name}</span>
+                                            <span className="text-[11px] font-bold text-slate-700">{room.name}</span>
                                         </div>
                                         <span className="text-[8px] font-black px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-500 uppercase tracking-tighter">
                                             {room.building}
@@ -421,11 +425,27 @@ const StaffBookings = () => {
                         </span>
                       </div>
                     </td>
+
+                    <td className="px-8 py-6 align-top min-w-[320px]">
+                      <div className="mt-1">
+                        <p className="text-[11px] italic text-slate-500 mb-2 leading-relaxed">
+                          "{b.review || "No review left by guest"}"
+                        </p>
+                        {b.review && (
+                          <ReviewChat 
+                            booking={b}
+                            backendUrl={backendUrl}
+                            token={sToken}
+                            onUpdate={fetchBookings}
+                          />
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 );
               })
             ) : (
-              <tr><td colSpan="5" className="px-8 py-24 text-center text-slate-400 font-medium italic">No results found matching your filters.</td></tr>
+              <tr><td colSpan="6" className="px-8 py-24 text-center text-slate-400 font-medium italic">No results found matching your filters.</td></tr>
             )}
           </tbody>
         </table>

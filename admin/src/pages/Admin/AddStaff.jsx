@@ -8,14 +8,13 @@ import {
   Eye, 
   EyeOff, 
   CheckCircle2, 
-  AlertCircle,
-  Lock 
+  AlertCircle 
 } from "lucide-react";
 import { toast } from "react-toastify";
 
 // ✅ VALIDATION LOGIC
 const TEXT_SUFFIXES = ["Jr.", "Sr."];
-const ROMAN_REGEX = /^C$|^(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
+const ROMAN_REGEX = /^(X{0,3})(IX|IV|V?I{0,3})$|^XL[IXV]{0,3}$|^L[X]{0,3}[IXV]{0,3}$|^XC[IXV]{0,3}$|^C$/i;
 
 const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   const { createStaff, updateStaff, allStaff } = useContext(AdminContext);
@@ -25,7 +24,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
-  
   const [suffix, setSuffix] = useState(""); 
   const [suffixError, setSuffixError] = useState(""); 
 
@@ -45,16 +43,10 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
 
   useEffect(() => {
     if (editData) {
-      if (editData.firstName) {
-          setFirstName(editData.firstName);
-          setLastName(editData.lastName);
-          setMiddleName(editData.middleName || "");
-          setSuffix(editData.suffix || "");
-      } else {
-          const nameParts = (editData.name || "").split(" ");
-          setFirstName(nameParts[0] || "");
-          setLastName(nameParts.length > 1 ? nameParts[nameParts.length - 1] : "");
-      }
+      setFirstName(editData.firstName || "");
+      setLastName(editData.lastName || "");
+      setMiddleName(editData.middleName || "");
+      setSuffix(editData.suffix || ""); // Loads existing suffix
       
       setFormData(prev => ({ 
         ...prev, 
@@ -86,8 +78,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     existingEmails.forEach(email => {
       const namePart = email.split('@')[0];
       const suffixNum = namePart.replace(basePrefix, "");
-      if (suffixNum === "") maxSuffix = Math.max(maxSuffix, 0);
-      else {
+      if (suffixNum !== "") {
         const num = parseInt(suffixNum);
         if (!isNaN(num)) maxSuffix = Math.max(maxSuffix, num);
       }
@@ -103,17 +94,17 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     if (name === "suffix") {
         formatted = value.replace(/[^a-zA-Z.]/g, "");
         if (formatted.length > 0) {
-            const isRoman = /^[IVX]+$/i.test(formatted);
+            const isRoman = /^[IVXLC]+$/i.test(formatted);
             if (isRoman) formatted = formatted.toUpperCase();
             else formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
         }
         setSuffix(formatted);
 
-        if (formatted === "") setSuffixError("");
-        else if (TEXT_SUFFIXES.includes(formatted)) setSuffixError("");
-        else if (ROMAN_REGEX.test(formatted)) setSuffixError("");
-        else setSuffixError("Invalid Suffix");
-
+        if (formatted === "" || TEXT_SUFFIXES.includes(formatted) || ROMAN_REGEX.test(formatted)) {
+            setSuffixError("");
+        } else {
+            setSuffixError("Invalid Suffix");
+        }
     } else {
         formatted = value.replace(/[^a-zA-Z-\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
         if (name === "firstName") setFirstName(formatted);
@@ -139,7 +130,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
 
   const handleRemoveImage = (e) => {
     e.preventDefault();
-    e.stopPropagation();
     setImage(null);
     setPreviewUrl("");
     setIsImageRemoved(true);
@@ -150,7 +140,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     if (!firstName || !lastName || !formData.phone) return toast.error("Please fill all required fields");
     if (suffixError) return toast.error("Invalid suffix.");
     
-    // ✅ Password validation for both Add and Edit
     if (formData.password !== formData.confirmPassword) {
         return toast.error("Passwords do not match");
     }
@@ -164,8 +153,13 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     const data = new FormData();
     data.append("firstName", firstName);
     data.append("lastName", lastName);
-    if (middleName) data.append("middleName", middleName);
-    if (suffix) data.append("suffix", suffix);
+    data.append("middleName", middleName || ""); // Sending empty string if removed
+    
+    // ✅ CRITICAL FIX: Always append the suffix value. 
+    // If 'suffix' is empty because you removed it, this sends "" to the backend, 
+    // which tells MongoDB to clear the field.
+    data.append("suffix", suffix || ""); 
+    
     data.append("position", "Staff"); 
     data.append("phone", formData.phone);
     data.append("email", formData.email);
@@ -173,8 +167,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     if (image) data.append("image", image);
     else if (isImageRemoved) data.append("removeImage", "true");
     
-    // ✅ PASSING THE NEW PASSWORD
-    // If isEdit is true and password is filled, the backend will update it and terminate sessions.
     if (formData.password) {
         data.append("password", formData.password);
     }
@@ -183,9 +175,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
       const success = isEdit ? await updateStaff(editData._id, data) : await createStaff(data);
       if (success) {
         await getAllUsers();
-        toast.success(isEdit && formData.password 
-            ? "Staff updated. Password change will log them out." 
-            : "Staff saved successfully");
+        toast.success("Staff details updated successfully");
         onClose();
       }
     } catch (error) {
@@ -251,6 +241,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                       <div className="col-span-1 space-y-1 relative">
                          <label className="text-xs font-semibold text-slate-600 flex justify-between">Suffix</label>
                          <input name="suffix" maxLength={8} value={suffix} onChange={handleNameChange} className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${suffixError ? "border-red-500 bg-red-50" : "bg-slate-50 border-slate-200"}`} placeholder="Jr." />
+                         {suffixError && <span className="absolute -bottom-4 right-0 text-[9px] font-bold text-red-500 uppercase">{suffixError}</span>}
                       </div>
                    </div>
                 </div>
@@ -262,7 +253,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                       <label className="text-xs font-semibold text-slate-600">Mobile Number <span className="text-red-500">*</span></label>
                       <div className="relative">
                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">+63</span>
-                         <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})} className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="912 345 6789" />
+                         <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 10)})} className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="912 345 6789" />
                       </div>
                    </div>
                 </div>

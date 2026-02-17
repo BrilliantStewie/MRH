@@ -34,7 +34,6 @@ export const createBooking = async (req, res) => {
     if (end <= start)
       return res.json({ success: false, message: "Invalid date range" });
 
-    // 🔥 BLOCK DOUBLE BOOKING (approved only)
     const conflict = await bookingModel.findOne({
       room_ids: { $in: room_ids },
       status: "approved",
@@ -225,22 +224,82 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 /* ===================================================================
-   7. RATE BOOKING
+   7. RATE BOOKING (Initial Review & Chat Start)
 =================================================================== */
 export const rateBooking = async (req, res) => {
   try {
     const { bookingId, rating, review } = req.body;
+    const name = req.userName || "Guest"; 
 
-    await bookingModel.findByIdAndUpdate(bookingId, { rating, review });
+    // ✅ FIXED: Creates history entry without overwriting previous data
+    const initialMessage = {
+      senderRole: "guest",
+      senderName: name,
+      message: review,
+      createdAt: new Date()
+    };
 
-    res.json({ success: true, message: "Review submitted" });
+    const booking = await bookingModel.findByIdAndUpdate(
+      bookingId, 
+      { 
+        rating, 
+        review,
+        $push: { reviewChat: initialMessage } 
+      },
+      { new: true }
+    );
+
+    if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, message: "Review submitted", reviewChat: booking.reviewChat });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
 };
 
 /* ===================================================================
-   8. CHECK AVAILABILITY
+   8. ADD REVIEW CHAT MESSAGE (Reply Logic for Guest/Staff/Admin)
+=================================================================== */
+export const addReviewChat = async (req, res) => {
+  try {
+    const { bookingId, message } = req.body;
+    
+    // ✅ FIXED: Using role and name from authStaff middleware correctly
+    const role = req.role || "staff"; 
+    const name = req.userName || "Staff"; 
+
+    if (!message || message.trim() === "") {
+      return res.json({ success: false, message: "Message cannot be empty" });
+    }
+
+    const newMessage = {
+      senderRole: role,
+      senderName: name,
+      message: message,
+      createdAt: new Date()
+    };
+
+    // ✅ FIXED: Using $push to preserve message history array
+    const booking = await bookingModel.findByIdAndUpdate(
+      bookingId,
+      { $push: { reviewChat: newMessage } },
+      { new: true }
+    );
+
+    if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+    res.json({ 
+      success: true, 
+      message: "Message added to history", 
+      reviewChat: booking.reviewChat 
+    });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   9. CHECK AVAILABILITY
 =================================================================== */
 export const checkAvailability = async (req, res) => {
   try {
@@ -266,7 +325,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 /* ===================================================================
-   9. GET UNAVAILABLE DATES
+   10. GET UNAVAILABLE DATES
 =================================================================== */
 export const getUnavailableDates = async (req, res) => {
   try {
@@ -295,7 +354,7 @@ export const getUnavailableDates = async (req, res) => {
 };
 
 /* ===================================================================
-   10. USER BOOKED DATES
+   11. USER BOOKED DATES
 =================================================================== */
 export const getUserBookedDates = async (req, res) => {
   try {
@@ -322,7 +381,7 @@ export const getUserBookedDates = async (req, res) => {
 };
 
 /* ===================================================================
-   11. GET OCCUPIED ROOMS (TODAY)
+   12. GET OCCUPIED ROOMS (TODAY)
 =================================================================== */
 export const getOccupiedRooms = async (req, res) => {
   try {

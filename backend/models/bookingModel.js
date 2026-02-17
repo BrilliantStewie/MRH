@@ -4,7 +4,7 @@ const bookingSchema = new mongoose.Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // Must match the User model name exactly
+      ref: "User",
       required: true,
     },
     room_ids: [
@@ -40,8 +40,23 @@ const bookingSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
+    // --- RATING & INITIAL REVIEW ---
     rating: { type: Number, min: 0, max: 5, default: 0 },
-    review: { type: String, default: "" },
+    review: { type: String, default: "" }, 
+
+    // --- NEW: THREADED CONVERSATION ---
+    reviewChat: [
+      {
+        senderRole: { 
+          type: String, 
+          enum: ["guest", "staff", "admin"], 
+          required: true 
+        },
+        senderName: { type: String, required: true },
+        message: { type: String, required: true },
+        createdAt: { type: Date, default: Date.now }
+      }
+    ],
   },
   { timestamps: true }
 );

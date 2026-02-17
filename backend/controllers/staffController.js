@@ -53,12 +53,13 @@ export const staffLogin = async (req, res) => {
       });
     }
 
-    // ✅ UPDATED: Added tokenVersion to the JWT payload
-    // This allows the middleware to verify if this specific session is still valid
+    // ✅ UPDATED: Added name to payload for Review Chat identification
+    // This allows the middleware to verify identity and display the correct sender name
     const token = jwt.sign(
       { 
         id: user._id, 
         role: "staff",
+        name: user.firstName ? `${user.firstName} ${user.lastName}` : user.name,
         tokenVersion: user.tokenVersion || 0 
       },
       process.env.JWT_SECRET,
@@ -114,7 +115,8 @@ export const getStaffProfile = async (req, res) => {
 ===================================================== */
 export const updateStaffProfile = async (req, res) => {
   try {
-    const { firstName, lastName, middleName, email, phone, oldPassword, newPassword } = req.body;
+    // 1. Destructure data (Note: 'name' comes as "First|Mid|Last|Suffix")
+    const { name, email, phone, oldPassword, newPassword, removeImage } = req.body;
     
     const staffId = req.userId || req.user?.id;
     const staff = await userModel.findById(staffId);
@@ -126,19 +128,26 @@ export const updateStaffProfile = async (req, res) => {
       });
     }
 
-    // Update fields including Middle Name
-    if (firstName) staff.firstName = firstName.trim();
-    if (lastName) staff.lastName = lastName.trim();
-    if (middleName) staff.middleName = middleName.trim();
-    if (phone !== undefined) staff.phone = phone.trim();
+    // --- 2. NAME UPDATE LOGIC ---
+    // The frontend sends the composite string: "First|Mid|Last|Suffix"
+    if (name) {
+        staff.name = name; // Save the full pipe-string so frontend can parse it back later
 
-    // Update 'name' composite field with Middle Name logic
-    if (firstName || lastName || middleName) {
-        const f = firstName || staff.firstName || "";
-        const m = middleName || staff.middleName || "";
-        const l = lastName || staff.lastName || "";
-        staff.name = `${f} ${m} ${l}`.replace(/\s+/g, " ").trim();
+        if (name.includes('|')) {
+            const [first, mid, last, suffix] = name.split('|');
+            staff.firstName = first || "";
+            staff.middleName = mid || "";
+            // Append suffix to lastName for sorting/searching purposes if your DB lacks a suffix field
+            staff.lastName = suffix ? `${last} ${suffix}` : last || "";
+        } else {
+            // Fallback: If for some reason pipes aren't used
+            staff.firstName = name.split(' ')[0] || "";
+            staff.lastName = name.split(' ').slice(1).join(' ') || "";
+        }
     }
+
+    // --- 3. PHONE & EMAIL UPDATE ---
+    if (phone) staff.phone = phone.trim();
 
     if (email && email !== staff.email) {
       const emailExists = await userModel.findOne({
@@ -155,7 +164,7 @@ export const updateStaffProfile = async (req, res) => {
       staff.email = email.trim();
     }
 
-    // Password Update Logic
+    // --- 4. PASSWORD UPDATE ---
     if (newPassword && oldPassword) {
        const isMatch = await bcrypt.compare(oldPassword, staff.password);
        if (!isMatch) {
@@ -166,15 +175,15 @@ export const updateStaffProfile = async (req, res) => {
        }
        const salt = await bcrypt.genSalt(10);
        staff.password = await bcrypt.hash(newPassword, salt);
-
-       // ✅ UPDATED: Increment tokenVersion
-       // This ensures that if the staff member changes their own password, 
-       // they are logged out of all other devices (like a tablet or phone) for security.
        staff.tokenVersion = (staff.tokenVersion || 0) + 1;
     }
 
-    // CLOUDINARY IMAGE UPLOAD
-    if (req.file) {
+    // --- 5. IMAGE HANDLING (Upload OR Remove) ---
+    if (removeImage === 'true') {
+        // User clicked the trash icon
+        staff.image = ""; 
+    } else if (req.file) {
+      // User uploaded a new photo
       const streamUpload = (fileBuffer) => {
         return new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(

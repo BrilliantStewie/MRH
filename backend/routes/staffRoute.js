@@ -8,6 +8,9 @@ import {
   getStaffBookings,
 } from "../controllers/staffController.js";
 
+// ✅ Import the chat controller
+import { addReviewChat } from "../controllers/bookingController.js"; 
+
 const router = express.Router();
 
 /* =========================
@@ -34,5 +37,10 @@ router.post(
    STAFF VIEW ALL GUEST BOOKINGS
 ========================= */
 router.get("/bookings", authStaff, getStaffBookings);
+
+/* =========================
+   💬 STAFF REVIEW CHAT (Reply to Guest)
+========================= */
+router.post("/add-review-chat", authStaff, addReviewChat);
 
 export default router;
