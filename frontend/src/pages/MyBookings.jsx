@@ -84,10 +84,7 @@ const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Logic for detailed view (Optional)
   const [selectedBooking, setSelectedBooking] = useState(null);
-
-  // --- REVIEW POPUP STATE ---
   const [reviewBooking, setReviewBooking] = useState(null);
 
   // Filters State
@@ -180,7 +177,6 @@ const MyBookings = () => {
     }
   };
 
-  // --- REVIEW HANDLER ---
   const handleOpenReview = (e, booking) => {
     e.stopPropagation(); 
     setReviewBooking(booking); 
@@ -204,7 +200,6 @@ const MyBookings = () => {
     }
   }, [token]);
 
-  // Filters logic
   const filteredBookings = useMemo(() => {
     return bookings.filter(b => {
       const mainRoom = (b.room_ids && b.room_ids.length > 0) ? b.room_ids[0] : {};
@@ -399,6 +394,23 @@ const MyBookings = () => {
                              </div>
                           </div>
                         )}
+
+                        {/* ✅ NEW: USER REVIEW DISPLAY SECTION */}
+                        {hasRated && booking.review && (
+                          <div className="w-full mt-2 mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in fade-in duration-500">
+                             <div className="flex items-center gap-2 mb-2">
+                                <div className="flex text-amber-400">
+                                   {[...Array(5)].map((_, i) => (
+                                     <Star key={i} size={12} fill={i < booking.rating ? "currentColor" : "none"} strokeWidth={i < booking.rating ? 0 : 2} />
+                                   ))}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Your Experience</span>
+                             </div>
+                             <p className="text-sm text-slate-600 italic font-light leading-relaxed">
+                                "{booking.review}"
+                             </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* FOOTER: Price & Actions */}
@@ -427,13 +439,12 @@ const MyBookings = () => {
                             )}
                           </div>
                           
-                           {/* Review Display */}
                            {hasRated && (
                              <div className="flex items-center gap-1 mt-2">
                                {[...Array(5)].map((_, i) => (
                                  <Star key={i} size={14} className={i < booking.rating ? "text-amber-400 fill-amber-400" : "text-slate-200"} />
                                ))}
-                               <span className="text-xs text-slate-500 ml-1 font-semibold">Your Rating</span>
+                               <span className="text-xs text-slate-500 ml-1 font-semibold">Stay Rated</span>
                              </div>
                            )}
                         </div>
@@ -466,7 +477,6 @@ const MyBookings = () => {
                             </button>
                           )}
 
-                          {/* EDIT REVIEW BUTTON */}
                           {hasRated && (
                             <button
                               onClick={(e) => handleOpenReview(e, booking)}
@@ -497,18 +507,17 @@ const MyBookings = () => {
 
       {/* RENDER THE POPUP HERE */}
       {reviewBooking && (
-  <ReviewPage 
-      booking={reviewBooking} 
-      onClose={() => setReviewBooking(null)} 
-      user={userData}
-      // Add this line below:
-      onSuccess={() => {
-          fetchUserBookings(); // Refresh the list to show the new rating
-      }}
-  />
-)}
-
+        <ReviewPage 
+            booking={reviewBooking} 
+            onClose={() => setReviewBooking(null)} 
+            user={userData}
+            onSuccess={() => {
+                fetchUserBookings(); // Refresh the list to show the new rating/review
+            }}
+        />
+      )}
     </div>
   );
 };
+
 export default MyBookings;

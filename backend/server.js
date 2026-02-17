@@ -8,12 +8,11 @@ import cron from "node-cron";
 // 📦 MODELS
 // =======================
 import bookingModel from "./models/bookingModel.js";
-import userModel from "./models/userModel.js"
+import userModel from "./models/userModel.js";
 
 // =======================
 // ☁️ CLOUDINARY
 // =======================
-// ✅ FIXED: Use curly braces { } to import the named export
 import { connectCloudinary } from "./config/cloudinary.js";
 
 // =======================
@@ -26,6 +25,7 @@ import userRouter from "./routes/userRoute.js";
 import bookingRouter from "./routes/bookingRoute.js";
 import paymentRouter from "./routes/paymentRoute.js";
 import packageRouter from "./routes/packageRoute.js";
+import reviewRouter from "./routes/reviewRoute.js"; 
 
 // =======================
 // 🚀 APP INIT
@@ -54,12 +54,12 @@ app.use("/uploads", express.static("uploads"));
 // =======================
 app.use("/api/admin", adminRouter);
 app.use("/api/staff", staffRouter);
-app.use("/api/admin", roomRouter);
 app.use("/api/room", roomRouter);
 app.use("/api/user", userRouter);
 app.use("/api/booking", bookingRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/package", packageRouter);
+app.use("/api/reviews", reviewRouter); // Connected to match AllReviews.jsx fetch
 
 // =======================
 // 🕒 CRON JOB
@@ -89,7 +89,6 @@ const startServer = async () => {
     await mongoose.connect(MONGODB_URI);
     console.log("✅ MongoDB Connected");
 
-    // This calls the function we imported above
     await connectCloudinary();
     
     app.listen(PORT, () => {

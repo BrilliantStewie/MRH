@@ -19,14 +19,11 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   const isEditMode = booking.rating > 0;
 
   // --- 2. INITIALIZE STATE ---
-  // If editing, start at Step 2 (Form). If new, start at Step 1 (Invite).
   const [step, setStep] = useState(isEditMode ? 2 : 1); 
   const [loading, setLoading] = useState(false);
 
-  // Pre-fill rating and comment if they exist (Edit Mode)
   const [rating, setRating] = useState(booking.rating || 0); 
-  // IMPORTANT: Ensure your backend /api/user/bookings endpoint returns the 'comment' field!
-  const [reviewText, setReviewText] = useState(booking.comment || ""); 
+  const [reviewText, setReviewText] = useState(booking.review || booking.comment || ""); 
   
   const [hover, setHover] = useState(0);
   const [subRatings, setSubRatings] = useState({
@@ -77,8 +74,20 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     setLoading(true);
 
     try {
-        const { data } = await axios.post(
+        // 1. Update the Private Booking (for My Bookings tab)
+        const bookingReq = axios.post(
             backendUrl + '/api/user/rate-booking', 
+            {
+                bookingId: booking._id,
+                rating: rating,
+                review: reviewText
+            },
+            { headers: { token } }
+        );
+
+        // 2. Create the Public Review (for All Reviews feed)
+        const reviewReq = axios.post(
+            backendUrl + '/api/reviews', 
             {
                 bookingId: booking._id,
                 rating: rating,
@@ -87,12 +96,13 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
             { headers: { token } }
         );
 
-        if (data.success) {
+        // Wait for both to finish
+        const [res1, res2] = await Promise.all([bookingReq, reviewReq]);
+
+        if (res1.data.success || res2.data.success) {
             toast.success(isEditMode ? "Review updated!" : "Review submitted!");
-            setStep(3); // Success Screen
+            setStep(3); 
             if (onSuccess) onSuccess(); 
-        } else {
-            toast.error(data.message || "Failed to submit review");
         }
     } catch (error) {
         console.error(error);
@@ -108,7 +118,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
 
       <div className="relative w-full max-w-[480px] bg-white rounded-[2rem] shadow-2xl shadow-black/40 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
         
-        {/* HEADER IMAGE */}
         <div className="relative h-64 w-full shrink-0">
             <img src={bookingData.headerImage} alt="Room" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10" />
@@ -129,7 +138,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
 
             <div className="absolute bottom-6 left-6 right-6 text-white">
                 <h1 className="text-3xl font-serif italic mb-1 tracking-wide">
-                  {/* Dynamic Header Text */}
                   {step === 1 ? "How Was Your Stay?" 
                     : step === 2 
                         ? (isEditMode ? "Edit Your Review" : "Detail Your Experience") 
@@ -141,11 +149,9 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
             </div>
         </div>
 
-        {/* CONTENT */}
         <div className="overflow-y-auto custom-scrollbar">
             <div className="p-6">
             
-            {/* STEP 1: INVITE (Only shown for NEW reviews) */}
             {step === 1 && (
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <div className="bg-[#F8F9FA] rounded-3xl p-5 border border-gray-100/80">
@@ -184,7 +190,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                 </div>
             )}
 
-            {/* STEP 2: FORM (Used for New AND Edit) */}
             {step === 2 && (
                 <div className="animate-in slide-in-from-right-4 duration-300">
                 <div className="flex justify-center gap-3 mb-10 bg-gray-50 py-6 rounded-2xl border border-gray-100 shadow-inner">
@@ -208,7 +213,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                     />
                 </div>
                 <div className="flex gap-3 pt-2">
-                    {/* Only show "Back" button if it was a NEW review (came from Step 1) */}
                     {!isEditMode && (
                         <button onClick={() => setStep(1)} className="px-6 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors">Back</button>
                     )}
@@ -229,7 +233,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                 </div>
             )}
 
-            {/* STEP 3: SUCCESS */}
             {step === 3 && (
                 <div className="py-8 text-center animate-in zoom-in-95 duration-300">
                 <div className="w-20 h-20 bg-[#1A1A1A] rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-black/30 animate-bounce">

@@ -296,6 +296,10 @@ const confirmCashPayment = async (req, res) => {
 
 // --- REVIEWS & CHAT LOGIC ---
 
+/**
+ * Handles the "Private" review stored in the booking.
+ * Note: Public reviews are handled in reviewController.js
+ */
 const rateBooking = async (req, res) => {
     try {
         const { bookingId, rating, review } = req.body;
@@ -316,13 +320,12 @@ const rateBooking = async (req, res) => {
                 }
             }
         });
-        res.json({ success: true, message: "Thank you for your feedback!" });
+        res.json({ success: true, message: "Rating updated in booking record." });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
 
-// ✅ NEW: Logic to add a follow-up reply
 const addReviewChat = async (req, res) => {
     try {
         const { bookingId, message } = req.body;
@@ -348,7 +351,6 @@ const addReviewChat = async (req, res) => {
     }
 };
 
-// ✅ NEW: Logic to delete a guest's own reply
 const deleteReviewReply = async (req, res) => {
     try {
         const { bookingId, chatId } = req.body;
@@ -369,26 +371,9 @@ const deleteReviewReply = async (req, res) => {
     }
 };
 
-const getAllPublicReviews = async (req, res) => {
-    try {
-        const reviews = await bookingModel.find({ 
-            rating: { $gt: 0 },
-            review: { $ne: "" } 
-        })
-        .populate("user_id", "firstName lastName image")
-        .populate("room_ids", "name")
-        .sort({ createdAt: -1 });
-
-        res.json({ success: true, reviews });
-    } catch (error) {
-        console.error(error);
-        res.json({ success: false, message: error.message });
-    }
-};
-
 export {
     registerUser, loginUser, googleAuth, getUserData, updateUserProfile,
     getUserBookings, createBooking, cancelBooking,
     createCheckoutSession, verifyPayment, markCashPayment, confirmCashPayment, 
-    rateBooking, addReviewChat, deleteReviewReply, getAllPublicReviews
+    rateBooking, addReviewChat, deleteReviewReply
 };
