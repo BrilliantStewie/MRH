@@ -461,14 +461,30 @@ const approveCancellationRequest = async (req, res) => {
 const resolveCancellation = async (req, res) => {
     try {
         const { bookingId, action } = req.body; 
+        
         if (!bookingId || !action) {
             return res.json({ success: false, message: "Missing required fields" });
         }
 
-        const status = action === 'approve' ? 'cancelled' : 'approved';
-        await bookingModel.findByIdAndUpdate(bookingId, { status });
+        // Explicitly map actions to statuses
+        // 'approve' -> 'cancelled'
+        // 'reject' -> 'approved' (reverting it to its active state)
+        const newStatus = action === 'approve' ? 'cancelled' : 'approved';
         
-        res.json({ success: true, message: `Cancellation Request ${action === 'approve' ? 'Approved' : 'Rejected'}.` });
+        const booking = await bookingModel.findByIdAndUpdate(
+            bookingId, 
+            { status: newStatus }, 
+            { new: true }
+        );
+
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: `Cancellation request ${action === 'approve' ? 'approved' : 'rejected'}.` 
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

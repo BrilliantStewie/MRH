@@ -155,18 +155,24 @@ const MyBookings = () => {
   };
 
   const handleCancelBooking = async (bookingId, status) => {
+    // If approved, it's a request. If pending, it's automatic.
     const isApproved = status === 'approved';
-    const message = isApproved
-      ? "Since this booking is approved, canceling it will send a request to the admin. Proceed?"
+    const message = isApproved 
+      ? "Since this booking is already approved, canceling it will send a request to the admin for review. Proceed?"
       : "Are you sure you want to cancel this booking?";
 
     if (!window.confirm(message)) return;
 
-    const toastId = toast.loading("Processing cancellation...");
+    const toastId = toast.loading(isApproved ? "Sending cancellation request..." : "Canceling booking...");
     try {
       const { data } = await axios.post(backendUrl + '/api/user/cancel-booking', { bookingId }, { headers: { token } });
       if (data.success) {
-        toast.update(toastId, { render: data.message || "Cancellation request sent", type: "success", isLoading: false, autoClose: 2000 });
+        toast.update(toastId, { 
+          render: isApproved ? "Cancellation request sent to admin" : "Booking cancelled successfully", 
+          type: "success", 
+          isLoading: false, 
+          autoClose: 2000 
+        });
         fetchUserBookings();
       } else {
         toast.update(toastId, { render: data.message, type: "error", isLoading: false, autoClose: 3000 });
@@ -325,13 +331,19 @@ const MyBookings = () => {
               const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
               const isCash = booking.paymentMethod === "cash";
               const isApproved = booking.status === "approved";
+              const isCancellationPending = booking.status === "cancellation_pending";
               const hasPassed = new Date() > checkOutDate;
               const isGCashPending = booking.paymentMethod === "gcash" && booking.paymentStatus === "pending";
               
               const showPaymentButtons = isApproved && !isPaid && !hasPassed && !isGCashPending;
               const canRate = isApproved && (isPaid || isCash) && hasPassed && !booking.rating;
               const hasRated = booking.rating > 0;
-              const showCancelButton = !hasPassed && !booking.status.includes('cancelled') && !booking.status.includes('declined');
+
+              // Logic: Show cancel button if not passed, not already cancelled/declined, and not already pending admin review
+              const showCancelButton = !hasPassed && 
+                                       !booking.status.includes('cancelled') && 
+                                       !booking.status.includes('declined') && 
+                                       !isCancellationPending;
 
               const imageUrl = getImageUrl(mainRoom.cover_image || mainRoom.images || mainRoom.image);
 
@@ -502,8 +514,14 @@ const MyBookings = () => {
                               onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id, booking.status); }}
                               className="flex-1 md:flex-none px-4 py-2.5 text-rose-500 font-bold text-sm hover:bg-rose-50 rounded-xl transition-all"
                             >
-                              Cancel
+                              {isApproved ? 'Request Cancellation' : 'Cancel'}
                             </button>
+                          )}
+
+                          {isCancellationPending && (
+                            <span className="flex-1 md:flex-none px-4 py-2.5 text-orange-600 bg-orange-50 font-bold text-sm rounded-xl border border-orange-100 flex items-center gap-2">
+                              <Clock size={14} /> Cancellation Pending
+                            </span>
                           )}
                         </div>
                       </div>

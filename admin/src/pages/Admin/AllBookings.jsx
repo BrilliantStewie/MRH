@@ -3,8 +3,34 @@ import { AdminContext } from "../../context/AdminContext";
 import {
   Search, User, RotateCcw, CalendarDays, ArrowRight,
   Moon, Home, Layers, Phone, CheckCircle,
-  Package, Info, X, Clock, BarChart3, ChevronDown
+  Package, Info, X, Clock, BarChart3, ChevronDown, Trash2,
+  AlertCircle, CheckCircle2, XCircle, Banknote
 } from "lucide-react";
+
+// --- HELPER COMPONENT: Status Badge ---
+const StatusBadge = ({ status }) => {
+    let styles = "bg-slate-100 text-slate-500 border-slate-200";
+    let Icon = Clock;
+    const s = (status || "").toLowerCase();
+
+    if (["approved", "confirmed", "checked_in"].includes(s)) {
+        styles = "bg-emerald-50 text-emerald-700 border-emerald-100";
+        Icon = CheckCircle2;
+    } else if (s === 'pending' || s === 'cancellation_pending') {
+        styles = "bg-amber-50 text-amber-700 border-amber-100";
+        Icon = AlertCircle;
+    } else if (["cancelled", "declined"].includes(s)) {
+        styles = "bg-rose-50 text-rose-700 border-rose-100";
+        Icon = XCircle;
+    }
+
+    return (
+        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border ${styles} inline-flex items-center gap-1.5`}>
+            <Icon size={10} />
+            {status?.replace('_', ' ')}
+        </span>
+    );
+};
 
 // --- MODAL COMPONENT (High-End Details View) ---
 const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl }) => {
@@ -180,12 +206,10 @@ const AllBookings = () => {
     
     if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.room_ids?.some(r => r.building === buildingFilter));
     
-    // Updated Status Filter
     if (statusFilter !== "All Status") {
       filtered = filtered.filter(b => b.status?.toLowerCase() === statusFilter.toLowerCase());
     }
 
-    // Updated Room Type Filter
     if (roomTypeFilter !== "All Types") {
       filtered = filtered.filter(b => b.room_ids?.some(r => r.room_type?.toLowerCase() === roomTypeFilter.toLowerCase()));
     }
@@ -200,7 +224,6 @@ const AllBookings = () => {
     if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(b.check_in || b.date).getMonth() === months.indexOf(monthFilter));
     if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(b.check_in || b.date).getFullYear() === parseInt(yearFilter));
 
-    // Sort Logic
     filtered.sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt);
         const dateB = new Date(b.date || b.createdAt);
@@ -212,8 +235,8 @@ const AllBookings = () => {
 
   const stats = {
     total: bookings.length,
-    pending: bookings.filter(b => b.status === 'pending').length,
-    revenue: bookings.filter(b => b.paymentStatus === 'paid').reduce((acc, curr) => acc + (curr.total_price || 0), 0)
+    pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
+    revenue: bookings.filter(b => b.paymentStatus === 'paid' || b.payment === true).reduce((acc, curr) => acc + (curr.total_price || 0), 0)
   };
 
   return (
@@ -284,14 +307,13 @@ const AllBookings = () => {
           <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Bookings</p><p className="text-xl font-black text-slate-800">{stats.total}</p></div>
         </div>
         <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
-          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><BarChart3 size={20}/></div>
-          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Revenue</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
-        </div>
-        <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
           <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600"><Clock size={20}/></div>
           <div><p className="text-[10px] font-black text-slate-400 uppercase">Awaiting Action</p><p className="text-xl font-black text-slate-800">{stats.pending}</p></div>
         </div>
-        
+        <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><BarChart3 size={20}/></div>
+          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Revenue</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
+        </div>
       </div>
 
       {/* SEARCH AND FILTERS */}
@@ -343,9 +365,9 @@ const AllBookings = () => {
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Profile</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Booking Info</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stay Period</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Bill</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Billing & Payment</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -359,15 +381,11 @@ const AllBookings = () => {
                       </div>
                       <div>
                         <p className="text-sm font-black text-slate-800 leading-tight">{b.user_id?.firstName} {b.user_id?.lastName}</p>
-                        <p className="text-[11px] text-slate-400 font-medium">{b.user_id?.email}</p>
+                        <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="text-[10px] font-bold text-emerald-600 hover:underline flex items-center gap-1 mt-1">
+                          <Info size={10}/> Details
+                        </button>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="text-xs font-black text-slate-700">{b.bookingName || "Retreat Stay"}</p>
-                    <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="text-[10px] font-bold text-emerald-600 hover:underline flex items-center gap-1 mt-1">
-                      <Info size={10}/> Details ({b.room_ids?.length} units)
-                    </button>
                   </td>
                   <td className="px-6 py-5">
                     <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 bg-slate-100/50 px-2 py-1 rounded-lg w-fit">
@@ -376,19 +394,74 @@ const AllBookings = () => {
                   </td>
                   <td className="px-6 py-5">
                     <p className="text-sm font-black text-slate-800">₱{b.total_price?.toLocaleString()}</p>
-                    <p className={`text-[9px] font-bold uppercase ${b.paymentStatus === 'paid' ? 'text-emerald-500' : 'text-amber-500'}`}>{b.paymentStatus || 'pending'}</p>
+                    <div className={`flex items-center gap-1 text-[9px] font-bold uppercase mt-1 ${ (b.paymentStatus === 'paid' || b.payment === true) ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        {(b.paymentStatus === 'paid' || b.payment === true) ? <CheckCircle2 size={10}/> : <Clock size={10}/>}
+                        {(b.paymentStatus === 'paid' || b.payment === true) ? 'Paid' : 'Awaiting Payment'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <StatusBadge status={b.status} />
                   </td>
                   <td className="px-6 py-5 text-right">
                     <div className="flex items-center justify-end gap-2">
-                       {b.status === "pending" && (
-                         <button onClick={() => approveBooking(b._id)} className="p-2 bg-emerald-500 text-white rounded-lg shadow-lg hover:bg-emerald-600"><CheckCircle size={14}/></button>
-                       )}
-                       {b.status === "approved" && b.paymentStatus !== 'paid' && (
-                         <button onClick={() => paymentConfirmed(b._id)} className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shadow-lg">Confirm</button>
-                       )}
-                       {b.status === "cancellation_pending" && (
-                         <button onClick={() => approveCancellation(b._id, "approve")} className="px-3 py-1.5 bg-rose-600 text-white text-[10px] font-bold rounded-lg shadow-lg">Accept Cancel</button>
-                       )}
+                        {/* ACTION BUTTONS (Updated with case-insensitive check) */}
+                        {b.status?.toLowerCase() === "pending" && (
+                         <>
+                             <button 
+                                 onClick={() => approveBooking(b._id)} 
+                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all active:scale-95"
+                             >
+                                 <CheckCircle size={12}/> Approve
+                             </button>
+                             <button 
+                                 onClick={() => {
+                                     if(window.confirm("Are you sure you want to DECLINE this booking request?")) {
+                                         approveCancellation(b._id, "decline"); 
+                                     }
+                                 }} 
+                                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all"
+                             >
+                                 <X size={12}/> Decline
+                             </button>
+                         </>
+                        )}
+
+                        {/* PAYMENT BUTTON (Updated: Only show if user has selected a payment method) */}
+                        {b.status?.toLowerCase() === "approved" && 
+                         (b.paymentStatus !== 'paid' && b.payment !== true) && 
+                         (b.paymentMethod === 'cash' || b.paymentMethod === 'gcash') && (
+                          <button 
+                            onClick={() => paymentConfirmed(b._id)} 
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                          >
+                            <Banknote size={12}/> Confirm Payment
+                          </button>
+                        )}
+
+                        {/* CANCELLATION BUTTONS */}
+{b.status?.toLowerCase() === "cancellation_pending" && (
+  <div className="flex items-center gap-2">
+    {/* Approve button: Keeps your existing logic */}
+    <button 
+      onClick={() => approveCancellation(b._id, "approve")} 
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-rose-100 hover:bg-rose-700 transition-all active:scale-95"
+    >
+      <Trash2 size={12}/> Approve Cancel
+    </button>
+
+    {/* NEW Decline button: Returns the booking to its previous state */}
+    <button 
+      onClick={() => {
+        if(window.confirm("Are you sure you want to REJECT this cancellation request? The booking will remain active.")) {
+            approveCancellation(b._id, "reject"); 
+        }
+      }} 
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95"
+    >
+      <X size={12}/> Reject Cancel
+    </button>
+  </div>
+)}
                     </div>
                   </td>
                 </tr>

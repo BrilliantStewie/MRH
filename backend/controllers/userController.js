@@ -206,8 +206,27 @@ const getUserBookings = async (req, res) => {
 const cancelBooking = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
-        res.json({ success: true, message: "Booking Cancelled" });
+        
+        // Find the booking first to check its current status
+        const booking = await bookingModel.findById(bookingId);
+
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
+        }
+
+        // Determine the new status based on current progress
+        // If it's already approved OR already paid, it requires admin approval to cancel
+        const isApproved = booking.status === 'approved';
+        const isPaid = booking.payment === true || booking.paymentStatus === 'paid';
+
+        if (isApproved || isPaid) {
+            await bookingModel.findByIdAndUpdate(bookingId, { status: "cancellation_pending" });
+            res.json({ success: true, message: "Cancellation request sent for approval" });
+        } else {
+            // If it's still pending and unpaid, cancel it immediately
+            await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
+            res.json({ success: true, message: "Booking Cancelled" });
+        }
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -296,10 +315,6 @@ const confirmCashPayment = async (req, res) => {
 
 // --- REVIEWS & CHAT LOGIC ---
 
-/**
- * Handles the "Private" review stored in the booking.
- * Note: Public reviews are handled in reviewController.js
- */
 const rateBooking = async (req, res) => {
     try {
         const { bookingId, rating, review } = req.body;
@@ -320,12 +335,13 @@ const rateBooking = async (req, res) => {
                 }
             }
         });
-        res.json({ success: true, message: "Rating updated in booking record." });
+        res.json({ success: true, message: "Thank you for your feedback!" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
 };
 
+// ✅ NEW: Logic to add a follow-up reply
 const addReviewChat = async (req, res) => {
     try {
         const { bookingId, message } = req.body;
@@ -351,6 +367,7 @@ const addReviewChat = async (req, res) => {
     }
 };
 
+// ✅ NEW: Logic to delete a guest's own reply
 const deleteReviewReply = async (req, res) => {
     try {
         const { bookingId, chatId } = req.body;
@@ -371,9 +388,26 @@ const deleteReviewReply = async (req, res) => {
     }
 };
 
+const getAllPublicReviews = async (req, res) => {
+    try {
+        const reviews = await bookingModel.find({ 
+            rating: { $gt: 0 },
+            review: { $ne: "" } 
+        })
+        .populate("user_id", "firstName lastName image")
+        .populate("room_ids", "name")
+        .sort({ createdAt: -1 });
+
+        res.json({ success: true, reviews });
+    } catch (error) {
+        console.error(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
 export {
     registerUser, loginUser, googleAuth, getUserData, updateUserProfile,
     getUserBookings, createBooking, cancelBooking,
     createCheckoutSession, verifyPayment, markCashPayment, confirmCashPayment, 
-    rateBooking, addReviewChat, deleteReviewReply
+    rateBooking, addReviewChat, deleteReviewReply, getAllPublicReviews
 };

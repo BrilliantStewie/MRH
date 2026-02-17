@@ -328,23 +328,24 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
-  const approveCancellation = async (bookingId) => {
+  const approveCancellation = async (bookingId, action = "approve") => {
     try {
-      const { data } = await axios.post(
-        `${backendUrl}/api/admin/approve-cancellation`,
-        { bookingId },
-        { headers: { token: aToken } }
-      );
-      if (data.success) {
-        toast.success(data.message);
-        getAllBookings();
-      } else {
-        toast.error(data.message);
-      }
+        const { data } = await axios.post(
+            `${backendUrl}/api/admin/resolve-cancellation`, 
+            { bookingId, action }, // Sends "approve" or "reject"
+            { headers: { token: aToken } }
+        );
+
+        if (data.success) {
+            toast.success(data.message);
+            getAllBookings(); // Refresh the list
+        } else {
+            toast.error(data.message);
+        }
     } catch (error) {
-      toast.error(error.message);
+        toast.error(error.message);
     }
-  };
+};
 
   // ============================================================
   // 📦 PACKAGES MANAGEMENT
