@@ -406,34 +406,6 @@ const MyBookings = () => {
                             ID: {booking._id.slice(-6).toUpperCase()}
                           </div>
                         </div>
-
-                        {/* STAFF REPLY DISPLAY */}
-                        {booking.adminReply && (
-                          <div className="w-full mt-2 mb-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 flex gap-3 animate-in slide-in-from-left-2 duration-300">
-                             <CornerDownRight className="text-indigo-300 mt-1 shrink-0" size={16} />
-                             <div>
-                               <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">Response from Staff</p>
-                               <p className="text-sm text-indigo-900 italic font-medium">"{booking.adminReply}"</p>
-                             </div>
-                          </div>
-                        )}
-
-                        {/* USER REVIEW DISPLAY SECTION */}
-                        {hasRated && booking.review && (
-                          <div className="w-full mt-2 mb-4 bg-slate-50 p-4 rounded-2xl border border-slate-100 animate-in fade-in duration-500">
-                             <div className="flex items-center gap-2 mb-2">
-                                <div className="flex text-amber-400">
-                                   {[...Array(5)].map((_, i) => (
-                                     <Star key={i} size={12} fill={i < booking.rating ? "currentColor" : "none"} strokeWidth={i < booking.rating ? 0 : 2} />
-                                   ))}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Your Experience</span>
-                             </div>
-                             <p className="text-sm text-slate-600 italic font-light leading-relaxed">
-                                "{booking.review}"
-                             </p>
-                          </div>
-                        )}
                       </div>
 
                       {/* FOOTER: Price & Actions */}

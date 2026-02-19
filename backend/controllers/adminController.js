@@ -390,11 +390,11 @@ const deleteRoom = async (req, res) => {
 
 const allBookings = async (req, res) => {
     try {
-        // ✅ UPDATED: Now populating 'package_id' so admin can see package info
         const bookings = await bookingModel.find({})
-            .populate('user_id', 'firstName middleName lastName suffix email image') 
+            // 👇 ADD 'phone' TO THIS LIST 👇
+            .populate('user_id', 'firstName middleName lastName suffix email image phone') 
             .populate('room_ids')
-            .populate('package_id') // <--- NEW POPULATE
+            .populate('package_id')
             .sort({ date: -1 });
 
         res.json({ success: true, bookings });

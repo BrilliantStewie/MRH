@@ -7,16 +7,20 @@ import Booking from "../models/bookingModel.js";
  */
 export const getAllReviews = async (req, res, next) => {
   try {
-    const reviews = await Review.find({ isHidden: false }) // Only show visible reviews
+    const reviews = await Review.find({ isHidden: false })
       .populate("userId", "firstName lastName image")
       .populate({
         path: "bookingId",
-        select: "check_in check_out",
-        populate: { path: "room_ids", select: "name" }, // Populates room names for the feed
+        select: "check_in check_out bookingName room_ids",
+        populate: { path: "room_ids", select: "name" },
       })
       .sort({ createdAt: -1 });
 
-    res.status(200).json(reviews);
+    res.status(200).json({
+      success: true,
+      reviews
+    });
+
   } catch (err) {
     next(err);
   }

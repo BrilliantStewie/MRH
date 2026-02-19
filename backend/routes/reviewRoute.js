@@ -5,7 +5,7 @@ import authUser from "../middlewares/authUser.js"; // Use your existing auth mid
 const reviewRouter = express.Router();
 
 // This allows: axios.get('/api/reviews')
-reviewRouter.get("/", getAllReviews);
+reviewRouter.get("/all-reviews", getAllReviews);
 
 // This allows: axios.post('/api/reviews') 
 // Note: We use "/" because the prefix in server.js is likely "/api/reviews"

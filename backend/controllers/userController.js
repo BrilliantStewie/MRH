@@ -196,7 +196,10 @@ const createBooking = async (req, res) => {
 const getUserBookings = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const bookings = await bookingModel.find({ user_id: userId }).populate("room_ids").sort({ createdAt: -1 });
+        const bookings = await bookingModel.find({ user_id: userId })
+            .populate("room_ids")
+            .populate("package_id", "name") // 👈 ADD THIS: To support the package name fallback
+            .sort({ createdAt: -1 });
         res.json({ success: true, bookings });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -391,16 +394,15 @@ const deleteReviewReply = async (req, res) => {
 const getAllPublicReviews = async (req, res) => {
     try {
         const reviews = await bookingModel.find({ 
-            rating: { $gt: 0 },
-            review: { $ne: "" } 
+            rating: { $gt: 0 } // Removed the empty text check
         })
         .populate("user_id", "firstName lastName image")
         .populate("room_ids", "name")
+        .populate("package_id", "name") 
         .sort({ createdAt: -1 });
 
         res.json({ success: true, reviews });
     } catch (error) {
-        console.error(error);
         res.json({ success: false, message: error.message });
     }
 };
