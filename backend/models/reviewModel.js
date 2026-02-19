@@ -1,55 +1,70 @@
 import mongoose from "mongoose";
 
-const reviewSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-    required: true
-  },
-  bookingId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Booking"
-  },
-  rating: {
-    type: Number,
-    required: true,
-    min: 1,
-    max: 5
-  },
-  comment: {
-    type: String,
-    required: true,
-    trim: true
-  },
-
-  reviewChat: [
-    {
-      senderId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        
-      },
-      senderRole: {
-        type: String,
-        enum: ["admin", "guest"],
-        required: true
-      },
-      message: {
-        type: String,
-        required: true
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now
-      }
+const reviewChatSchema = new mongoose.Schema(
+  {
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+    senderRole: {
+      type: String,
+      enum: ["admin", "staff", "guest"],
+      required: true
+    },
+    message: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    isEdited: {
+      type: Boolean,
+      default: false
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
     }
-  ],
+  },
+  { _id: true }
+);
 
-  isHidden: {
-    type: Boolean,
-    default: false
-  }
+const reviewSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
 
-}, { timestamps: true });
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Booking"
+    },
 
-export default mongoose.models.Review || mongoose.model("Review", reviewSchema);
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+
+    comment: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    reviewChat: [reviewChatSchema],
+
+    isHidden: {
+      type: Boolean,
+      default: false
+    }
+  },
+  { timestamps: true }
+);
+
+const Review = mongoose.model("Review", reviewSchema);
+
+export default Review;

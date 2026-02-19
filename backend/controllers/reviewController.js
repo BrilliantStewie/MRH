@@ -95,7 +95,7 @@ export const replyToReview = async (req, res, next) => {
     const { reviewId } = req.params;
 
     const userId = req.userId;
-    const role = req.userRole; // must be set in auth middleware
+    const role = req.userRole;
 
     if (!response || response.trim() === "") {
       return res.status(400).json({
@@ -112,20 +112,17 @@ export const replyToReview = async (req, res, next) => {
       });
     }
 
-    // 🔐 Security: Only admin OR review owner can reply
-    if (
-      role !== "admin" &&
-      review.userId.toString() !== userId.toString()
-    ) {
+    // 🔐 SECURITY
+    if (role === "guest" && review.userId.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Unauthorized reply."
+        message: "You can only reply to your own review."
       });
     }
 
     review.reviewChat.push({
       senderId: userId,
-      senderRole: role === "admin" ? "admin" : "guest",
+      senderRole: role, // admin | staff | guest
       message: response
     });
 
@@ -150,39 +147,57 @@ export const editReply = async (req, res) => {
   try {
     const { reviewId, replyId } = req.params;
     const { message } = req.body;
+
     const userId = req.userId;
     const role = req.userRole;
 
     const review = await Review.findById(reviewId);
     if (!review) {
-      return res.status(404).json({ message: "Review not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Review not found."
+      });
     }
 
     const reply = review.reviewChat.id(replyId);
     if (!reply) {
-      return res.status(404).json({ message: "Reply not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Reply not found."
+      });
     }
 
-    // Only admin or original sender can edit
+    // 🔐 Permission check
     if (
       role !== "admin" &&
+      role !== "staff" &&
       reply.senderId.toString() !== userId.toString()
     ) {
-      return res.status(403).json({ message: "Unauthorized edit." });
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized edit."
+      });
     }
 
     reply.message = message;
+    reply.isEdited = true;
+
     await review.save();
 
-    res.json({
+    return res.status(200).json({
       success: true,
       message: "Reply updated successfully."
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Edit Reply Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while editing reply."
+    });
   }
 };
+
 
 
 /* ============================================================
@@ -191,29 +206,35 @@ export const editReply = async (req, res) => {
 export const deleteReply = async (req, res) => {
   try {
     const { reviewId, replyId } = req.params;
+
     const userId = req.userId;
     const role = req.userRole;
 
     const review = await Review.findById(reviewId);
     if (!review) {
-      return res.status(404).json({ message: "Review not found." });
+      return res.status(404).json({ success: false, message: "Review not found." });
     }
 
     const reply = review.reviewChat.id(replyId);
     if (!reply) {
-      return res.status(404).json({ message: "Reply not found." });
+      return res.status(404).json({ success: false, message: "Reply not found." });
     }
 
-    // Only admin or original sender can delete
+    // ✅ Admin OR Staff OR Original Sender
     if (
       role !== "admin" &&
+      role !== "staff" &&
       reply.senderId.toString() !== userId.toString()
     ) {
-      return res.status(403).json({ message: "Unauthorized delete." });
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized delete."
+      });
     }
 
-    reply.remove();
-    await review.save();
+    review.reviewChat.pull(replyId);
+await review.save();
+
 
     res.json({
       success: true,
@@ -221,7 +242,7 @@ export const deleteReply = async (req, res) => {
     });
 
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

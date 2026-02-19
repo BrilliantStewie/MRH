@@ -11,11 +11,9 @@ const StaffContextProvider = ({ children }) => {
     localStorage.getItem("sToken") || null
   );
 
-  // =====================================================
-  // 🛡️ AUTOMATIC LOGOUT INTERCEPTOR
-  // =====================================================
-  // This watches for 401 errors (Unauthorized) which are sent 
-  // by the middleware when a password version mismatch is detected.
+  /* =====================================================
+     🛡️ AUTO LOGOUT INTERCEPTOR
+  ===================================================== */
   useEffect(() => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
@@ -23,13 +21,14 @@ const StaffContextProvider = ({ children }) => {
         if (error.response && error.response.status === 401) {
           localStorage.removeItem("sToken");
           setSToken(null);
-          toast.error(error.response.data.message || "Session expired. Please login again.");
+          toast.error(
+            error.response.data.message || "Session expired. Please login again."
+          );
         }
         return Promise.reject(error);
       }
     );
 
-    // Eject interceptor on unmount to prevent memory leaks
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
 
@@ -53,15 +52,97 @@ const StaffContextProvider = ({ children }) => {
         return data;
       }
     } catch (error) {
-      const errorMessage = error.response?.data?.message || "Login failed";
-      
-      if (errorMessage.toLowerCase().includes("disabled") || errorMessage.toLowerCase().includes("frozen")) {
-         return { success: false, message: errorMessage };
-      }
-
+      const errorMessage =
+        error.response?.data?.message || "Login failed";
       toast.error(errorMessage);
       return { success: false, message: errorMessage };
     }
+  };
+
+  /* =====================================================
+     FETCH ALL REVIEWS
+  ===================================================== */
+  const fetchReviews = async () => {
+    try {
+      const { data } = await axios.get(
+        `${backendUrl}/api/reviews/all-reviews`,
+        {
+          headers: { token: sToken }
+        }
+      );
+
+      if (data.success) {
+        return data.reviews;
+      }
+    } catch (error) {
+      toast.error("Failed to load reviews");
+      return [];
+    }
+  };
+
+  /* =====================================================
+     STAFF REPLY TO REVIEW
+  ===================================================== */
+  const postReviewReply = async (reviewId, message) => {
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/reviews/reply/${reviewId}`,
+        { response: message },
+        { headers: { token: sToken } }
+      );
+
+      if (data.success) {
+        toast.success("Reply added");
+        return true;
+      }
+    } catch (error) {
+      toast.error("Failed to reply");
+    }
+
+    return false;
+  };
+
+  /* =====================================================
+     EDIT REPLY
+  ===================================================== */
+  const editReviewReply = async (reviewId, replyId, message) => {
+    try {
+      const { data } = await axios.put(
+        `${backendUrl}/api/reviews/reply/${reviewId}/${replyId}`,
+        { message },
+        { headers: { token: sToken } }
+      );
+
+      if (data.success) {
+        toast.success("Reply updated");
+        return true;
+      }
+    } catch (error) {
+      toast.error("Failed to update reply");
+    }
+
+    return false;
+  };
+
+  /* =====================================================
+     DELETE REPLY
+  ===================================================== */
+  const deleteReviewReply = async (reviewId, replyId) => {
+    try {
+      const { data } = await axios.delete(
+        `${backendUrl}/api/reviews/reply/${reviewId}/${replyId}`,
+        { headers: { token: sToken } }
+      );
+
+      if (data.success) {
+        toast.success("Reply deleted");
+        return true;
+      }
+    } catch (error) {
+      toast.error("Failed to delete reply");
+    }
+
+    return false;
   };
 
   /* =====================================================
@@ -80,7 +161,11 @@ const StaffContextProvider = ({ children }) => {
         setSToken,
         staffLogin,
         staffLogout,
-        backendUrl
+        backendUrl,
+        fetchReviews,
+        postReviewReply,
+        editReviewReply,
+        deleteReviewReply
       }}
     >
       {children}

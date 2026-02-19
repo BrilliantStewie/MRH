@@ -7,20 +7,20 @@ import "react-toastify/dist/ReactToastify.css";
 import { AdminContext } from "./context/AdminContext";
 import { StaffContext } from "./context/StaffContext";
 
-// Admin Components - Matches folder "Admin"
+// Admin Components
 import Sidebar from "./components/Admin/Sidebar";
 import Navbar from "./components/Admin/Navbar";
 
-// Staff Components - Matches folder "Staff"
+// Staff Components
 import StaffNavbar from "./components/Staff/StaffNavbar";
 import StaffSidebar from "./components/Staff/StaffSidebar";
 
 // Pages
 import Login from "./pages/Login";
-// UPDATED: Matches the new page component name
-import AdminReviews from "./pages/Admin/AdminReviews"; 
+import AdminReviews from "./pages/Admin/AdminReviews";
+import StaffReviews from "./pages/Staff/StaffReviews";
 
-// Admin Pages - Matches folder "pages/Admin"
+// Admin Pages
 import Dashboard from "./pages/Admin/Dashboard";
 import RoomsList from "./pages/Admin/RoomsList";
 import AllBookings from "./pages/Admin/AllBookings";
@@ -29,7 +29,7 @@ import StaffList from "./pages/Admin/StaffList";
 import Packages from "./pages/Admin/Packages";
 import Analytics from "./pages/Admin/Analytics";
 
-// Staff Pages - Matches folder "pages/Staff"
+// Staff Pages
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
@@ -64,8 +64,7 @@ const App = () => {
                   <Route path="/admin-users" element={<Users />} />
                   <Route path="/admin-staff-list" element={<StaffList />} />
                   <Route path="/admin-packages" element={<Packages />} />
-                  {/* UPDATED: Matches the Sidebar to link */}
-                  <Route path="/admin-reviews" element={<AdminReviews />} /> 
+                  <Route path="/admin-reviews" element={<AdminReviews />} />
                   <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
                 </Routes>
               </div>
@@ -109,9 +108,16 @@ const App = () => {
                       </StaffProtectedRoute>
                     }
                   />
-                  
-                  {/* UPDATED: Path to remain consistent */}
-                  <Route path="/admin-reviews" element={<AdminReviews />} />
+
+                  {/* ✅ STAFF REVIEWS ROUTE */}
+                  <Route
+                    path="/staff-reviews"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffReviews />
+                      </StaffProtectedRoute>
+                    }
+                  />
 
                   <Route
                     path="*"
@@ -123,12 +129,10 @@ const App = () => {
           </div>
         </>
       ) : (
-        /* ================= LOGIN & PUBLIC ================= */
+        /* ================= LOGIN ================= */
         <div className="flex-1 flex items-center justify-center bg-slate-100">
           <Routes>
             <Route path="/" element={<Login />} />
-            {/* UPDATED: Path to remain consistent */}
-            <Route path="/admin-reviews" element={<AdminReviews />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
