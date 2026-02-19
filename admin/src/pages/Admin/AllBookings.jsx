@@ -68,7 +68,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
       <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
         
         {/* Header - X Button Removed */}
-        <div className="relative h-28 bg-gradient-to-r from-emerald-600 to-teal-700 p-6 flex items-end">
+        <div className="relative h-28 bg-gradient-to-r from-slate-900 to-black p-6 flex items-end">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
               <Package size={28} />
@@ -112,14 +112,14 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
           {/* Stay Period */}
           <div className="space-y-3">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stay Period</h3>
-            <div className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+            <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
               <div className="text-center">
-                <p className="text-[9px] font-bold text-emerald-600 uppercase">Check-In</p>
+                <p className="text-[9px] font-bold text-blue-600 uppercase">Check-In</p>
                 <p className="text-xs font-black text-slate-700">{formatDate(booking.check_in || booking.date)}</p>
               </div>
-              <ArrowRight size={14} className="text-emerald-300" />
+              <ArrowRight size={14} className="text-blue-300" />
               <div className="text-center">
-                <p className="text-[9px] font-bold text-emerald-600 uppercase">Check-Out</p>
+                <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
                 <p className="text-xs font-black text-slate-700">{formatDate(booking.check_out || booking.checkOutDate)}</p>
               </div>
             </div>
@@ -157,7 +157,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                         <p className="text-[9px] text-slate-400 font-bold uppercase">{room.building}</p>
                       </div>
                       <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[9px] text-slate-500 font-medium italic">{room.room_type}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{room.room_type}</p>
                         <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.capacity}</p>
                       </div>
                     </div>
