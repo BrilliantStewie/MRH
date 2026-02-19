@@ -8,7 +8,8 @@ import {
   Package,
   Users,
   User,
-  TrendingUp, // Added for Analytics
+  TrendingUp,
+  MessageSquare // Added for Reviews
 } from "lucide-react";
 
 const Sidebar = () => {
@@ -16,15 +17,16 @@ const Sidebar = () => {
   if (!aToken) return null;
 
   const linkClass = ({ isActive }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium ${
+    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
       isActive
-        ? "bg-blue-50 text-blue-700"
+        ? "bg-blue-50 text-blue-700 shadow-sm"
         : "text-slate-600 hover:bg-slate-100"
     }`;
 
   return (
-    <aside className="w-64 bg-white border-r min-h-screen p-4">
-      <p className="text-xs font-bold text-slate-400 uppercase mb-2">
+    <aside className="w-64 bg-white border-r min-h-screen p-4 flex flex-col gap-1">
+      {/* OVERVIEW SECTION */}
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-2 mb-2">
         Overview
       </p>
 
@@ -33,7 +35,6 @@ const Sidebar = () => {
         Dashboard
       </NavLink>
 
-      {/* New Analytics Link */}
       <NavLink to="/admin-analytics" className={linkClass}>
         <TrendingUp size={18} />
         Analytics
@@ -44,7 +45,8 @@ const Sidebar = () => {
         Bookings
       </NavLink>
 
-      <p className="text-xs font-bold text-slate-400 uppercase mt-6 mb-2">
+      {/* MANAGEMENT SECTION */}
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
         Management
       </p>
 
@@ -58,7 +60,13 @@ const Sidebar = () => {
         Packages
       </NavLink>
 
-      <p className="text-xs font-bold text-slate-400 uppercase mt-6 mb-2">
+      <NavLink to="/admin-reviews" className={linkClass}>
+        <MessageSquare size={18} />
+        Guest Reviews
+      </NavLink>
+
+      {/* PEOPLE SECTION */}
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
         People
       </p>
 

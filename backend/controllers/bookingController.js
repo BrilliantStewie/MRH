@@ -16,7 +16,6 @@ const normalizeDate = (date) => {
 export const createBooking = async (req, res) => {
   try {
     const userId = req.userId;
-    // 👇 UPDATED: Added bookingName, package_id, and package_details
     const {
       bookingName,
       room_ids = [],
@@ -53,13 +52,13 @@ export const createBooking = async (req, res) => {
 
     const booking = await bookingModel.create({
       user_id: userId,
-      bookingName,      // <--- Saved here
+      bookingName,
       room_ids,
       check_in: start,
       check_out: end,
       participants,
-      package_id,       // <--- Saved here
-      package_details,  // <--- Saved here
+      package_id,
+      package_details,
       total_price,
       status: "pending",
       payment: false,
@@ -238,7 +237,6 @@ export const rateBooking = async (req, res) => {
     const { bookingId, rating, review } = req.body;
     const name = req.userName || "Guest"; 
 
-    // ✅ FIXED: Creates history entry without overwriting previous data
     const initialMessage = {
       senderRole: "guest",
       senderName: name,
@@ -269,9 +267,10 @@ export const rateBooking = async (req, res) => {
 =================================================================== */
 export const addReviewChat = async (req, res) => {
   try {
+    // Corrected to use the ID sent from the frontend
     const { bookingId, message } = req.body;
     
-    // ✅ FIXED: Using role and name from authStaff middleware correctly
+    // Uses role and name provided by your auth middleware
     const role = req.role || "staff"; 
     const name = req.userName || "Staff"; 
 
@@ -286,7 +285,7 @@ export const addReviewChat = async (req, res) => {
       createdAt: new Date()
     };
 
-    // ✅ FIXED: Using $push to preserve message history array
+    // Correctly finds the booking and pushes the new message to history
     const booking = await bookingModel.findByIdAndUpdate(
       bookingId,
       { $push: { reviewChat: newMessage } },

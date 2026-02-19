@@ -1,14 +1,24 @@
 import express from "express";
-import { createReview, getAllReviews } from "../controllers/reviewController.js";
-import authUser from "../middlewares/authUser.js"; // Use your existing auth middleware
+import {
+  createReview,
+  getAllReviews,
+  replyToReview,
+  editReply,
+  deleteReply
+} from "../controllers/reviewController.js";
+
+import authUser from "../middlewares/authUser.js";
 
 const reviewRouter = express.Router();
 
-// This allows: axios.get('/api/reviews')
 reviewRouter.get("/all-reviews", getAllReviews);
 
-// This allows: axios.post('/api/reviews') 
-// Note: We use "/" because the prefix in server.js is likely "/api/reviews"
 reviewRouter.post("/", authUser, createReview);
+
+reviewRouter.post("/reply/:reviewId", authUser, replyToReview);
+
+reviewRouter.put("/reply/:reviewId/:replyId", authUser, editReply);
+
+reviewRouter.delete("/reply/:reviewId/:replyId", authUser, deleteReply);
 
 export default reviewRouter;

@@ -17,8 +17,8 @@ import StaffSidebar from "./components/Staff/StaffSidebar";
 
 // Pages
 import Login from "./pages/Login";
-// CHANGED: Match actual filename "Reviews.jsx" instead of "AllReviews"
-import AllReviews from "./pages/Reviews"; 
+// UPDATED: Matches the new page component name
+import AdminReviews from "./pages/Admin/AdminReviews"; 
 
 // Admin Pages - Matches folder "pages/Admin"
 import Dashboard from "./pages/Admin/Dashboard";
@@ -64,7 +64,8 @@ const App = () => {
                   <Route path="/admin-users" element={<Users />} />
                   <Route path="/admin-staff-list" element={<StaffList />} />
                   <Route path="/admin-packages" element={<Packages />} />
-                  <Route path="/all-reviews" element={<AllReviews />} /> 
+                  {/* UPDATED: Matches the Sidebar to link */}
+                  <Route path="/admin-reviews" element={<AdminReviews />} /> 
                   <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
                 </Routes>
               </div>
@@ -109,7 +110,8 @@ const App = () => {
                     }
                   />
                   
-                  <Route path="/all-reviews" element={<AllReviews />} />
+                  {/* UPDATED: Path to remain consistent */}
+                  <Route path="/admin-reviews" element={<AdminReviews />} />
 
                   <Route
                     path="*"
@@ -125,7 +127,8 @@ const App = () => {
         <div className="flex-1 flex items-center justify-center bg-slate-100">
           <Routes>
             <Route path="/" element={<Login />} />
-            <Route path="/all-reviews" element={<AllReviews />} />
+            {/* UPDATED: Path to remain consistent */}
+            <Route path="/admin-reviews" element={<AdminReviews />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

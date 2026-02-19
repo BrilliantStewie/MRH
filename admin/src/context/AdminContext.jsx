@@ -6,7 +6,13 @@ export const AdminContext = createContext();
 
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
+const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
+
+// 🔥 NEW
+const authHeader = {
+  headers: { token: aToken }
+};
+
 
   // ============================================================
   // 📊 STATE MANAGEMENT
@@ -55,9 +61,11 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   const getDashboardData = async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/admin/dashboard`, {
-        headers: { token: aToken },
-      });
+      const { data } = await axios.get(
+  `${backendUrl}/api/admin/dashboard`,
+  authHeader
+);
+
       if (data.success) {
         setDashboardData(data.dashData);
       } else {
@@ -75,9 +83,8 @@ const AdminContextProvider = ({ children }) => {
   // Fetches Guests/Users
   const getAllUsers = async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/admin/users`, {
-        headers: { token: aToken },
-      });
+      const { data } = await axios.get(`${backendUrl}/api/admin/users`, authHeader);
+
       if (data.success) {
         setAllUsers(data.users);
       } else {
@@ -91,9 +98,8 @@ const AdminContextProvider = ({ children }) => {
   // ✅ FIXED: Fetches from the correct users endpoint and filters for staff
   const getAllStaff = async () => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/admin/users`, {
-        headers: { token: aToken },
-      });
+      const { data } = await axios.get(`${backendUrl}/api/admin/users`, authHeader);
+
       if (data.success) {
         // Filter by role to ensure only staff members are stored in allStaff state
         const staffOnly = data.users.filter(user => user.role === "staff" || user.role === "admin");
@@ -110,10 +116,11 @@ const AdminContextProvider = ({ children }) => {
   const changeUserStatus = async (userId, status) => {
     try {
       const { data } = await axios.post(
-        `${backendUrl}/api/admin/change-user-status`,
-        { userId, status },
-        { headers: { token: aToken } }
-      );
+  `${backendUrl}/api/admin/change-user-status`,
+  { userId, status },
+  authHeader
+);
+
       if (data.success) {
         toast.success(data.message);
         getAllUsers(); 
@@ -129,10 +136,11 @@ const AdminContextProvider = ({ children }) => {
   const createStaff = async (formData) => {
     try {
       const { data } = await axios.post(
-        `${backendUrl}/api/admin/create-staff`,
-        formData,
-        { headers: { token: aToken } }
-      );
+  `${backendUrl}/api/admin/create-staff`,
+  formData,
+  authHeader
+);
+
 
       if (data.success) {
         toast.success(data.message);
@@ -154,8 +162,8 @@ const AdminContextProvider = ({ children }) => {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/update-staff`,
         formData,
-        { headers: { token: aToken } }
-      );
+  authHeader
+);
 
       if (data.success) {
         toast.success(data.message);
@@ -386,6 +394,44 @@ const AdminContextProvider = ({ children }) => {
   };
 
   // ============================================================
+  // 💬 REVIEWS MANAGEMENT
+  // ============================================================
+  const [allReviews, setAllReviews] = useState([]);
+
+  const getAllReviews = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/reviews/all-reviews`);
+      if (data.success) {
+        setAllReviews(data.reviews);
+      }
+    } catch (error) {
+      toast.error("Failed to fetch reviews");
+    }
+  };
+
+  const postReviewReply = async (reviewId, message) => {
+  try {
+    const { data } = await axios.post(
+      `${backendUrl}/api/reviews/reply/${reviewId}`,
+      { response: message },
+      { headers: { token: aToken } }
+    );
+
+    if (data.success) {
+      toast.success("Reply posted successfully");
+      return true;
+    } else {
+      toast.error(data.message);
+      return false;
+    }
+  } catch (error) {
+    toast.error(error.response?.data?.message || error.message);
+    return false;
+  }
+};
+
+
+  // ============================================================
   // 📤 EXPORT CONTEXT VALUE
   // ============================================================
   const value = {
@@ -431,7 +477,12 @@ const AdminContextProvider = ({ children }) => {
     // Packages
     allPackages,
     getAllPackages,
-    deletePackage
+    deletePackage,
+
+    // Reviews
+    allReviews,
+    getAllReviews,
+    postReviewReply
   };
 
   return (

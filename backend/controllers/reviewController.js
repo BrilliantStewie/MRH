@@ -1,10 +1,9 @@
 import Review from "../models/reviewModel.js";
 import Booking from "../models/bookingModel.js";
 
-/**
- * 1. GET ALL REVIEWS
- * Fetches all public reviews with full details for the AllReviews.jsx feed.
- */
+/* ============================================================
+   1️⃣ GET ALL REVIEWS (Public)
+============================================================ */
 export const getAllReviews = async (req, res, next) => {
   try {
     const reviews = await Review.find({ isHidden: false })
@@ -12,7 +11,7 @@ export const getAllReviews = async (req, res, next) => {
       .populate({
         path: "bookingId",
         select: "check_in check_out bookingName room_ids",
-        populate: { path: "room_ids", select: "name" },
+        populate: { path: "room_ids", select: "name" }
       })
       .sort({ createdAt: -1 });
 
@@ -26,112 +25,230 @@ export const getAllReviews = async (req, res, next) => {
   }
 };
 
-/**
- * 2. CREATE OR UPDATE REVIEW
- * Uses findOneAndUpdate to handle both initial submissions and future edits.
- */
 
+/* ============================================================
+   2️⃣ CREATE OR UPDATE REVIEW (Guest Only)
+============================================================ */
 export const createReview = async (req, res, next) => {
   const { bookingId, rating, comment } = req.body;
-
-  // Bridge the gap between authUser (req.userId) and verifyUser (req.user.id)
-  const userId = req.userId || (req.user ? req.user.id : null);
+  const userId = req.userId;
 
   if (!userId) {
-    return res.status(401).json({ success: false, message: "Unauthorized. Please login." });
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized. Please login."
+    });
   }
 
   try {
-    // 1. Validate Booking ownership
+    // Validate booking exists
     const booking = await Booking.findById(bookingId);
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found!" });
-    }
-
-    if (booking.user_id.toString() !== userId.toString()) {
-      return res.status(403).json({
+      return res.status(404).json({
         success: false,
-        message: "Security Alert: You can only review your own stays.",
+        message: "Booking not found."
       });
     }
 
-    // 2. UPSERT LOGIC: Update existing or Create new
-    // This allows the "Edit Review" button in the frontend to work correctly.
+    // Validate ownership
+    if (booking.user_id.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only review your own stay."
+      });
+    }
+
     const savedReview = await Review.findOneAndUpdate(
-      { bookingId: bookingId }, 
+      { bookingId },
       {
         userId,
         rating: Number(rating),
         comment,
-        isHidden: false, // Reset visibility to visible if they update/fix their review
+        isHidden: false
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // 3. Sync the Booking record automatically (Backend Sync)
-    // Marks the booking as rated and saves the review text for internal tracking/chat
     await Booking.findByIdAndUpdate(bookingId, {
       rating: Number(rating),
-      review: comment,
+      review: comment
     });
 
     res.status(200).json({
       success: true,
       message: "Review saved successfully",
-      data: savedReview,
+      data: savedReview
     });
+
   } catch (err) {
     next(err);
   }
 };
 
-/**
- * 3. ADMIN REPLY
- * Allows admins to respond to public reviews.
- */
+
+/* ============================================================
+   3️⃣ ADD REPLY (Admin + Guest)
+============================================================ */
 export const replyToReview = async (req, res, next) => {
   try {
     const { response } = req.body;
     const { reviewId } = req.params;
 
-    if (!response) {
-      return res.status(400).json({ success: false, message: "Response content cannot be empty." });
+    const userId = req.userId;
+    const role = req.userRole; // must be set in auth middleware
+
+    if (!response || response.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Reply cannot be empty."
+      });
     }
 
-    const updatedReview = await Review.findByIdAndUpdate(
-      reviewId,
-      { response: response },
-      { new: true }
-    ).populate("userId", "firstName lastName");
-
-    if (!updatedReview) {
-      return res.status(404).json({ success: false, message: "Review not found." });
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found."
+      });
     }
 
-    res.status(200).json({ success: true, message: "Reply posted", data: updatedReview });
+    // 🔐 Security: Only admin OR review owner can reply
+    if (
+      role !== "admin" &&
+      review.userId.toString() !== userId.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized reply."
+      });
+    }
+
+    review.reviewChat.push({
+      senderId: userId,
+      senderRole: role === "admin" ? "admin" : "guest",
+      message: response
+    });
+
+    await review.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Reply added successfully",
+      data: review
+    });
+
   } catch (err) {
     next(err);
   }
 };
 
-/**
- * 4. TOGGLE VISIBILITY
- * Allows admins to hide/show reviews from the public feed.
- */
+
+/* ============================================================
+   4️⃣ EDIT REPLY
+============================================================ */
+export const editReply = async (req, res) => {
+  try {
+    const { reviewId, replyId } = req.params;
+    const { message } = req.body;
+    const userId = req.userId;
+    const role = req.userRole;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found." });
+    }
+
+    const reply = review.reviewChat.id(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: "Reply not found." });
+    }
+
+    // Only admin or original sender can edit
+    if (
+      role !== "admin" &&
+      reply.senderId.toString() !== userId.toString()
+    ) {
+      return res.status(403).json({ message: "Unauthorized edit." });
+    }
+
+    reply.message = message;
+    await review.save();
+
+    res.json({
+      success: true,
+      message: "Reply updated successfully."
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+/* ============================================================
+   5️⃣ DELETE REPLY
+============================================================ */
+export const deleteReply = async (req, res) => {
+  try {
+    const { reviewId, replyId } = req.params;
+    const userId = req.userId;
+    const role = req.userRole;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found." });
+    }
+
+    const reply = review.reviewChat.id(replyId);
+    if (!reply) {
+      return res.status(404).json({ message: "Reply not found." });
+    }
+
+    // Only admin or original sender can delete
+    if (
+      role !== "admin" &&
+      reply.senderId.toString() !== userId.toString()
+    ) {
+      return res.status(403).json({ message: "Unauthorized delete." });
+    }
+
+    reply.remove();
+    await review.save();
+
+    res.json({
+      success: true,
+      message: "Reply deleted successfully."
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+/* ============================================================
+   6️⃣ TOGGLE VISIBILITY (Admin Only)
+============================================================ */
 export const toggleReviewVisibility = async (req, res, next) => {
   try {
     const { reviewId } = req.params;
     const review = await Review.findById(reviewId);
 
-    if (!review) return res.status(404).json({ success: false, message: "Review not found" });
+    if (!review) {
+      return res.status(404).json({
+        success: false,
+        message: "Review not found."
+      });
+    }
 
     review.isHidden = !review.isHidden;
     await review.save();
 
-    res.status(200).json({ 
-      success: true, 
-      message: `Review is now ${review.isHidden ? 'Hidden' : 'Visible'}` 
+    res.status(200).json({
+      success: true,
+      message: `Review is now ${review.isHidden ? "Hidden" : "Visible"}`
     });
+
   } catch (err) {
     next(err);
   }

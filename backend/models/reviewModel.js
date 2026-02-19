@@ -3,12 +3,12 @@ import mongoose from "mongoose";
 const reviewSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', 
+    ref: "User",
     required: true
   },
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Booking',
+    ref: "Booking"
   },
   rating: {
     type: Number,
@@ -21,19 +21,35 @@ const reviewSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
-  response: {
-    type: String,
-    default: null
-  },
+
+  reviewChat: [
+    {
+      senderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        
+      },
+      senderRole: {
+        type: String,
+        enum: ["admin", "guest"],
+        required: true
+      },
+      message: {
+        type: String,
+        required: true
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    }
+  ],
+
   isHidden: {
     type: Boolean,
     default: false
   }
-}, {
-  timestamps: true 
-});
 
-// Check if model exists before creating to prevent overwrite errors
-const Review = mongoose.models.Review || mongoose.model('Review', reviewSchema);
+}, { timestamps: true });
 
-export default Review;
+export default mongoose.models.Review || mongoose.model("Review", reviewSchema);
