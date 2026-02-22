@@ -382,15 +382,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
                   </div>
                 </div>
 
-                <div className="bg-blue-600 p-6 rounded-[2rem] text-white shadow-xl shadow-blue-100">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Info size={18} />
-                    <h4 className="text-xs font-black uppercase tracking-widest">Management Info</h4>
-                  </div>
-                  <p className="text-[11px] leading-relaxed opacity-80 font-medium">
-                    Ensure all data is accurate. Use the Password field to set specific access codes for this room.
-                  </p>
-                </div>
+                
               </div>
 
               {/* RIGHT: CONFIGURATION */}
@@ -402,22 +394,61 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
                       className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
                   </div>
                   
-                  {/* EDITABLE PASSWORD FIELD */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
-                      <Lock size={12} /> Room Password
-                    </label>
-                    <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Assign access code"
-                      className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Guest Capacity</label>
                     <input type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} required min="1" placeholder="0"
                       className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* ROOM TYPE DROPDOWN */}
+                <div className="relative" ref={typeRef}>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room Type</label>
+                  <button type="button" onClick={() => setShowTypeDropdown(!showTypeDropdown)}
+                    className="w-full flex items-center justify-between px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700">
+                    <span className="flex items-center gap-2"><BedSingle size={16} className="text-amber-500" /> {roomType || "Select Type"}</span>
+                    <ChevronDown size={18} className={`transition-transform duration-300 ${showTypeDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showTypeDropdown && (
+                    <div className="absolute z-30 top-full mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden">
+                      <div className="flex flex-col">
+                        <div className="max-h-48 overflow-y-auto no-scrollbar" style={scrollbarHideStyle}>
+                          {roomTypes.slice(0, showAllTypes ? roomTypes.length : 3).map((t) => (
+                            <div key={t._id} className="group flex items-center justify-between px-5 py-3 hover:bg-slate-50 cursor-pointer">
+                              <span onClick={() => { setRoomType(t.name); setShowTypeDropdown(false); }} className="flex-1 text-sm font-bold text-slate-600">{t.name}</span>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button type="button" onClick={() => { setEditingTypeId(t._id); setTempTypeName(t.name); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 size={14}/></button>
+                                <button type="button" onClick={(e) => handleDeleteType(e, t._id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {roomTypes.length > 3 && (
+                          <button type="button" onClick={() => setShowAllTypes(!showAllTypes)} className="w-full py-2 text-[10px] font-black uppercase text-slate-400 hover:text-amber-500 border-t border-slate-50 transition-colors">
+                            {showAllTypes ? "Show Less" : `+ View ${roomTypes.length - 3} More`}
+                          </button>
+                        )}
+
+                        {(isAddingNewType || editingTypeId) ? (
+                          <div className="p-4 bg-slate-50 space-y-3 border-t">
+                            <input autoFocus value={tempTypeName} onChange={(e)=>setTempTypeName(e.target.value)} placeholder="Category name..." className="w-full px-3 py-2 border rounded-xl text-sm font-bold outline-none focus:border-amber-500" />
+                            <div className="flex gap-2">
+                              <button type="button" onClick={handleSaveType} className="flex-1 py-2 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase">Save</button>
+                              <button type="button" onClick={resetTypeStates} className="flex-1 py-2 bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => setIsAddingNewType(true)} className="w-full p-4 bg-slate-50 text-amber-600 text-[9px] font-black uppercase border-t hover:bg-amber-50">
+                            + Add Room Type
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                   {/* BUILDING DROPDOWN */}
                   <div className="relative" ref={buildingRef}>
@@ -468,53 +499,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
                   </div>
                 </div>
 
-                {/* ROOM TYPE DROPDOWN */}
-                <div className="relative" ref={typeRef}>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room Type</label>
-                  <button type="button" onClick={() => setShowTypeDropdown(!showTypeDropdown)}
-                    className="w-full flex items-center justify-between px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-700">
-                    <span className="flex items-center gap-2"><BedSingle size={16} className="text-amber-500" /> {roomType || "Select Type"}</span>
-                    <ChevronDown size={18} className={`transition-transform duration-300 ${showTypeDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {showTypeDropdown && (
-                    <div className="absolute z-30 top-full mt-2 w-full bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden">
-                      <div className="flex flex-col">
-                        <div className="max-h-48 overflow-y-auto no-scrollbar" style={scrollbarHideStyle}>
-                          {roomTypes.slice(0, showAllTypes ? roomTypes.length : 3).map((t) => (
-                            <div key={t._id} className="group flex items-center justify-between px-5 py-3 hover:bg-slate-50 cursor-pointer">
-                              <span onClick={() => { setRoomType(t.name); setShowTypeDropdown(false); }} className="flex-1 text-sm font-bold text-slate-600">{t.name}</span>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button type="button" onClick={() => { setEditingTypeId(t._id); setTempTypeName(t.name); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 size={14}/></button>
-                                <button type="button" onClick={(e) => handleDeleteType(e, t._id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {roomTypes.length > 3 && (
-                          <button type="button" onClick={() => setShowAllTypes(!showAllTypes)} className="w-full py-2 text-[10px] font-black uppercase text-slate-400 hover:text-amber-500 border-t border-slate-50 transition-colors">
-                            {showAllTypes ? "Show Less" : `+ View ${roomTypes.length - 3} More`}
-                          </button>
-                        )}
-
-                        {(isAddingNewType || editingTypeId) ? (
-                          <div className="p-4 bg-slate-50 space-y-3 border-t">
-                            <input autoFocus value={tempTypeName} onChange={(e)=>setTempTypeName(e.target.value)} placeholder="Category name..." className="w-full px-3 py-2 border rounded-xl text-sm font-bold outline-none focus:border-amber-500" />
-                            <div className="flex gap-2">
-                              <button type="button" onClick={handleSaveType} className="flex-1 py-2 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase">Save</button>
-                              <button type="button" onClick={resetTypeStates} className="flex-1 py-2 bg-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase">Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => setIsAddingNewType(true)} className="w-full p-4 bg-slate-50 text-amber-600 text-[9px] font-black uppercase border-t hover:bg-amber-50">
-                            + Add Room Type
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                
 
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Room Description</label>

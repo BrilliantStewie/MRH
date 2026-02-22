@@ -7,20 +7,45 @@ const reviewChatSchema = new mongoose.Schema(
       ref: "User",
       required: true
     },
+
     senderRole: {
       type: String,
       enum: ["admin", "staff", "guest"],
       required: true
     },
+
     message: {
       type: String,
       required: true,
       trim: true
     },
+
+    // 🚀 NEW: Links a reply to a specific Admin/Staff comment
+    // If null, it's a top-level response to the main review.
+    parentReplyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null
+    },
+
+    // Edit history for replies
+    editHistory: [
+      {
+        message: {
+          type: String,
+          trim: true
+        },
+        editedAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
+
     isEdited: {
       type: Boolean,
       default: false
     },
+
     createdAt: {
       type: Date,
       default: Date.now
@@ -53,6 +78,28 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true
+    },
+
+    // Store edit history for the main review
+    editHistory: [
+      {
+        rating: { 
+          type: Number
+        },
+        comment: {
+          type: String,
+          trim: true
+        },
+        editedAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ],
+
+    isEdited: {
+      type: Boolean,
+      default: false
     },
 
     reviewChat: [reviewChatSchema],

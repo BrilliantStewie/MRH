@@ -35,17 +35,16 @@ const loginAdmin = async (req, res) => {
         const { email, password } = req.body;
 
         if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-            // ✅ ADDED 'name' to the token. 
-            // This ensures your authAdmin middleware can pass req.adminName to the chat.
+            // ✅ Use a valid 24-character dummy ObjectId for the Admin
             const token = jwt.sign(
-  { 
-    id: "admin",   // 🔥 IMPORTANT
-    role: "admin", 
-    name: "Administrator"
-  }, 
-  process.env.JWT_SECRET, 
-  { expiresIn: "1d" }
-);
+              { 
+                id: "000000000000000000000000", // 24 zeros!
+                role: "admin", 
+                name: "Administrator"
+              }, 
+              process.env.JWT_SECRET, 
+              { expiresIn: "1d" }
+            );
 
             res.json({ success: true, token });
         } else {
