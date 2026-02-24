@@ -71,7 +71,7 @@ export const createReview = async (req, res, next) => {
         existingReview.editHistory.push({
           rating: existingReview.rating,
           comment: existingReview.comment,
-          editedAt: new Date()
+          editedAt: new Date() // The exact time this old version was replaced
         });
 
         // 4. Update the current fields
@@ -132,11 +132,88 @@ export const createReview = async (req, res, next) => {
 
 
 /* ============================================================
+   🟢 NEW: EDIT MAIN REVIEW DIRECTLY (Guest Only)
+============================================================ */
+export const editReview = async (req, res, next) => {
+  try {
+    const { reviewId } = req.params;
+    const { comment, rating } = req.body; // <-- EXTRACTING RATING HERE
+    const userId = req.userId;
+
+    const review = await Review.findById(reviewId);
+    if (!review) return res.status(404).json({ success: false, message: "Review not found." });
+
+    // 🔐 STRICT OWNERSHIP CHECK
+    if (review.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized. You can only edit your own review." });
+    }
+
+    // Save previous state to history
+    review.editHistory.push({
+      rating: review.rating,
+      comment: review.comment,
+      editedAt: new Date()
+    });
+
+    // UPDATE COMMENT AND RATING
+    review.comment = comment;
+    if (rating) {
+      review.rating = Number(rating); // <-- UPDATE RATING
+    }
+    review.isEdited = true;
+
+    await review.save();
+
+    // Sync with Booking model
+    if (review.bookingId) {
+      const updateData = { review: comment };
+      if (rating) updateData.rating = Number(rating); // <-- SYNC RATING TO BOOKING
+      
+      await Booking.findByIdAndUpdate(review.bookingId, updateData);
+    }
+
+    res.status(200).json({ success: true, message: "Review updated successfully." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* ============================================================
+   🟢 NEW: DELETE MAIN REVIEW (Guest Only)
+============================================================ */
+export const deleteReview = async (req, res, next) => {
+  try {
+    const { reviewId } = req.params;
+    const userId = req.userId;
+
+    const review = await Review.findById(reviewId);
+    if (!review) return res.status(404).json({ success: false, message: "Review not found." });
+
+    // 🔐 STRICT OWNERSHIP CHECK
+    if (review.userId.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: "Unauthorized. You can only delete your own review." });
+    }
+
+    await Review.findByIdAndDelete(reviewId);
+
+    // Optional: Clear review fields from associated booking if deleted
+    if (review.bookingId) {
+      await Booking.findByIdAndUpdate(review.bookingId, { review: "", rating: null });
+    }
+
+    res.status(200).json({ success: true, message: "Review deleted successfully." });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+/* ============================================================
    3️⃣ ADD REPLY (Admin, Staff, Guest)
 ============================================================ */
 export const replyToReview = async (req, res, next) => {
   try {
-    const { response, parentReplyId } = req.body; // Add parentReplyId here
+    const { response, parentReplyId } = req.body; 
     const { reviewId } = req.params;
     const userId = req.userId;
     const role = req.userRole;
@@ -160,7 +237,7 @@ export const replyToReview = async (req, res, next) => {
       senderId: userId,
       senderRole: role,
       message: response,
-      parentReplyId: parentReplyId || null // Link to the specific comment
+      parentReplyId: parentReplyId || null 
     });
 
     await review.save();
@@ -175,22 +252,26 @@ export const replyToReview = async (req, res, next) => {
 ============================================================ */
 export const editReply = async (req, res) => {
   try {
-    const { reviewId, replyId } = req.params;
+    const { replyId } = req.params; // Using the streamlined route parameters
     const { message } = req.body;
     const userId = req.userId;
 
-    const review = await Review.findById(reviewId);
-    if (!review) return res.status(404).json({ success: false, message: "Review not found." });
+    // Find the parent review that contains this specific reply
+    const review = await Review.findOne({ "reviewChat._id": replyId });
+    if (!review) return res.status(404).json({ success: false, message: "Reply not found." });
 
     const reply = review.reviewChat.id(replyId);
-    if (!reply) return res.status(404).json({ success: false, message: "Reply not found." });
 
     // 🔐 STRICT OWNERSHIP CHECK
     if (reply.senderId.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized. You can only edit your own replies." });
     }
 
-    reply.editHistory.push({ message: reply.message, editedAt: new Date() });
+    reply.editHistory.push({ 
+      message: reply.message, 
+      editedAt: new Date() // The exact time this old version was replaced
+    });
+    
     reply.message = message;
     reply.isEdited = true;
 
@@ -208,14 +289,14 @@ export const editReply = async (req, res) => {
 ============================================================ */
 export const deleteReply = async (req, res) => {
   try {
-    const { reviewId, replyId } = req.params;
+    const { replyId } = req.params; // Using the streamlined route parameters
     const userId = req.userId;
 
-    const review = await Review.findById(reviewId);
-    if (!review) return res.status(404).json({ success: false, message: "Review not found." });
+    // Find the parent review that contains this specific reply
+    const review = await Review.findOne({ "reviewChat._id": replyId });
+    if (!review) return res.status(404).json({ success: false, message: "Reply not found." });
 
     const reply = review.reviewChat.id(replyId);
-    if (!reply) return res.status(404).json({ success: false, message: "Reply not found." });
 
     // 🔐 STRICT OWNERSHIP CHECK
     if (reply.senderId.toString() !== userId.toString()) {

@@ -5,8 +5,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Search, CalendarDays, MapPin, Loader2, CheckCircle2,
-  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight, Tag
-} from "lucide-react"; // 👈 Added Tag icon here
+  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight, Tag, Wallet
+} from "lucide-react"; // 👈 Added Tag and Wallet icons here
 import ReviewPage from "./ReviewPage"; // Ensure this path is correct
 
 // --- HELPER: Date Formatter ---
@@ -140,7 +140,11 @@ const MyBookings = () => {
 
     try {
       const toastId = toast.loading("Connecting to GCash...");
-      const { data } = await axios.post(backendUrl + "/api/user/create-checkout-session", { bookingId }, { headers: { token } });
+      const { data } = await axios.post(backendUrl + "/api/user/create-checkout-session", { 
+  bookingId: booking._id,
+  amount: booking.total_price, 
+  description: `Room Booking ID: ${booking._id}`
+}, { headers: { token } });
 
       if (data.success) {
         toast.update(toastId, { render: "Redirecting...", type: "success", isLoading: false, autoClose: 1500 });
@@ -450,9 +454,10 @@ const MyBookings = () => {
                             <>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleOnlinePayment(booking._id); }}
-                                className="flex-1 md:flex-none px-5 py-2.5 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-bold text-sm hover:shadow-lg hover:shadow-indigo-500/20 hover:-translate-y-0.5 transition-all"
+                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white font-bold text-sm hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all"
                               >
-                                Pay Online
+                                <Wallet size={16} className="text-blue-100" />
+                                Pay with GCash
                               </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleCashPayment(booking._id); }}

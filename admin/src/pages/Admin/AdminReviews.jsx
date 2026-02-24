@@ -40,7 +40,7 @@ const AdminReviews = () => {
   const [expandedReplies, setExpandedReplies] = useState({});
   const [expandedReviewThreads, setExpandedReviewThreads] = useState({});
 
-  // 🌟 State for Custom Delete Modal
+  // 🗑️ State for Custom Delete Modal
   const [itemToDelete, setItemToDelete] = useState(null);
 
   const toggleReplies = (parentId) => {
@@ -230,6 +230,18 @@ const AdminReviews = () => {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "";
+    return new Date(dateString).toLocaleString("en-US", {
+      month: "short", 
+      day: "numeric", 
+      year: "numeric", 
+      hour: "numeric", 
+      minute: "2-digit", 
+      hour12: true 
+    });
+  };
+
   const formatStayDate = (start, end) => {
     if (!start) return "";
     const s = new Date(start);
@@ -319,16 +331,16 @@ const AdminReviews = () => {
                         ))}
                       </div>
                       <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1 mb-1">
-                        {formatDate(review.createdAt)}
+                        {formatDateTime(review.createdAt)}
                         {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
                       </p>
 
-                      {/* 🌟 GUEST EDIT HISTORY TOGGLE */}
+                      {/* GUEST EDIT HISTORY TOGGLE */}
                       {review.isEdited && review.editHistory && review.editHistory.length > 0 && (
                         <div className="flex justify-end mt-1">
                           <button 
                             onClick={() => setVisibleReviewHistoryId(visibleReviewHistoryId === review._id ? null : review._id)}
-                            className="mt-5 flex items-center gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
+                            className="mt-5 flex items-center justify-end w-full gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
                           >
                             <Clock size={10} />
                             {visibleReviewHistoryId === review._id ? "Hide History" : "View History"}
@@ -338,36 +350,36 @@ const AdminReviews = () => {
                     </div>
                   </div>
 
-                  {/* 🌟 GUEST EDIT HISTORY CONTENT (BELOW HEADER) */}
+                  {/* GUEST EDIT HISTORY CONTENT */}
                   {visibleReviewHistoryId === review._id && review.editHistory && review.editHistory.length > 0 && (
                     <div className="mb-6 space-y-4 bg-slate-50/50 p-4 rounded-lg border border-slate-100 animate-in fade-in slide-in-from-top-1 duration-200">
                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Previous Versions</p>
-                      {/* Using .slice().reverse() to show latest edits at the top */}
-                      {review.editHistory.slice().reverse().map((history, index) => (
-                        <div key={index} className="relative pl-4 border-l-2 border-slate-200 py-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {history.rating && (
-                              <div className="flex items-center gap-0.5 text-amber-500 bg-white px-1.5 py-0.5 rounded border border-amber-100 shadow-sm">
-                                <span className="font-bold text-[10px]">{history.rating}</span>
-                                <Star size={10} fill="currentColor" />
-                              </div>
-                            )}
-                            <span className="text-[10px] font-semibold text-slate-400">
-                              Edited on {new Date(history.editedAt).toLocaleString("en-US", { 
-                                month: "short", 
-                                day: "numeric", 
-                                year: "numeric", 
-                                hour: "numeric", 
-                                minute: "2-digit", 
-                                hour12: true 
-                              })}
-                            </span>
+                      {review.editHistory.slice().reverse().map((history, reversedIdx) => {
+                        // Accurately calculate the exact time this specific version was submitted
+                        const originalIdx = review.editHistory.length - 1 - reversedIdx;
+                        const postedTime = originalIdx === 0 
+                          ? review.createdAt 
+                          : review.editHistory[originalIdx - 1].editedAt;
+
+                        return (
+                          <div key={reversedIdx} className="relative pl-4 border-l-2 border-slate-200 py-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {history.rating && (
+                                <div className="flex items-center gap-0.5 text-amber-500 bg-white px-1.5 py-0.5 rounded border border-amber-100 shadow-sm">
+                                  <span className="font-bold text-[10px]">{history.rating}</span>
+                                  <Star size={10} fill="currentColor" />
+                                </div>
+                              )}
+                              <span className="text-[10px] font-semibold text-slate-400">
+                                Posted on {formatDateTime(postedTime)}
+                              </span>
+                            </div>
+                            <p className="text-xs italic text-slate-500 leading-relaxed">
+                              "{history.comment || "No written comment."}"
+                            </p>
                           </div>
-                          <p className="text-xs italic text-slate-500 leading-relaxed">
-                            "{history.comment || "No written comment."}"
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -376,7 +388,6 @@ const AdminReviews = () => {
                     <h2 className="text-2xl font-serif italic text-slate-800 mb-3 leading-snug">
                       "{review.bookingId?.bookingName || (review.bookingId?.room_ids?.length > 0 ? review.bookingId.room_ids.map((r) => r.name).join(", ") : "Retreat Stay")}"
                     </h2>
-
                     <p className="text-slate-600 text-[14px] leading-relaxed font-light">{review.comment || "No written review provided."}</p>
                   </div>
 
@@ -384,8 +395,9 @@ const AdminReviews = () => {
                   {parentChats.length > 0 && (
                     <div className="mb-6 space-y-4">
                       
-                      {/* SHOW ONLY 1 PARENT CHAT UNLESS EXPANDED */}
                       {(isThreadExpanded ? parentChats : parentChats.slice(0, 1)).map((parentChat) => {
+                        
+                        // Check if there are any child replies to this parent reply
                         const childReplies = review.reviewChat.filter(child => child.parentReplyId === parentChat._id);
                         const isExpanded = expandedReplies[parentChat._id];
 
@@ -417,55 +429,63 @@ const AdminReviews = () => {
                                   </span>
                                 )}
 
-                                <div className="text-[10px] text-slate-400 ml-auto flex gap-3 items-center">
-                                  <span className="flex items-center gap-1">
-                                    {formatDate(parentChat.createdAt)}
+                                <div className="text-[10px] text-slate-400 ml-auto flex flex-col items-end gap-1">
+                                  <div className="flex items-center justify-end w-full gap-1">
+                                    {formatDateTime(parentChat.createdAt)}
                                     {parentChat.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
-                                  </span>
+                                  </div>
+                                  {parentChat.editHistory && parentChat.editHistory.length > 0 && (
+                                    <button onClick={() => setVisibleHistoryId(visibleHistoryId === parentChat._id ? null : parentChat._id)} className="hover:text-blue-600 font-medium transition-colors flex items-center justify-end w-full gap-1">
+                                      <Clock size={10} />
+                                      {visibleHistoryId === parentChat._id ? "Hide History" : "View History"}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 
                               {/* EDIT MODE */}
                               {editingReplyId === parentChat._id ? (
                                 <>
-                                  <textarea className="w-full border border-slate-200 rounded-lg p-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={editText} onChange={(e) => setEditText(e.target.value)} />
+                                  <textarea
+                                    className="w-full border border-slate-200 rounded-lg p-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                  />
                                   <div className="flex gap-2 mt-2 justify-end">
-                                    <button onClick={() => setEditingReplyId(null)} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
-                                    <button onClick={() => handleEditReply(review._id, parentChat._id)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded">Save</button>
+                                    <button onClick={() => setEditingReplyId(null)} className="px-3 py-1 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                                    <button onClick={() => handleEditReply(review._id, parentChat._id)} className="bg-blue-600 text-white px-3 py-1 rounded-md text-xs font-bold shadow-sm hover:bg-blue-700">Save</button>
                                   </div>
                                 </>
                               ) : (
                                 <>
                                   <p className="text-slate-600 text-[13px] leading-relaxed pr-16">{parentChat.message}</p>
-
-                                  <div className="mt-3 flex justify-between items-center">
-                                    {(!activeReplyId || activeReplyId !== parentChat._id) ? (
-                                      <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-all hover:bg-blue-50 px-2 py-1 rounded-md -ml-2">
-                                        <Reply size={14} /> Reply
-                                      </button>
-                                    ) : <span />}
-
-                                    {parentChat.editHistory && parentChat.editHistory.length > 0 && (
-                                      <button onClick={() => setVisibleHistoryId(visibleHistoryId === parentChat._id ? null : parentChat._id)} className="text-[10px] text-slate-400 hover:text-blue-600 font-medium transition-colors">
-                                        {visibleHistoryId === parentChat._id ? "Hide Edit History" : "View Edit History"}
-                                      </button>
-                                    )}
-                                  </div>
-
+                                  
+                                  {/* PARENT HISTORY CONTENT */}
                                   {visibleHistoryId === parentChat._id && (
-                                    <div className="mt-3 text-xs text-slate-500 border-r-2 border-slate-200 pr-3 text-right space-y-3">
-                                      {[...parentChat.editHistory].reverse().map((history, index) => (
-                                        <div key={index} className="flex flex-col items-end">
-                                          <p className="text-[10px] font-semibold text-slate-400 mb-0.5">{new Date(history.editedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
-                                          <p className="italic text-slate-600">"{history.message}"</p>
-                                        </div>
-                                      ))}
+                                    <div className="mt-4 text-xs text-slate-500 border-r-2 border-slate-200 pr-3 text-right space-y-3 bg-white p-3 rounded-lg animate-in fade-in slide-in-from-top-1 duration-200 shadow-sm">
+                                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Previous Versions</p>
+                                      {[...parentChat.editHistory].reverse().map((history, reversedIdx) => {
+                                        // Accurately calculate the exact time this specific version was submitted
+                                        const originalIdx = parentChat.editHistory.length - 1 - reversedIdx;
+                                        const postedTime = originalIdx === 0 
+                                          ? parentChat.createdAt 
+                                          : parentChat.editHistory[originalIdx - 1].editedAt;
+
+                                        return (
+                                          <div key={reversedIdx} className="flex flex-col items-end">
+                                            <p className="text-[10px] font-semibold text-slate-400 mb-0.5">
+                                              Posted on {formatDateTime(postedTime)}
+                                            </p>
+                                            <p className="italic text-slate-600">"{history.message}"</p>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
 
                                   {/* ADMIN ONLY: FLOATING ACTION MENU */}
                                   {parentChat.senderRole === "admin" && (
-                                    <div className="absolute top-12 right-4 opacity-0 group-hover/thread:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white border border-slate-200 shadow-sm rounded-md p-0.5 z-10">
+                                    <div className="absolute top-10 right-4 opacity-0 group-hover/thread:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white border border-slate-200 shadow-sm rounded-md p-0.5 z-10">
                                       <button onClick={() => { setEditingReplyId(parentChat._id); setEditText(parentChat.message); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"><Pencil size={13} /></button>
                                       <div className="w-px h-3 bg-slate-200"></div>
                                       <button onClick={() => confirmDelete(review._id, parentChat._id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"><Trash2 size={13} /></button>
@@ -478,7 +498,7 @@ const AdminReviews = () => {
                             {/* TOGGLE REPLIES BUTTON */}
                             {childReplies.length > 0 && (
                               <button onClick={() => toggleReplies(parentChat._id)} className="ml-12 mt-1 flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors">
-                                {isExpanded ? <><ChevronUp size={14} /> Hide replies</> : <><CornerDownRight size={14} /> View {childReplies.length} {childReplies.length === 1 ? "reply" : "replies"}</>}
+                                {isExpanded ? <><ChevronUp size={14} /> Hide {childReplies.length === 1 ? "reply" : "replies"}</> : <><CornerDownRight size={14} /> View {childReplies.length} {childReplies.length === 1 ? "reply" : "replies"}</>}
                               </button>
                             )}
 
@@ -506,47 +526,65 @@ const AdminReviews = () => {
                                         </span>
                                       )}
                                       
-                                      <div className="text-[10px] text-slate-400 ml-auto flex gap-1 items-center">
-                                        {formatDate(childChat.createdAt)}
-                                        {childChat.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
+                                      <div className="text-[10px] text-slate-400 ml-auto flex flex-col items-end gap-1">
+                                        <div className="flex items-center justify-end w-full gap-1">
+                                          {formatDateTime(childChat.createdAt)}
+                                          {childChat.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
+                                        </div>
+                                        {childChat.editHistory && childChat.editHistory.length > 0 && (
+                                          <button onClick={() => setVisibleHistoryId(visibleHistoryId === childChat._id ? null : childChat._id)} className="hover:text-blue-600 font-medium transition-colors flex items-center justify-end w-full gap-1">
+                                            <Clock size={10} />
+                                            {visibleHistoryId === childChat._id ? "Hide History" : "View History"}
+                                          </button>
+                                        )}
                                       </div>
                                     </div>
 
-                                    {/* EDIT OR MESSAGE */}
+                                    {/* EDIT MODE */}
                                     {editingReplyId === childChat._id ? (
                                       <>
-                                        <textarea className="w-full border border-slate-200 rounded-lg p-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" value={editText} onChange={(e) => setEditText(e.target.value)} />
+                                        <textarea
+                                          className="w-full border border-slate-200 rounded-lg p-2 mt-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                          value={editText}
+                                          onChange={(e) => setEditText(e.target.value)}
+                                        />
                                         <div className="flex gap-2 mt-2 justify-end">
-                                          <button onClick={() => setEditingReplyId(null)} className="text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
-                                          <button onClick={() => handleEditReply(review._id, childChat._id)} className="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded">Save</button>
+                                          <button onClick={() => setEditingReplyId(null)} className="px-3 py-1 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                                          <button onClick={() => handleEditReply(review._id, childChat._id)} className="bg-blue-600 text-white px-3 py-1 rounded-md text-xs font-bold shadow-sm hover:bg-blue-700">Save</button>
                                         </div>
                                       </>
                                     ) : (
                                       <>
                                         <p className="text-slate-600 text-[13px] leading-relaxed pr-10">{childChat.message}</p>
                                         
-                                        <div className="mt-2 flex justify-between items-center">
-                                          {(!activeReplyId || activeReplyId !== parentChat._id) ? (
+                                        <div className="mt-2 flex justify-start items-center">
+                                          {(!activeReplyId || activeReplyId !== parentChat._id) && (
                                             <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-all hover:bg-blue-50 px-2 py-1 rounded-md -ml-2">
                                               <Reply size={14} /> Reply
-                                            </button>
-                                          ) : <span />}
-
-                                          {childChat.editHistory && childChat.editHistory.length > 0 && (
-                                            <button onClick={() => setVisibleHistoryId(visibleHistoryId === childChat._id ? null : childChat._id)} className="text-[10px] text-slate-400 hover:text-blue-600 font-medium transition-colors">
-                                              {visibleHistoryId === childChat._id ? "Hide Edit History" : "View Edit History"}
                                             </button>
                                           )}
                                         </div>
 
+                                        {/* CHILD HISTORY CONTENT */}
                                         {visibleHistoryId === childChat._id && (
-                                          <div className="mt-3 text-xs text-slate-500 border-r-2 border-slate-200 pr-3 text-right space-y-3">
-                                            {[...childChat.editHistory].reverse().map((history, index) => (
-                                              <div key={index} className="flex flex-col items-end">
-                                                <p className="text-[10px] font-semibold text-slate-400 mb-0.5">{new Date(history.editedAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}</p>
-                                                <p className="italic text-slate-600">"{history.message}"</p>
-                                              </div>
-                                            ))}
+                                          <div className="mt-4 text-xs text-slate-500 border-r-2 border-slate-200 pr-3 text-right space-y-3 bg-white p-3 rounded-lg animate-in fade-in slide-in-from-top-1 duration-200 shadow-sm">
+                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">Previous Versions</p>
+                                            {[...childChat.editHistory].reverse().map((history, reversedIdx) => {
+                                              // Accurately calculate the exact time this specific version was submitted
+                                              const originalIdx = childChat.editHistory.length - 1 - reversedIdx;
+                                              const postedTime = originalIdx === 0 
+                                                ? childChat.createdAt 
+                                                : childChat.editHistory[originalIdx - 1].editedAt;
+
+                                              return (
+                                                <div key={reversedIdx} className="flex flex-col items-end">
+                                                  <p className="text-[10px] font-semibold text-slate-400 mb-0.5">
+                                                    Posted on {formatDateTime(postedTime)}
+                                                  </p>
+                                                  <p className="italic text-slate-600">"{history.message}"</p>
+                                                </div>
+                                              );
+                                            })}
                                           </div>
                                         )}
 
@@ -626,7 +664,7 @@ const AdminReviews = () => {
         )}
       </div>
 
-      {/* 🌟 CUSTOM DELETE CONFIRMATION MODAL */}
+      {/* DELETION CONFIRMATION MODAL */}
       {itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
@@ -646,7 +684,7 @@ const AdminReviews = () => {
               </button>
               <button 
                 onClick={executeDelete} 
-                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm shadow-red-600/20"
+                className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-white bg-red-500 hover:bg-red-600 transition-colors shadow-sm"
               >
                 Delete
               </button>
@@ -654,7 +692,6 @@ const AdminReviews = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };
