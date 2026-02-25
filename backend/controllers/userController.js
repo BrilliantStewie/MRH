@@ -7,8 +7,12 @@ import bookingModel from "../models/bookingModel.js";
 import cloudinary from "../config/cloudinary.js"; 
 
 // --- HELPERS ---
-const createToken = (id, name) => {
-    return jwt.sign({ id, name }, process.env.JWT_SECRET, { expiresIn: "30d" });
+const createToken = (id, name, role) => {
+    return jwt.sign(
+        { id, name, role },
+        process.env.JWT_SECRET,
+        { expiresIn: "30d" }
+    );
 };
 
 const streamUpload = (fileBuffer) => {
@@ -52,7 +56,11 @@ const googleAuth = async (req, res) => {
             await user.save();
         }
 
-        const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
+        const token = createToken(
+    user._id,
+    `${user.firstName} ${user.lastName}`,
+    user.role
+);
         res.json({ success: true, token });
     } catch (error) {
         console.log(error);
@@ -93,7 +101,11 @@ const registerUser = async (req, res) => {
         });
 
         const user = await newUser.save();
-        const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
+        const token = createToken(
+    user._id,
+    `${user.firstName} ${user.lastName}`,
+    user.role
+);
         res.json({ success: true, token });
     } catch (error) {
         console.log(error);
@@ -109,7 +121,11 @@ const loginUser = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
-            const token = createToken(user._id, `${user.firstName} ${user.lastName}`);
+            const token = createToken(
+    user._id,
+    `${user.firstName} ${user.lastName}`,
+    user.role
+);
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });

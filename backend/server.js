@@ -26,6 +26,7 @@ import bookingRouter from "./routes/bookingRoute.js";
 import paymentRouter from "./routes/paymentRoute.js";
 import packageRouter from "./routes/packageRoute.js";
 import reviewRouter from "./routes/reviewRoute.js"; 
+import notificationRouter from "./routes/notificationRoute.js"; // ✅ Added notification route
 
 // =======================
 // 🚀 APP INIT
@@ -59,7 +60,8 @@ app.use("/api/user", userRouter);
 app.use("/api/booking", bookingRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/package", packageRouter);
-app.use("/api/reviews", reviewRouter); // Connected to match AllReviews.jsx fetch
+app.use("/api/reviews", reviewRouter); 
+app.use("/api/notifications", notificationRouter); // ✅ Registered notification router
 
 // =======================
 // 🕒 CRON JOB

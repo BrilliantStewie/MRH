@@ -1,5 +1,6 @@
 import Review from "../models/reviewModel.js";
 import Booking from "../models/bookingModel.js";
+import Notification from "../models/notificationModel.js";
 
 /* ============================================================
    1️⃣ GET ALL REVIEWS (Public)
@@ -118,6 +119,21 @@ export const createReview = async (req, res, next) => {
       rating: Number(rating),
       review: comment
     });
+
+    // 🔔 NOTIFY ADMINS: New Review Submitted
+    const admins = await Booking.db.model("User").find({ role: "admin" });
+    const adminNotifications = admins.map((admin) => ({
+      recipient: admin._id,
+      sender: userId,
+      type: "new_review",
+      message: `A guest just left a ${rating}-star review for their stay.`,
+      link: "/admin/reviews", // Or wherever your admin reviews page is
+      isRead: false
+    }));
+
+    if (adminNotifications.length > 0) {
+      await Notification.insertMany(adminNotifications);
+    }
 
     res.status(200).json({
       success: true,
@@ -241,6 +257,34 @@ export const replyToReview = async (req, res, next) => {
     });
 
     await review.save();
+
+    // 🔔 NOTIFICATION LOGIC FOR REPLIES
+    if (role !== "guest") {
+      // If Admin/Staff replied, notify the guest
+      await Notification.create({
+        recipient: review.userId,
+        sender: userId,
+        type: "new_reply",
+        message: `Management has replied to your review.`,
+        link: "/my-bookings", 
+        isRead: false
+      });
+    } else {
+      // If Guest replied, notify the admins
+      const admins = await Booking.db.model("User").find({ role: "admin" });
+      const adminNotifications = admins.map((admin) => ({
+        recipient: admin._id,
+        sender: userId,
+        type: "new_reply",
+        message: `A guest replied to a review thread.`,
+        link: "/admin/reviews",
+        isRead: false
+      }));
+      if (adminNotifications.length > 0) {
+        await Notification.insertMany(adminNotifications);
+      }
+    }
+
     res.status(200).json({ success: true, data: review });
   } catch (err) {
     next(err);
@@ -330,6 +374,17 @@ export const toggleReviewVisibility = async (req, res, next) => {
 
     review.isHidden = !review.isHidden;
     await review.save();
+
+    // 🔔 NOTIFY GUEST: Review Hidden
+    if (review.isHidden) {
+      await Notification.create({
+        recipient: review.userId,
+        type: "review_hidden",
+        message: `Your review has been hidden by moderation.`,
+        link: "/my-bookings",
+        isRead: false
+      });
+    }
 
     res.status(200).json({
       success: true,

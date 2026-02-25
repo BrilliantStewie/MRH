@@ -25,16 +25,23 @@ const Navbar = () => {
   const fetchNotifications = async () => {
     if (!token) return;
     try {
-      const { data } = await axios.get(`${backendUrl}/api/notifications`, {
+      const { data } = await axios.get(`${backendUrl}/api/notifications/get`, {
         headers: { token }
       });
       if (data.success) {
-        setNotifications(data.notifications);
+        setNotifications(data.notifications || []);
       }
     } catch (err) {
-      console.error("Error fetching notifications:", err);
+      console.error(err);
     }
   };
+
+  // 🚀 ADD THIS RIGHT HERE! This runs the fetch automatically.
+  useEffect(() => {
+    if (token) {
+      fetchNotifications();
+    }
+  }, [token, backendUrl]);
 
   const markAsRead = async (id) => {
     try {
@@ -54,7 +61,8 @@ const Navbar = () => {
     return () => clearInterval(interval);
   }, [token]);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Safe check using fallback array
+  const unreadCount = (notifications || []).filter(n => !n.isRead).length;
 
   /* ==========================================
      NAVBAR UI LOGIC
@@ -134,8 +142,9 @@ const Navbar = () => {
                   )}
                 </button>
 
+                {/* ADDED top-full and z-50 to ensure it drops down below the header properly */}
                 {showNotifications && (
-                  <div className="absolute right-0 mt-4 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                     <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Notifications</h4>
                       {unreadCount > 0 && <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">{unreadCount} New</span>}
@@ -186,8 +195,9 @@ const Navbar = () => {
                   {userProfileImage ? <img src={userProfileImage} alt="profile" className="w-full h-full object-cover" /> : <User size={20} className="text-slate-400" />}
                 </button>
 
+                {/* ADDED top-full and z-50 here as well */}
                 {showProfileMenu && (
-                  <div className="absolute right-0 mt-4 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 animate-in fade-in zoom-in-95 duration-200 z-50">
                     <div className="px-4 py-2 border-b border-slate-50 mb-1">
                       <p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Signed in as</p>
                       <p className="text-sm font-bold truncate text-slate-900">{firstName}</p>
@@ -198,7 +208,6 @@ const Navbar = () => {
                     <button onClick={() => navigate("/my-bookings")} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
                       <Calendar size={14}/> My Bookings
                     </button>
-                    <div className="h-px bg-slate-100 my-1 mx-4"></div>
                     <button onClick={logout} className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2">
                       <LogOut size={14}/> Sign Out
                     </button>
@@ -219,12 +228,26 @@ const Navbar = () => {
 
         {/* MOBILE MENU */}
         {showMobileMenu && (
-          <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-2">
+          <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-2 z-50">
              {navLinks.map((link) => (
-                <NavLink key={link.name} to={link.path} onClick={() => setShowMobileMenu(false)} className={({ isActive }) => `block px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest ${isActive ? "bg-slate-900 text-white" : "bg-slate-50 text-slate-500"}`}>
+                <NavLink 
+                  key={link.name} 
+                  to={link.path} 
+                  onClick={() => setShowMobileMenu(false)} 
+                  className={({ isActive }) => `block px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest ${isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                >
                   {link.name}
                 </NavLink>
-              ))}
+             ))}
+             {token ? (
+               <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
+                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-profile'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Profile</button>
+                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-bookings'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Bookings</button>
+                 <button onClick={() => { setShowMobileMenu(false); logout(); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50">Sign Out</button>
+               </div>
+             ) : (
+                <button onClick={() => { setShowMobileMenu(false); navigate('/login'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 mt-2 border-t border-slate-100 pt-4">Login</button>
+             )}
           </div>
         )}
       </nav>

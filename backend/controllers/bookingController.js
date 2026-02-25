@@ -1,4 +1,5 @@
 import bookingModel from "../models/bookingModel.js";
+import Notification from "../models/notificationModel.js";
 import axios from "axios";
 
 /* ===================================================================
@@ -66,14 +67,67 @@ export const createBooking = async (req, res) => {
       paymentMethod: "n/a",
     });
 
-    res.json({ success: true, booking });
+    // 🔔 NOTIFY ADMIN (VERY IMPORTANT FIX)
+    const admins = await bookingModel.db.model("User").find({ role: "admin" });
+
+  
+      const adminNotifications = admins.map((admin) => ({
+  recipient: admin._id,
+  sender: userId, // The guest who booked
+  type: "booking_update",
+  message: `New booking request: ${bookingName}`,
+  link: "/admin/bookings", // Or wherever your admin dashboard is
+  isRead: false
+}));
+
+   if (adminNotifications.length > 0) {
+  await Notification.insertMany(adminNotifications);
+}
+
+    res.json({ success: true, message: "Booking Created successfully" });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    res.json({ success: false, message: error.message });
   }
 };
 
 /* ===================================================================
-   2. USER BOOKINGS
+   2. ADMIN: UPDATE BOOKING STATUS (Approve, Decline, Cancel)
+=================================================================== */
+export const updateBookingStatus = async (req, res) => {
+  try {
+    const { bookingId, status } = req.body; 
+
+    const booking = await bookingModel.findByIdAndUpdate(
+      bookingId,
+      { status },
+      { new: true }
+    );
+
+    if (!booking) {
+      return res.json({ success: false, message: "Booking not found" });
+    }
+
+    // 🔔 NOTIFY USER: Decision by Admin (Approved, Declined, or Cancelled)
+    let msg = status === "approved" 
+      ? `Great news! Your booking for ${booking.bookingName} has been APPROVED.` 
+      : `Your booking for ${booking.bookingName} was ${status.toUpperCase()} by the administration.`;
+
+    await Notification.create({
+  recipient: booking.user_id,
+  type: "booking_update",
+  message: msg,
+  link: "/my-bookings",
+  isRead: false
+});
+
+    res.json({ success: true, message: `Booking ${status}` });
+  } catch (error) {
+    res.json({ success: false, message: error.message });
+  }
+};
+
+/* ===================================================================
+   3. USER BOOKINGS
 =================================================================== */
 export const userBookings = async (req, res) => {
   try {
@@ -89,7 +143,7 @@ export const userBookings = async (req, res) => {
 };
 
 /* ===================================================================
-   3. CANCEL BOOKING
+   4. CANCEL BOOKING (By User)
 =================================================================== */
 export const cancelBooking = async (req, res) => {
   try {
@@ -112,6 +166,16 @@ export const cancelBooking = async (req, res) => {
       });
 
     await booking.save();
+
+    // 🔔 NOTIFICATION: Cancellation Status Receipt
+    await Notification.create({
+  recipient: booking.user_id,
+  type: "booking_update",
+  message: `The status of your booking ${booking.bookingName} is now ${booking.status.replace('_',' ')}.`,
+  link: "/my-bookings",
+  isRead: false
+});
+
     res.json({ success: true, message: "Cancellation processed" });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -119,7 +183,7 @@ export const cancelBooking = async (req, res) => {
 };
 
 /* ===================================================================
-   4. MARK CASH PAYMENT
+   5. MARK CASH PAYMENT
 =================================================================== */
 export const markCash = async (req, res) => {
   try {
@@ -148,17 +212,32 @@ export const markCash = async (req, res) => {
 };
 
 /* ===================================================================
-   5. VERIFY PAYMENT (GCASH / ONLINE)
+   6. VERIFY PAYMENT
 =================================================================== */
 export const verifyPayment = async (req, res) => {
   try {
     const { bookingId } = req.body;
 
-    await bookingModel.findByIdAndUpdate(bookingId, {
-      payment: true,
-      paymentStatus: "paid",
-      paymentMethod: "gcash",
-    });
+    const booking = await bookingModel.findByIdAndUpdate(
+      bookingId,
+      {
+        payment: true,
+        paymentStatus: "paid",
+        paymentMethod: "gcash",
+      },
+      { new: true }
+    );
+
+    if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+    // 🔔 NOTIFICATION: Payment Confirmed
+    await Notification.create({
+  recipient: booking.user_id,
+  type: "payment_update",
+  message: `Payment verified for ${booking.bookingName}. Your stay is confirmed!`,
+  link: "/my-bookings",
+  isRead: false
+});
 
     res.json({ success: true, message: "Payment verified" });
   } catch (error) {
@@ -167,7 +246,7 @@ export const verifyPayment = async (req, res) => {
 };
 
 /* ===================================================================
-   6. PAYMONGO CHECKOUT
+   7. PAYMONGO CHECKOUT SESSION
 =================================================================== */
 export const createCheckoutSession = async (req, res) => {
   try {
@@ -230,49 +309,51 @@ export const createCheckoutSession = async (req, res) => {
 };
 
 /* ===================================================================
-   7. RATE BOOKING (Initial Review & Chat Start)
+   8. RATE BOOKING (Initial Review)
 =================================================================== */
 export const rateBooking = async (req, res) => {
   try {
     const { bookingId, rating, review } = req.body;
-    const name = req.userName || "Guest"; 
+    const name = req.userName || "Guest";
 
     const initialMessage = {
       senderRole: "guest",
       senderName: name,
       message: review,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     const booking = await bookingModel.findByIdAndUpdate(
-      bookingId, 
-      { 
-        rating, 
+      bookingId,
+      {
+        rating,
         review,
-        $push: { reviewChat: initialMessage } 
+        $push: { reviewChat: initialMessage },
       },
       { new: true }
     );
 
-    if (!booking) return res.json({ success: false, message: "Booking not found" });
+    if (!booking)
+      return res.json({ success: false, message: "Booking not found" });
 
-    res.json({ success: true, message: "Review submitted", reviewChat: booking.reviewChat });
+    res.json({
+      success: true,
+      message: "Review submitted",
+      reviewChat: booking.reviewChat,
+    });
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
 };
 
 /* ===================================================================
-   8. ADD REVIEW CHAT MESSAGE (Reply Logic for Guest/Staff/Admin)
+   9. ADD REVIEW CHAT MESSAGE (Staff/Admin Reply)
 =================================================================== */
 export const addReviewChat = async (req, res) => {
   try {
-    // Corrected to use the ID sent from the frontend
     const { bookingId, message } = req.body;
-    
-    // Uses role and name provided by your auth middleware
-    const role = req.role || "staff"; 
-    const name = req.userName || "Staff"; 
+    const role = req.userRole || "staff"; 
+    const name = req.userName || "Staff";
 
     if (!message || message.trim() === "") {
       return res.json({ success: false, message: "Message cannot be empty" });
@@ -282,22 +363,33 @@ export const addReviewChat = async (req, res) => {
       senderRole: role,
       senderName: name,
       message: message,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
-    // Correctly finds the booking and pushes the new message to history
     const booking = await bookingModel.findByIdAndUpdate(
       bookingId,
       { $push: { reviewChat: newMessage } },
       { new: true }
     );
 
-    if (!booking) return res.json({ success: false, message: "Booking not found" });
+    if (!booking)
+      return res.json({ success: false, message: "Booking not found" });
 
-    res.json({ 
-      success: true, 
-      message: "Message added to history", 
-      reviewChat: booking.reviewChat 
+    // 🔔 NOTIFICATION: Notify guest if staff/admin replies
+    if (role !== "guest") {
+      await Notification.create({
+  recipient: booking.user_id,
+  type: "new_reply",
+  message: `Management has replied to your review/chat for ${booking.bookingName}.`,
+  link: "/my-bookings",
+  isRead: false
+});
+    }
+
+    res.json({
+      success: true,
+      message: "Message added",
+      reviewChat: booking.reviewChat,
     });
   } catch (error) {
     res.json({ success: false, message: error.message });
@@ -305,7 +397,7 @@ export const addReviewChat = async (req, res) => {
 };
 
 /* ===================================================================
-   9. CHECK AVAILABILITY
+   10. CHECK AVAILABILITY
 =================================================================== */
 export const checkAvailability = async (req, res) => {
   try {
@@ -321,8 +413,9 @@ export const checkAvailability = async (req, res) => {
       check_out: { $gt: start },
     });
 
-    if (conflict)
-      return res.json({ success: false, message: "Rooms unavailable" });
+    if (conflict) {
+      return res.json({ success: false, message: "Rooms are unavailable for selected dates" });
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -331,7 +424,7 @@ export const checkAvailability = async (req, res) => {
 };
 
 /* ===================================================================
-   10. GET UNAVAILABLE DATES
+   11. GET UNAVAILABLE DATES
 =================================================================== */
 export const getUnavailableDates = async (req, res) => {
   try {
@@ -360,7 +453,7 @@ export const getUnavailableDates = async (req, res) => {
 };
 
 /* ===================================================================
-   11. USER BOOKED DATES
+   12. USER BOOKED DATES
 =================================================================== */
 export const getUserBookedDates = async (req, res) => {
   try {
@@ -387,7 +480,7 @@ export const getUserBookedDates = async (req, res) => {
 };
 
 /* ===================================================================
-   12. GET OCCUPIED ROOMS (TODAY)
+   13. GET OCCUPIED ROOMS (TODAY)
 =================================================================== */
 export const getOccupiedRooms = async (req, res) => {
   try {

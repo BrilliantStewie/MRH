@@ -9,6 +9,7 @@ import roomModel from "../models/roomModel.js";
 import bookingModel from "../models/bookingModel.js";
 import buildingModel from "../models/buildingModel.js";
 import roomTypeModel from "../models/roomTypeModel.js";
+import Notification from "../models/notificationModel.js";
 
 // ======================================================================
 // 🛠️ CLOUD HELPER
@@ -408,6 +409,16 @@ const approveBooking = async (req, res) => {
         const { bookingId } = req.params;
         const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true });
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        // 🔔 NOTIFY GUEST: Booking Approved
+        await Notification.create({
+            recipient: booking.user_id,
+            type: "booking_update",
+            message: `Great news! Your booking has been approved by the administration.`,
+            link: "/my-bookings",
+            isRead: false
+        });
+
         res.json({ success: true, message: "Booking Approved Successfully" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -419,6 +430,16 @@ const declineBooking = async (req, res) => {
         const { bookingId } = req.params;
         const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true });
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        // 🔔 NOTIFY GUEST: Booking Declined
+        await Notification.create({
+            recipient: booking.user_id,
+            type: "booking_update",
+            message: `Your booking was declined by the administration.`,
+            link: "/my-bookings",
+            isRead: false
+        });
+
         res.json({ success: true, message: "Booking Declined" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -430,6 +451,16 @@ const paymentConfirmed = async (req, res) => {
         const { bookingId } = req.body;
         const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true }, { new: true });
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        // 🔔 NOTIFY GUEST: Payment Confirmed Manually
+        await Notification.create({
+            recipient: booking.user_id,
+            type: "payment_update",
+            message: `Your payment has been manually confirmed by the administration.`,
+            link: "/my-bookings",
+            isRead: false
+        });
+
         res.json({ success: true, message: "Payment Status Updated to Confirmed" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -466,9 +497,6 @@ const resolveCancellation = async (req, res) => {
             return res.json({ success: false, message: "Missing required fields" });
         }
 
-        // Explicitly map actions to statuses
-        // 'approve' -> 'cancelled'
-        // 'reject' -> 'approved' (reverting it to its active state)
         const newStatus = action === 'approve' ? 'cancelled' : 'approved';
         
         const booking = await bookingModel.findByIdAndUpdate(
@@ -480,6 +508,19 @@ const resolveCancellation = async (req, res) => {
         if (!booking) {
             return res.json({ success: false, message: "Booking not found" });
         }
+
+        // 🔔 NOTIFY GUEST: Cancellation Request Resolved
+        const notificationMsg = action === 'approve' 
+            ? `Your cancellation request was APPROVED.` 
+            : `Your cancellation request was REJECTED. Your booking remains active.`;
+
+        await Notification.create({
+            recipient: booking.user_id,
+            type: "booking_update",
+            message: notificationMsg,
+            link: "/my-bookings",
+            isRead: false
+        });
         
         res.json({ 
             success: true, 

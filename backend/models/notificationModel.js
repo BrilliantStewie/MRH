@@ -12,7 +12,14 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["new_review", "new_reply", "review_hidden"],
+    // ✅ Updated Enum: Added booking and payment types
+    enum: [
+      "new_review", 
+      "new_reply", 
+      "review_hidden", 
+      "booking_update", 
+      "payment_update"
+    ],
     required: true
   },
   message: {
