@@ -16,17 +16,25 @@ const AppProvider = ({ children }) => {
   // Auth State
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true); // Initial loading state
+  const [loading, setLoading] = useState(true);
 
   // Rooms State
   const [rooms, setRooms] = useState([]);
   const [selectedRooms, setSelectedRooms] = useState([]);
 
   // ==============================
-  // 🔐 AUTH & PROFILE
+  // 🔐 AUTH & PROFILE LOGIC
   // ==============================
+
+  // 🧹 Helper to clear storage and state (Now accessible globally)
+  const logoutUser = () => {
+    setToken("");
+    setUserData(null);
+    localStorage.removeItem("token");
+    // This state change will trigger the ternary logic in App.jsx instantly
+  };
+
   const loadUserProfileData = async () => {
-    // If no token exists, stop loading and return
     if (!token) {
       setUserData(null);
       setLoading(false);
@@ -41,25 +49,39 @@ const AppProvider = ({ children }) => {
 
       if (data.success) {
         setUserData(data.userData);
-      } else {
-        // If token is invalid (e.g., expired), clear it to reset state
-        toast.error(data.message);
-        if (data.message === "Invalid token" || data.message === "Authentication failed") {
-            setToken("");
-            localStorage.removeItem("token");
-        }
-      }
+      } 
     } catch (error) {
-      console.error("Profile Load Error:", error);
-      // Optional: Clear token on 401 Unauthorized
-      if (error.response && error.response.status === 401) {
-         setToken("");
-         localStorage.removeItem("token");
-      }
+      console.log("Profile Load Error:", error);
+      // Note: 403 errors are now handled by the Interceptor below
     } finally {
       setLoading(false);
     }
   };
+
+  // ==============================
+  // 🛡️ GLOBAL SECURITY INTERCEPTOR
+  // ==============================
+  // This is the "secret sauce" that prevents needing a refresh.
+  // It listens to EVERY axios call made in the app.
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // If backend returns 403 (Forbidden) or 401 (Unauthorized)
+        if (error.response && (error.response.status === 403 || error.response.status === 401)) {
+          const msg = error.response.data.message || "";
+          if (msg.toLowerCase().includes("disabled") || msg.toLowerCase().includes("not authorized")) {
+            toast.error(msg || "Account disabled. Logging out...");
+            logoutUser();
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // Cleanup interceptor on unmount
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   // ==============================
   // 🛏️ DATA FETCHING
@@ -74,7 +96,6 @@ const AppProvider = ({ children }) => {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to load rooms");
     }
   };
 
@@ -82,7 +103,6 @@ const AppProvider = ({ children }) => {
   // 🛒 ROOM SELECTION LOGIC
   // ==============================
   const addRoom = (room) => {
-    // Prevent duplicates
     if (selectedRooms.some((r) => r._id === room._id)) {
       toast.warning("Room already added");
       return;
@@ -110,33 +130,26 @@ const AppProvider = ({ children }) => {
   // 2. Load Profile when Token Changes
   useEffect(() => {
     if (token) {
+        localStorage.setItem("token", token);
         loadUserProfileData();
     } else {
-        setUserData(null);
+        logoutUser();
         setLoading(false);
     }
   }, [token]);
 
-  // ==============================
-  // 📤 EXPORT
-  // ==============================
   const value = {
     backendUrl,
     currencySymbol,
     loading,
-    
-    // Auth
     token,
     setToken,
     userData,
     setUserData,
     loadUserProfileData,
-    
-    // Data
+    logoutUser,
     rooms,
     getRoomsData,
-    
-    // Selection
     selectedRooms,
     addRoom,
     removeRoom,

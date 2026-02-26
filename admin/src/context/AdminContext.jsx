@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import { createContext, useState, useEffect } from "react"; // Added useEffect
 import axios from "axios";
 import { toast } from "react-toastify";
 
@@ -6,13 +6,32 @@ export const AdminContext = createContext();
 
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
+  const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
 
-// 🔥 NEW
-const authHeader = {
-  headers: { token: aToken }
-};
+  // 🔥 NEW
+  const authHeader = {
+    headers: { token: aToken }
+  };
 
+  // ============================================================
+  // 🛡️ GLOBAL SECURITY INTERCEPTOR (THE FIX)
+  // ============================================================
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          const msg = error.response.data.message || "";
+          if (msg.toLowerCase().includes("not authorized") || msg.toLowerCase().includes("disabled")) {
+            toast.error(msg);
+            logoutAdmin(); // Instantly clears state so App.jsx redirects
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   // ============================================================
   // 📊 STATE MANAGEMENT
@@ -62,9 +81,9 @@ const authHeader = {
   const getDashboardData = async () => {
     try {
       const { data } = await axios.get(
-  `${backendUrl}/api/admin/dashboard`,
-  authHeader
-);
+        `${backendUrl}/api/admin/dashboard`,
+        authHeader
+      );
 
       if (data.success) {
         setDashboardData(data.dashData);
@@ -116,10 +135,10 @@ const authHeader = {
   const changeUserStatus = async (userId, status) => {
     try {
       const { data } = await axios.post(
-  `${backendUrl}/api/admin/change-user-status`,
-  { userId, status },
-  authHeader
-);
+        `${backendUrl}/api/admin/change-user-status`,
+        { userId, status },
+        authHeader
+      );
 
       if (data.success) {
         toast.success(data.message);
@@ -136,10 +155,10 @@ const authHeader = {
   const createStaff = async (formData) => {
     try {
       const { data } = await axios.post(
-  `${backendUrl}/api/admin/create-staff`,
-  formData,
-  authHeader
-);
+        `${backendUrl}/api/admin/create-staff`,
+        formData,
+        authHeader
+      );
 
 
       if (data.success) {
@@ -162,8 +181,8 @@ const authHeader = {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/update-staff`,
         formData,
-  authHeader
-);
+        authHeader
+      );
 
       if (data.success) {
         toast.success(data.message);

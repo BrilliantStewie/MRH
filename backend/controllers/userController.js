@@ -35,7 +35,16 @@ const googleAuth = async (req, res) => {
         const { email, displayName, photoURL } = req.body;
         let user = await userModel.findOne({ email });
 
-        if (!user) {
+        if (user) {
+            // 🛑 CHECK IF USER IS DISABLED
+            if (user.disabled) {
+                return res.json({ 
+                    success: false, 
+                    message: "Your account has been disabled. Please contact administration." 
+                });
+            }
+        } else {
+            // New user registration logic
             const parts = displayName.split(" ");
             const firstName = parts[0];
             const lastName = parts.length > 1 ? parts[parts.length - 1] : "User";
@@ -57,10 +66,10 @@ const googleAuth = async (req, res) => {
         }
 
         const token = createToken(
-    user._id,
-    `${user.firstName} ${user.lastName}`,
-    user.role
-);
+            user._id,
+            `${user.firstName} ${user.lastName}`,
+            user.role
+        );
         res.json({ success: true, token });
     } catch (error) {
         console.log(error);
@@ -117,15 +126,24 @@ const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await userModel.findOne({ email });
+        
         if (!user) return res.json({ success: false, message: "User does not exist" });
+
+        // 🛑 CHECK IF USER IS DISABLED
+        if (user.disabled) {
+            return res.json({ 
+                success: false, 
+                message: "Your account has been disabled. Please contact administration." 
+            });
+        }
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
             const token = createToken(
-    user._id,
-    `${user.firstName} ${user.lastName}`,
-    user.role
-);
+                user._id,
+                `${user.firstName} ${user.lastName}`,
+                user.role
+            );
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });

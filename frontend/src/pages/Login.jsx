@@ -1,9 +1,8 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import axios from 'axios';
-import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Eye, EyeOff, Loader2, Lock } from 'lucide-react';
+import { User, Camera, Eye, EyeOff, Loader2 } from 'lucide-react';
 
 // ✅ VALIDATION CONSTANTS
 const TEXT_SUFFIXES = ["Jr.", "Sr."];
@@ -18,6 +17,10 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Error States
+  const [isDisabled, setIsDisabled] = useState(false);
+  const [error, setError] = useState("");
+
   // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,8 +28,8 @@ const Login = () => {
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [suffix, setSuffix] = useState(''); // ✅ Added Suffix State
-  const [suffixError, setSuffixError] = useState(''); // ✅ Added Suffix Error State
+  const [suffix, setSuffix] = useState('');
+  const [suffixError, setSuffixError] = useState('');
   const [phone, setPhone] = useState('');
   const [image, setImage] = useState(null);
 
@@ -35,8 +38,13 @@ const Login = () => {
     if (token) navigate('/');
   }, [token, navigate]);
 
-  // --- VALIDATION & FORMATTING HELPERS ---
+  // Reset errors when user interacts with form
+  useEffect(() => {
+    setIsDisabled(false);
+    setError("");
+  }, [state, email, password, firstName, lastName]);
 
+  // --- VALIDATION & FORMATTING HELPERS ---
   const formatName = (val) => {
     const cleaned = val.replace(/[^a-zA-Z\s-]/g, ''); 
     return cleaned
@@ -45,7 +53,6 @@ const Login = () => {
       .join(' ');
   };
 
-  // ✅ Added Suffix Formatter & Validator
   const handleSuffixChange = (val) => {
     let formatted = val.replace(/[^a-zA-Z.]/g, "");
     if (formatted.length > 0) {
@@ -62,36 +69,24 @@ const Login = () => {
     }
   };
 
-  const formatPhone = (val) => {
-    return val.replace(/\D/g, '');
-  };
-
-  const validateEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
+  const formatPhone = (val) => val.replace(/\D/g, '');
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   // --- HANDLERS ---
-
   const onSubmitHandler = async (event) => {
     event.preventDefault();
+    setError("");
+    setIsDisabled(false);
 
     if (!validateEmail(email)) {
-      return toast.error("Please enter a valid email address");
+      return setError("Please enter a valid email address");
     }
 
     if (state === 'Sign Up') {
-      if (suffixError) {
-        return toast.error("Please provide a valid suffix (e.g., Jr., Sr., III)");
-      }
-      if (password !== confirmPassword) {
-        return toast.error("Passwords do not match!");
-      }
-      if (password.length < 8) {
-        return toast.error("Password must be at least 8 characters");
-      }
-      if (phone.length < 10) {
-        return toast.error("Please enter a valid phone number");
-      }
+      if (suffixError) return setError("Please provide a valid suffix (e.g., Jr., Sr., III)");
+      if (password !== confirmPassword) return setError("Passwords do not match!");
+      if (password.length < 8) return setError("Password must be at least 8 characters");
+      if (phone.length < 10) return setError("Please enter a valid phone number");
     }
 
     setLoading(true);
@@ -102,7 +97,7 @@ const Login = () => {
         formData.append('firstName', firstName.trim());
         formData.append('middleName', middleName.trim());
         formData.append('lastName', lastName.trim());
-        formData.append('suffix', suffix.trim()); // ✅ Added to FormData
+        formData.append('suffix', suffix.trim());
         formData.append('email', email);
         formData.append('password', password);
         formData.append('phone', phone);
@@ -111,12 +106,11 @@ const Login = () => {
         const { data } = await axios.post(backendUrl + '/api/user/register', formData);
         
         if (data.success) {
-          toast.success("Account created! Please login with your credentials.");
           setState('Login');
           setPassword('');
           setConfirmPassword('');
         } else {
-          toast.error(data.message);
+          setError(data.message);
         }
       } else {
         const { data } = await axios.post(backendUrl + '/api/user/login', { email, password });
@@ -124,13 +118,22 @@ const Login = () => {
         if (data.success) {
           localStorage.setItem('token', data.token);
           setToken(data.token);
-          toast.success("Login successful");
         } else {
-          toast.error(data.message);
+          const msg = data.message.toLowerCase();
+          if (msg.includes("disabled") || msg.includes("frozen") || msg.includes("revoked")) {
+            setIsDisabled(true);
+          } else {
+            setError(data.message);
+          }
         }
       }
-    } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.message || "";
+      if (errMsg.toLowerCase().includes("disabled") || errMsg.toLowerCase().includes("frozen")) {
+        setIsDisabled(true);
+      } else {
+        setError("Authentication Failed. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }
@@ -145,6 +148,7 @@ const Login = () => {
           <p className='text-zinc-500 mt-1'>Please {state === 'Sign Up' ? "sign up" : "log in"} to book an appointment</p>
         </div>
 
+        {/* PROFILE PIC SECTION */}
         {state === 'Sign Up' && (
           <div className="w-full flex justify-center mb-4">
             <label htmlFor="profile-pic" className="cursor-pointer relative group">
@@ -177,7 +181,6 @@ const Login = () => {
                 </div>
               </div>
               
-              {/* ✅ Added Middle Name and Suffix Grid */}
               <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
                 <div className='md:col-span-2 flex flex-col gap-1'>
                   <label className='font-semibold ml-1'>Middle Name (Optional)</label>
@@ -231,20 +234,35 @@ const Login = () => {
           )}
         </div>
 
+        {/* --- ERROR MESSAGE (General) --- */}
+        {error && !isDisabled && (
+            <div className="w-full mt-4 p-3 bg-red-50 text-red-600 border border-red-100 rounded-xl text-xs font-medium animate-pulse">
+                ⚠️ {error}
+            </div>
+        )}
+
+        {/* --- DISABLED ACCOUNT WARNING --- */}
+        {isDisabled && (
+            <div className="w-full mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-xl">
+                <p className="text-sm font-bold text-red-800">Account Disabled</p>
+                <p className="text-xs text-red-600 mt-0.5">Your access has been restricted. Please contact our support team for assistance.</p>
+            </div>
+        )}
+
         <button 
           disabled={loading} 
           type='submit' 
-          className='bg-blue-600 text-white w-full py-3 rounded-xl text-base font-bold hover:bg-blue-700 transition-all mt-6 flex justify-center items-center shadow-md active:scale-[0.98]'
+          className='bg-blue-600 text-white w-full py-3 rounded-xl text-base font-bold hover:bg-blue-700 transition-all mt-6 flex justify-center items-center shadow-md active:scale-[0.98] disabled:bg-zinc-300'
         >
           {loading ? <Loader2 className='animate-spin' size={20} /> : (state === 'Sign Up' ? "Create Account" : "Login")}
         </button>
 
         <div className='w-full text-center mt-4'>
           {state === 'Sign Up' ? (
-            <p>Already have an account? <span onClick={() => { setState('Login'); setPassword(''); setConfirmPassword(''); }} className='text-blue-600 font-bold underline cursor-pointer hover:text-blue-800'>Login here</span></p>
+            <p>Already have an account? <span onClick={() => { setState('Login'); setPassword(''); setConfirmPassword(''); setError(''); setIsDisabled(false); }} className='text-blue-600 font-bold underline cursor-pointer hover:text-blue-800'>Login here</span></p>
           ) : (
-            <p>Create a new account? <span onClick={() => { setState('Sign Up'); setPassword(''); }} className='text-blue-600 font-bold underline cursor-pointer hover:text-blue-800'>Click here</span></p>
-          )}
+            <p>Create a new account? <span onClick={() => { setState('Sign Up'); setPassword(''); setError(''); setIsDisabled(false); }} className='text-blue-600 font-bold underline cursor-pointer hover:text-blue-800'>Click here</span></p>
+          ) }
         </div>
       </div>
     </form>

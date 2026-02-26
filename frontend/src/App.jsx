@@ -1,5 +1,7 @@
-import React from "react";
-import { Route, Routes, useLocation } from "react-router-dom"; // 1. Import useLocation
+import React, { useContext, useEffect } from "react";
+import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { AppContext } from "./context/AppContext";
 import Home from "./pages/Home";
 import Rooms from "./pages/Rooms";
 import Login from "./pages/Login";
@@ -12,35 +14,71 @@ import UploadPayment from "./pages/UploadPayment";
 import RetreatBooking from "./pages/RetreatBooking";
 import Payment from "./pages/Payment";
 import ReviewPage from "./pages/ReviewPage"; 
-import AllReviews from "./pages/AllReviews"; // 2. Import the new AllReviews page
+import AllReviews from "./pages/AllReviews"; 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { ToastContainer } from "react-toastify";
+import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 const App = () => {
-  const location = useLocation(); // 3. Get the current URL path
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { token, setToken, backendUrl } = useContext(AppContext);
 
-  // 4. Logic to hide Navbar/Footer on specific pages
+  // ================= SECURITY & AUTO-LOGOUT LOGIC =================
+  useEffect(() => {
+    // 1. AXIOS INTERCEPTOR: Kicks user if any active request returns 403
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 403) {
+          logoutUser();
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    // 2. LOGOUT FUNCTION: Clears state and storage
+    const logoutUser = () => {
+      localStorage.removeItem("token");
+      setToken("");
+      toast.error("Account disabled or session expired.");
+      navigate("/login");
+    };
+
+    // 3. HEARTBEAT: Checks the server every 2 minutes even if user is idle
+    const heartbeat = setInterval(() => {
+      if (token) {
+        axios.get(`${backendUrl}/api/user/get-profile`, { headers: { token } })
+          .catch((err) => {
+            if (err.response && err.response.status === 403) {
+              logoutUser();
+            }
+          });
+      }
+    }, 120000); // 120,000ms = 2 minutes
+
+    // CLEANUP: Stop the heartbeat and remove interceptor when app closes
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+      clearInterval(heartbeat);
+    };
+  }, [token, backendUrl, setToken, navigate]);
+
+  // Logic to hide Navbar/Footer on specific pages
   const isFullScreenPage = location.pathname === '/reviews';
 
   return (
     <div className="w-full overflow-hidden">
-      <ToastContainer />
+      <ToastContainer position="top-right" autoClose={3000} />
       
-      {/* 5. Only show Navbar if NOT on a full screen page */}
       {!isFullScreenPage && <Navbar />}
 
-      {/* 6. Adjust main container: remove padding-top if on full screen page */}
       <main className={isFullScreenPage ? "" : "min-h-screen pt-20"}>
         <Routes>
-          {/* --- PUBLIC / FULL WIDTH ROUTES --- */}
           <Route path="/" element={<Home />} />
-          
-          {/* ✅ The All Reviews Page (No container, No Navbar) */}
           <Route path="/reviews" element={<AllReviews />} />
 
-          {/* --- MAIN LAYOUT ROUTES (Wrapped in container) --- */}
           <Route path="/*" element={
             <div className="max-w-7xl mx-auto px-4 sm:px-6">
               <Routes>
@@ -53,10 +91,7 @@ const App = () => {
                 <Route path="/my-bookings" element={<MyBookings />} />
                 <Route path="/rooms/:roomId" element={<RoomBooking />} />
                 <Route path="/payment/:id" element={<Payment />} />
-                
-                {/* Single Booking Review Popup */}
                 <Route path="/review/:bookingId" element={<ReviewPage />} />
-                
                 <Route path="/upload-payment" element={<UploadPayment />} />
               </Routes>
             </div>
@@ -64,7 +99,6 @@ const App = () => {
         </Routes>
       </main>
 
-      {/* 7. Only show Footer if NOT on a full screen page */}
       {!isFullScreenPage && <Footer />}
     </div>
   );

@@ -17,6 +17,27 @@ const AppContextProvider = (props) => {
     return savedRooms ? JSON.parse(savedRooms) : [];
   });
 
+  // ================= SECURITY INTERCEPTOR =================
+  // This ensures that IF any request fails with 403 (Disabled), 
+  // the state is cleared immediately across the whole app.
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 403) {
+          // Clear all guest data instantly
+          setToken(null);
+          setUserData(null);
+          localStorage.removeItem("token");
+          toast.error("Account disabled. Logging out...");
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("selectedRooms", JSON.stringify(selectedRooms));
   }, [selectedRooms]);
@@ -24,7 +45,7 @@ const AppContextProvider = (props) => {
   // Load User Profile
   const loadUserProfileData = async () => {
     try {
-      if (!token) return; 
+      if (!token) return;
 
       const { data } = await axios.get(
         backendUrl + "/api/user/profile",
@@ -32,19 +53,20 @@ const AppContextProvider = (props) => {
       );
 
       if (data.success) {
-        setUserData(data.userData); 
+        setUserData(data.userData);
       } else {
         console.log("Failed to load profile:", data.message);
       }
     } catch (error) {
-      console.log(error);
-      // toast.error(error.message); 
+      console.log("Profile Load Error:", error.message);
+      // The interceptor above handles 403 errors, so we don't need logic here
     }
   };
 
-  // Sync Token
+  // Sync Token and Profile
   useEffect(() => {
     if (token) {
+      localStorage.setItem("token", token);
       loadUserProfileData();
     } else {
       setUserData(null);
@@ -86,8 +108,8 @@ const AppContextProvider = (props) => {
     token,
     setToken,
     userData,
-    setUserData,         // ✅ Make sure this is here
-    loadUserProfileData, // ✅ CRITICAL FIX: Make sure this is here
+    setUserData,
+    loadUserProfileData,
     backendUrl,
   };
 

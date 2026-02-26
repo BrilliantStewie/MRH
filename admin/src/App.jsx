@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import React, { useContext } from "react"; // Removed useEffect, axios
+import { Routes, Route, Navigate } from "react-router-dom"; // Removed useNavigate
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -7,11 +7,9 @@ import "react-toastify/dist/ReactToastify.css";
 import { AdminContext } from "./context/AdminContext";
 import { StaffContext } from "./context/StaffContext";
 
-// Admin Components
+// Components
 import Sidebar from "./components/Admin/Sidebar";
 import Navbar from "./components/Admin/Navbar";
-
-// Staff Components
 import StaffNavbar from "./components/Staff/StaffNavbar";
 import StaffSidebar from "./components/Staff/StaffSidebar";
 
@@ -19,8 +17,6 @@ import StaffSidebar from "./components/Staff/StaffSidebar";
 import Login from "./pages/Login";
 import AdminReviews from "./pages/Admin/AdminReviews";
 import StaffReviews from "./pages/Staff/StaffReviews";
-
-// Admin Pages
 import Dashboard from "./pages/Admin/Dashboard";
 import RoomsList from "./pages/Admin/RoomsList";
 import AllBookings from "./pages/Admin/AllBookings";
@@ -28,8 +24,6 @@ import Users from "./pages/Admin/Users";
 import StaffList from "./pages/Admin/StaffList";
 import Packages from "./pages/Admin/Packages";
 import Analytics from "./pages/Admin/Analytics";
-
-// Staff Pages
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
@@ -41,18 +35,19 @@ const App = () => {
   const { aToken } = useContext(AdminContext);
   const { sToken } = useContext(StaffContext);
 
+  // NOTE: The Security Interceptor is now handled inside AdminContext.jsx
+  // This makes the App.jsx much cleaner and prevents duplicate logic.
+
   return (
     <div className="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans antialiased">
       <ToastContainer position="top-right" autoClose={3000} />
 
-      {/* ================= ADMIN ================= */}
+      {/* ================= ADMIN LAYOUT ================= */}
       {aToken ? (
         <>
           <Navbar />
-
           <div className="flex flex-1 overflow-hidden">
             <Sidebar />
-
             <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8">
               <div className="max-w-7xl mx-auto pb-20">
                 <Routes>
@@ -72,13 +67,11 @@ const App = () => {
           </div>
         </>
       ) : sToken ? (
-        /* ================= STAFF ================= */
+        /* ================= STAFF LAYOUT ================= */
         <>
           <StaffNavbar />
-
           <div className="flex flex-1 overflow-hidden">
             <StaffSidebar />
-
             <main className="flex-1 overflow-y-auto bg-slate-50 p-6">
               <div className="max-w-7xl mx-auto">
                 <Routes>
@@ -90,7 +83,6 @@ const App = () => {
                       </StaffProtectedRoute>
                     }
                   />
-
                   <Route
                     path="/staff-bookings"
                     element={
@@ -99,7 +91,6 @@ const App = () => {
                       </StaffProtectedRoute>
                     }
                   />
-
                   <Route
                     path="/staff-profile"
                     element={
@@ -108,8 +99,6 @@ const App = () => {
                       </StaffProtectedRoute>
                     }
                   />
-
-                  {/* ✅ STAFF REVIEWS ROUTE */}
                   <Route
                     path="/staff-reviews"
                     element={
@@ -118,18 +107,14 @@ const App = () => {
                       </StaffProtectedRoute>
                     }
                   />
-
-                  <Route
-                    path="*"
-                    element={<Navigate to="/staff-dashboard" replace />}
-                  />
+                  <Route path="*" element={<Navigate to="/staff-dashboard" replace />} />
                 </Routes>
               </div>
             </main>
           </div>
         </>
       ) : (
-        /* ================= LOGIN ================= */
+        /* ================= LOGIN LAYOUT ================= */
         <div className="flex-1 flex items-center justify-center bg-slate-100">
           <Routes>
             <Route path="/" element={<Login />} />

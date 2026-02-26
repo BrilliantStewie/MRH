@@ -64,7 +64,7 @@ const loginAdmin = async (req, res) => {
 const adminDashboard = async (req, res) => {
     try {
         const [userCount, staffCount, roomCount, bookings] = await Promise.all([
-            userModel.countDocuments({ role: 'user' }),
+            userModel.countDocuments({ role: 'guest' }),
             userModel.countDocuments({ role: 'staff' }),
             roomModel.countDocuments({}),
             bookingModel.find({}).sort({ date: -1 })
@@ -135,7 +135,7 @@ const addGuestUser = async (req, res) => {
             email,
             password: hashedPassword,
             phone,
-            role: 'user',
+            role: 'guest',
             image: "" 
         });
 
@@ -242,7 +242,7 @@ const changeUserStatus = async (req, res) => {
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
 
-        user.disabled = !user.disabled;
+        user.disabled = !user.disabled; // Automatically toggles between true and false
         await user.save();
 
         res.json({ success: true, message: `User is now ${user.disabled ? 'Disabled' : 'Enabled'}` });

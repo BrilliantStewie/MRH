@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
     middleName: { type: String, default: "" }, 
     lastName: { type: String, required: true },
     suffix: { type: String, default: "" }, // Ensure suffix is here if used in UI
-    role: { type: String, default: 'user' },
+    role: { type: String, default: 'guest' },
     email: { type: String, required: true, unique: true },
     phone: { type: String, default: "0000000000" },
     password: { type: String, required: true },

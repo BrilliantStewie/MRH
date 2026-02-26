@@ -16,7 +16,7 @@ const RetreatBooking = () => {
   const navigate = useNavigate();
 
   // --- 1. STATE VARIABLES ---
-  const [bookingName, setBookingName] = useState(""); // 👈 NEW STATE
+  const [bookingName, setBookingName] = useState(""); 
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [participants, setParticipants] = useState(1);
@@ -27,7 +27,7 @@ const RetreatBooking = () => {
 
   // Blocking State
   const [roomUnavailableDates, setRoomUnavailableDates] = useState([]); 
-  const [userBookedDates, setUserBookedDates] = useState([]);         
+  const [userBookedDates, setUserBookedDates] = useState([]);        
 
   // --- 2. FETCH PACKAGES FROM API ---
   useEffect(() => {
@@ -65,6 +65,9 @@ const RetreatBooking = () => {
 
   const getRoomImage = (room) => {
     if (!room) return null;
+    if (room.cover_image) return room.cover_image;
+    if (Array.isArray(room.images) && room.images.length > 0) return room.images[0];
+    
     return room.image_url || (Array.isArray(room.image) ? room.image[0] : room.image);
   };
 
@@ -137,6 +140,8 @@ const RetreatBooking = () => {
     return diff;
   };
 
+  const isSameDayBooking = startDate && endDate && toDateObj(startDate).getTime() === toDateObj(endDate).getTime();
+
   // --- 6. CALCULATION LOGIC ---
   const calculateTotal = () => {
     const duration = getDuration();
@@ -158,6 +163,14 @@ const RetreatBooking = () => {
         toast.error("Please select dates.");
         return;
     }
+
+    const startTimestamp = new Date(startDate).setHours(0,0,0,0);
+    const endTimestamp = new Date(endDate).setHours(0,0,0,0);
+    if (startTimestamp === endTimestamp && selectedRooms.length > 0) {
+        toast.error("Rooms cannot be booked for a same-day event. Please remove the selected room(s) or adjust your dates.");
+        return;
+    }
+
     if (!token) {
         toast.error("Please login to book.");
         navigate('/login');
@@ -168,7 +181,6 @@ const RetreatBooking = () => {
        return;
     }
     
-    // 👇 CRITICAL FIX: Validate Booking Name
     if (!bookingName.trim()) {
       toast.error("Please enter an Event Name (e.g. Family Reunion)"); 
       return;
@@ -179,7 +191,7 @@ const RetreatBooking = () => {
 
     try {
         const bookingPayload = {
-            bookingName: bookingName, // 👈 SENDING TO BACKEND
+            bookingName: bookingName, 
             room_ids: selectedRooms.map(r => r._id),
             check_in: startDate,
             check_out: endDate,
@@ -216,6 +228,9 @@ const RetreatBooking = () => {
         toast.error(error.response?.data?.message || "Failed.");
     }
   };
+
+  // Helper boolean to cleanly disable the button
+  const isInvalidBookingState = isSameDayBooking && selectedRooms.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-50 pt-8 pb-20 font-sans text-slate-900">
@@ -273,7 +288,6 @@ const RetreatBooking = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     
-                    {/* 👇 NEW INPUT FIELD FOR BOOKING NAME */}
                     <div className="md:col-span-2">
                         <label className="block text-xs font-bold uppercase text-slate-500 mb-2">
                           Event Name / Group Name <span className="text-red-500">*</span>
@@ -353,7 +367,7 @@ const RetreatBooking = () => {
                         <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">2</span>
                         <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Rooms</h2>
                     </div>
-                    {selectedRooms.length > 0 && (
+                    {selectedRooms.length > 0 && !isSameDayBooking && (
                         <button onClick={() => navigate('/rooms')} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">
                             + Add Another
                         </button>
@@ -361,17 +375,29 @@ const RetreatBooking = () => {
                 </div>
 
                 {selectedRooms.length === 0 ? (
-                    <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-row items-center justify-between gap-4">
-                        <p className="text-sm text-slate-500 font-medium ml-2">No accommodation selected.</p>
+                    <div className={`p-4 rounded-xl border border-dashed flex flex-row items-center justify-between gap-4 ${isSameDayBooking ? "bg-slate-100 border-slate-300" : "bg-slate-50 border-slate-200"}`}>
+                        <p className={`text-sm font-medium ml-2 ${isSameDayBooking ? "text-slate-400" : "text-slate-500"}`}>
+                            {isSameDayBooking ? "Rooms are not available for same-day events." : "No accommodation selected."}
+                        </p>
                         <button 
-                            onClick={() => navigate('/rooms')} 
-                            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 shadow-sm hover:bg-slate-100 transition-colors"
+                            onClick={() => { if (!isSameDayBooking) navigate('/rooms') }} 
+                            disabled={isSameDayBooking}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors ${
+                                isSameDayBooking 
+                                ? "bg-slate-200 text-slate-400 cursor-not-allowed border-transparent" 
+                                : "bg-white border border-slate-200 text-slate-900 hover:bg-slate-100"
+                            }`}
                         >
                             + Add Room
                         </button>
                     </div>
                 ) : (
                     <div className="space-y-3">
+                        {isSameDayBooking && (
+                            <div className="p-3 mb-2 bg-red-50 border border-red-200 text-red-600 text-xs font-bold rounded-xl text-center">
+                                ⚠️ {selectedRooms.length === 1 ? "A room" : "Rooms"} cannot be booked for same-day events. Please remove the {selectedRooms.length === 1 ? "room" : "rooms"} or adjust your dates.
+                            </div>
+                        )}
                         {selectedRooms.map((room) => {
                             const imagePath = getRoomImage(room);
                             const fullImageUrl = getImageUrl(imagePath);
@@ -379,7 +405,7 @@ const RetreatBooking = () => {
                             const price = getPrice(room.price);
 
                             return (
-                                <div key={room._id} className="group flex flex-row items-center gap-4 p-3 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-blue-300 transition-all duration-300">
+                                <div key={room._id} className={`group flex flex-row items-center gap-4 p-3 bg-white border rounded-xl transition-all duration-300 ${isSameDayBooking ? "border-red-200 opacity-50 grayscale" : "border-slate-200 hover:shadow-md hover:border-blue-300"}`}>
                                     <div className="w-20 h-20 shrink-0 rounded-lg overflow-hidden bg-slate-100 border border-slate-100">
                                         {fullImageUrl ? (
                                             <img 
@@ -426,7 +452,7 @@ const RetreatBooking = () => {
                                         
                                         <button 
                                             onClick={() => handleRemoveRoom(room._id)}
-                                            className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all group-hover:text-red-400"
+                                            className="text-slate-500 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all group-hover:text-red-400"
                                             title="Remove Room"
                                         >
                                             <Trash2 size={16} />
@@ -546,9 +572,15 @@ const RetreatBooking = () => {
                     <span className="font-extrabold text-3xl text-slate-900">{currencySymbol}{calculateTotal().toLocaleString()}</span>
                 </div>
 
+                {/* 👇 UPDATED BUTTON */}
                 <button 
                     onClick={handleProceed}
-                    className="w-full bg-blue-500 text-white py-4 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-blue-600 shadow-lg shadow-blue-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    disabled={isInvalidBookingState}
+                    className={`w-full py-4 rounded-xl font-bold uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2 ${
+                        isInvalidBookingState
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                        : "bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-200 active:scale-[0.98]"
+                    }`}
                 >
                     Book Now <CheckCircle size={16} />
                 </button>

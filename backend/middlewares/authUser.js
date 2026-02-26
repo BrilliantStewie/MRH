@@ -1,39 +1,41 @@
 import jwt from "jsonwebtoken";
+import userModel from "../models/userModel.js"; // 👈 Import your model
 
-const authUser = (req, res, next) => {
+const authUser = async (req, res, next) => { // 👈 Make this async
   try {
-    // Allows token to be passed as just "token" or as a standard "Bearer" token
     const token = req.headers.token || req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Not authorized"
-      });
+      return res.status(401).json({ success: false, message: "Not authorized" });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // 🛑 THE SECURITY CHECK:
+    // Look up the user in the database to see if they are disabled
+    const user = await userModel.findById(decoded.id);
 
-    // 🛠️ DEBUGGING LOG: Check your backend terminal to see what is actually inside your token!
-    console.log("Decoded Token Payload:", decoded); 
+    if (!user) {
+      return res.status(401).json({ success: false, message: "User not found" });
+    }
 
-    // ✅ Attach user ID
+    if (user.disabled) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Your account has been disabled. Please contact administration." 
+      });
+    }
+
+    // ✅ Attach user info to request
     req.userId = decoded.id;
-
-    // ✅ Attach user role from token (Defaults to guest if missing)
-    req.userRole = decoded.role || "guest";
-
-    // ✅ Attach name (optional)
-    req.userName = decoded.name || "Guest";
+    req.userRole = user.role || "guest"; // Use DB role for better accuracy
+    req.userName = `${user.firstName} ${user.lastName}`;
 
     next();
 
   } catch (error) {
     console.error("User Auth Error:", error.message);
-    return res.status(401).json({
-      success: false,
-      message: "Invalid token"
-    });
+    return res.status(401).json({ success: false, message: "Invalid token" });
   }
 };
 
