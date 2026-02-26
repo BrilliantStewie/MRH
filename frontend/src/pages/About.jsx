@@ -1,33 +1,36 @@
 import React from 'react';
-import { assets } from '../assets/assets';
-import { Ship, Sun, Feather, ArrowUpRight, Cross } from 'lucide-react';
+// Direct import to ensure the build tool (Vite/Webpack) finds the file
+import mrh_about from '../assets/mrh_about.jpg'; 
+import { Ship, Sun, Feather, Cross } from 'lucide-react';
 
 const About = () => {
   return (
-    /* - pt-[180px]: Aggressive padding to handle high-zoom scales (125%+) 
-      - bg-slate-50: Neutral, clean backdrop matching the Home page
-    */
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 pt-10">
       <div className="max-w-7xl mx-auto px-6">
-         {/* --- HEADER SECTION --- */}
+        
+        {/* --- HEADER SECTION --- */}
         <div className="text-center mb-16">
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4 tracking-tight">
             Mercedarian <span className="text-blue-600">Retreat House</span>
           </h1>
           <div className="w-28 h-1.5 bg-blue-600 mx-auto rounded-full mb-6"></div>
-         
         </div>
         
         {/* --- SECTION 1: THE SPLIT HERO --- */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-32 items-stretch">
           
           {/* Left Block: Image Container */}
-          <div className="relative h-[500px] lg:h-auto rounded-[2.5rem] overflow-hidden shadow-2xl group">
+          <div className="relative h-[500px] lg:h-auto rounded-[2.5rem] overflow-hidden shadow-2xl group bg-slate-200">
             <img 
-              src={assets.about_image} 
-              alt="The Retreat Grounds" 
+              src={mrh_about} 
+              alt="Mercedarian Retreat House and Sisters" 
               className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-110" 
+              onError={(e) => {
+                console.error("Image failed to load at path:", mrh_about);
+                e.target.src = "https://via.placeholder.com/800x1200?text=Check+File+Extension";
+              }}
             />
+            
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
             <div className="absolute bottom-10 left-10 text-white">
                 <p className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-80 mb-2">Since 2004</p>
@@ -55,15 +58,11 @@ const About = () => {
                 Our mission is to provide professional hospitality within a strictly quiet environment, allowing every guest to encounter the Divine in the beauty of Bohol's landscape.
               </p>
             </div>
-
-            
           </div>
         </div>
 
-        {/* --- SECTION 2: THE ATMOSPHERE (Grid) --- */}
+        {/* --- SECTION 2: THE ATMOSPHERE --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-          
-          {/* Virtue 1 */}
           <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
                 <Sun size={24} strokeWidth={1.5} />
@@ -74,18 +73,16 @@ const About = () => {
             </p>
           </div>
 
-          {/* Virtue 2 */}
           <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
                 <Feather size={24} strokeWidth={1.5} />
             </div>
             <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Softness</h3>
             <p className="text-slate-500 text-sm leading-relaxed">
-                An environment designed for quiet movements and gentle reflection in every corner.
+                An environment designed for quiet movements and gentle reflection.
             </p>
           </div>
 
-          {/* Virtue 3 */}
           <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
             <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
                 <Ship size={24} strokeWidth={1.5} />
@@ -95,10 +92,7 @@ const About = () => {
                 A place to ground yourself and find stability amidst the storms of life.
             </p>
           </div>
-
         </div>
-
-        
       </div>
     </div>
   );

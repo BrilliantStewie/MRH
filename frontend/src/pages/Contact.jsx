@@ -1,6 +1,6 @@
 import React from 'react';
-import { assets } from '../assets/assets';
-import { MapPin, Phone, Mail, Briefcase, ArrowRight } from 'lucide-react';
+import mrh_contact from '../assets/mrh_contact.jpg'; 
+import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 
 const Contact = () => {
   return (
@@ -14,80 +14,87 @@ const Contact = () => {
           </h1>
           <div className="w-20 h-1.5 bg-blue-600 mx-auto rounded-full mb-6"></div>
           <p className="text-slate-500 max-w-2xl mx-auto text-sm md:text-base leading-relaxed">
-            We are here to help. Reach out to us for any inquiries or support.
+            We are here to assist you. Reach out to the Mercedarian Retreat House for any inquiries regarding our facilities and spiritual retreats.
           </p>
         </div>
 
-        {/* --- MAIN CONTENT --- */}
-        <div className="flex flex-col md:flex-row gap-12 items-start justify-center">
+        {/* --- MAIN CONTENT: Aligned Grid --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch justify-center max-w-6xl mx-auto">
           
-          {/* Left Column: Image */}
-          <div className="w-full md:w-5/12">
-            <div className="relative group">
-                {/* Decorative offset background */}
-                <div className="absolute -inset-4 bg-blue-100 rounded-[2.5rem] -z-10 transform -rotate-2 group-hover:rotate-1 transition-transform duration-500"></div>
-                
-                <img 
-                    className="w-full h-auto rounded-3xl shadow-xl object-cover border border-slate-200" 
-                    src={assets.contact_image} 
-                    alt="Contact Us" 
-                />
-            </div>
+          {/* Left Column: Centered Image */}
+          <div className="relative group min-h-[500px]">
+            <div className="absolute -inset-4 bg-blue-100 rounded-[2.5rem] -z-10 transform -rotate-1 group-hover:rotate-0 transition-transform duration-500"></div>
+            
+            <img 
+                className="w-full h-full rounded-[2rem] shadow-xl object-cover object-center border border-slate-200" 
+                src={mrh_contact} 
+                alt="Mercedarian Retreat House Contact" 
+            />
           </div>
 
-          {/* Right Column: Info Cards */}
-          <div className="w-full md:w-6/12 space-y-8">
+          {/* Right Column: Aligned Info Card */}
+          <div className="bg-white p-8 md:p-12 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-center">
+            <h3 className="text-2xl font-bold text-slate-900 mb-8 border-b border-slate-50 pb-4">
+                Get in Touch
+            </h3>
             
-            {/* Office Info Card */}
-            <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300">
-                <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                    Our Office
-                </h3>
-                
-                <div className="space-y-6">
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
-                            <MapPin size={20} />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-slate-900 text-sm">Location</p>
-                            <p className="text-slate-500 text-sm leading-relaxed mt-1">
-                                00000 Willms Station <br /> 
-                                Suite 000, Washington, USA
-                            </p>
-                        </div>
+            <div className="space-y-8">
+                {/* Location Section */}
+                <div className="flex items-start gap-5">
+                    <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                        <MapPin size={22} />
                     </div>
-
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
-                            <Phone size={20} />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-slate-900 text-sm">Phone</p>
-                            <p className="text-slate-500 text-sm mt-1">(000) 000-0000</p>
-                        </div>
+                    <div>
+                        <p className="font-bold text-slate-900 text-sm uppercase tracking-wide">Address</p>
+                        <p className="text-slate-500 leading-relaxed mt-1">
+                            Sitio Union, Brgy. Totolan, <br /> 
+                            Dauis, Bohol, Philippines
+                        </p>
                     </div>
+                </div>
 
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-blue-600 shrink-0">
-                            <Mail size={20} />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-slate-900 text-sm">Email</p>
-                            <p className="text-slate-500 text-sm mt-1">greatstackdev@gmail.com</p>
+                {/* Phone Section */}
+                <div className="flex items-start gap-5">
+                    <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                        <Phone size={22} />
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-900 text-sm uppercase tracking-wide">Phone</p>
+                        <p className="text-slate-500 mt-1">+63 (038) 411-0000</p>
+                    </div>
+                </div>
+
+                {/* Email Section */}
+                <div className="flex items-start gap-5">
+                    <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                        <Mail size={22} />
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-900 text-sm uppercase tracking-wide">Email</p>
+                        <p className="text-slate-500 mt-1">mercedarianretreat@gmail.com</p>
+                    </div>
+                </div>
+
+                {/* Office Hours Section */}
+                <div className="flex items-start gap-5">
+                    <div className="w-11 h-11 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                        <Clock size={22} />
+                    </div>
+                    <div>
+                        <p className="font-bold text-slate-900 text-sm uppercase tracking-wide">Office Hours</p>
+                        <div className="text-slate-500 mt-1 text-sm space-y-1">
+                            <p>Mon – Sat: 8:00 AM – 5:00 PM</p>
+                            <p className="italic text-blue-400">Sunday: Closed for Prayer</p>
                         </div>
                     </div>
                 </div>
             </div>
-
-          
-
           </div>
 
         </div>
-    </div>
+      </div>
     </div>
   )
 }
 
-export default Contact
+export default Contact;

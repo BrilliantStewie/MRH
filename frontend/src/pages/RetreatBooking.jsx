@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 import { 
   ArrowLeft, Calendar, User, Package, CheckCircle, 
   Trash2, Image as ImageIcon, Building2, Users,
-  Utensils, Wind, Tag 
+  Utensils, Wind, Tag, ChevronDown, ChevronUp 
 } from "lucide-react"; 
 
 const RetreatBooking = () => {
@@ -22,6 +22,10 @@ const RetreatBooking = () => {
   const [participants, setParticipants] = useState(1);
   const [selectedPackageId, setSelectedPackageId] = useState(null); 
   
+  // New expansion states
+  const [showAllRooms, setShowAllRooms] = useState(false);
+  const [showAllPackages, setShowAllPackages] = useState(false);
+
   // Database Packages State
   const [dbPackages, setDbPackages] = useState([]);
 
@@ -36,9 +40,7 @@ const RetreatBooking = () => {
         const { data } = await axios.get(backendUrl + '/api/package/list'); 
         if (data.success) {
           setDbPackages(data.packages);
-          if (data.packages.length > 0) {
-             setSelectedPackageId(data.packages[0]._id);
-          }
+          // REMOVED: Auto-setting the first package. selectedPackageId remains null.
         }
       } catch (error) {
         console.error("Error fetching packages", error);
@@ -176,6 +178,8 @@ const RetreatBooking = () => {
         navigate('/login');
         return;
     }
+    
+    // VALIDATION: Ensure package is selected
     if (allPackages.length > 0 && !selectedPackageId) {
        toast.error("Please select a package.");
        return;
@@ -230,7 +234,7 @@ const RetreatBooking = () => {
   };
 
   // Helper boolean to cleanly disable the button
-  const isInvalidBookingState = isSameDayBooking && selectedRooms.length > 0;
+  const isInvalidBookingState = (isSameDayBooking && selectedRooms.length > 0) || !selectedPackageId;
 
   return (
     <div className="min-h-screen bg-slate-50 pt-8 pb-20 font-sans text-slate-900">
@@ -398,7 +402,7 @@ const RetreatBooking = () => {
                                 ⚠️ {selectedRooms.length === 1 ? "A room" : "Rooms"} cannot be booked for same-day events. Please remove the {selectedRooms.length === 1 ? "room" : "rooms"} or adjust your dates.
                             </div>
                         )}
-                        {selectedRooms.map((room) => {
+                        {selectedRooms.slice(0, showAllRooms ? selectedRooms.length : 2).map((room) => {
                             const imagePath = getRoomImage(room);
                             const fullImageUrl = getImageUrl(imagePath);
                             const capacity = Number(room.capacity) || 0;
@@ -461,6 +465,20 @@ const RetreatBooking = () => {
                                 </div>
                             );
                         })}
+
+                        {/* ROOMS SHOW MORE/LESS */}
+                        {selectedRooms.length > 2 && (
+                          <button 
+                            onClick={() => setShowAllRooms(!showAllRooms)}
+                            className="w-full py-2 flex items-center justify-center gap-1 text-[11px] font-bold text-slate-500 hover:text-blue-600 transition-colors uppercase tracking-tighter"
+                          >
+                            {showAllRooms ? (
+                              <><ChevronUp size={14}/> Show Less</>
+                            ) : (
+                              <><ChevronDown size={14}/> Show All ({selectedRooms.length})</>
+                            )}
+                          </button>
+                        )}
                     </div>
                 )}
             </div>
@@ -473,7 +491,7 @@ const RetreatBooking = () => {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {allPackages.map((pkg) => {
+                    {allPackages.slice(0, showAllPackages ? allPackages.length : 3).map((pkg) => {
                          const pkgPrice = getPrice(pkg.price);
                          const isSelected = selectedPackageId === pkg._id;
 
@@ -524,6 +542,20 @@ const RetreatBooking = () => {
                         </div>
                     )})}
                 </div>
+
+                {/* PACKAGES SHOW MORE/LESS */}
+                {allPackages.length > 3 && (
+                  <button 
+                    onClick={() => setShowAllPackages(!showAllPackages)}
+                    className="w-full mt-6 py-3 border border-slate-200 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all uppercase tracking-widest"
+                  >
+                    {showAllPackages ? (
+                      <><ChevronUp size={16}/> Show Less</>
+                    ) : (
+                      <><ChevronDown size={16}/> Show All Packages ({allPackages.length})</>
+                    )}
+                  </button>
+                )}
             </div>
 
         </div>
@@ -572,7 +604,6 @@ const RetreatBooking = () => {
                     <span className="font-extrabold text-3xl text-slate-900">{currencySymbol}{calculateTotal().toLocaleString()}</span>
                 </div>
 
-                {/* 👇 UPDATED BUTTON */}
                 <button 
                     onClick={handleProceed}
                     disabled={isInvalidBookingState}
