@@ -20,6 +20,17 @@ import Footer from "./components/Footer";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+// 👈 ADDED: ScrollToTop component
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [pathname]);
+
+  return null;
+};
+
 const App = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,6 +81,7 @@ const App = () => {
 
   return (
     <div className="w-full overflow-hidden">
+      <ScrollToTop /> {/* 👈 ADDED: Component inserted here */}
       <ToastContainer position="top-right" autoClose={3000} />
       
       {!isFullScreenPage && <Navbar />}

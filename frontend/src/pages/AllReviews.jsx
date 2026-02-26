@@ -319,10 +319,11 @@ const AllReviews = () => {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex justify-between items-start gap-4">
-                          <p className="text-slate-600 text-[14px] leading-relaxed font-light flex-1">
-                            {review.comment || "No written review provided."}
-                          </p>
+                        <div className="mb-8">
+                    <h2 className="text-2xl font-serif italic text-slate-800 mb-3 leading-snug">
+                      "{review.bookingId?.bookingName || (review.bookingId?.room_ids?.length > 0 ? review.bookingId.room_ids.map((r) => r.name).join(", ") : "Retreat Stay")}"
+                    </h2>
+                    <p className="text-slate-600 text-[14px] leading-relaxed font-light">{review.comment || "No written review provided."}</p>
                           
                           {/* OWNERSHIP ACTIONS FOR MAIN REVIEW */}
                           {isMyReview && (
@@ -343,6 +344,9 @@ const AllReviews = () => {
                         </div>
                       )}
                     </div>
+
+                   
+
 
                     {/* --- REPLIES THREAD --- */}
                     {parentChats.length > 0 && (

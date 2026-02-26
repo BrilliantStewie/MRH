@@ -1,11 +1,11 @@
 import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../context/AppContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // 👈 Added useLocation
 import axios from "axios";
 import {
   Users, Wind, Plus, X, ArrowRight, Filter, Building2,
   BedDouble, Layers, User, Ban, CalendarX, Sun, CheckCircle,
-  CircleDashed, ChevronLeft, ChevronRight, Trash2 // 👈 Added Trash2 icon
+  CircleDashed, ChevronLeft, ChevronRight, Trash2
 } from "lucide-react";
 
 const Rooms = () => {
@@ -14,12 +14,13 @@ const Rooms = () => {
     selectedRooms,
     addRoom,
     removeRoom,
-    clearRooms, // 👈 Import the clear function
+    clearRooms,
     getRoomsData,
     backendUrl
   } = useContext(AppContext);
 
   const navigate = useNavigate();
+  const location = useLocation(); // 👈 Added location hook
 
   // --- STATE ---
   const [filteredRooms, setFilteredRooms] = useState([]);
@@ -28,7 +29,15 @@ const Rooms = () => {
 
   // Filter States
   const [filterStatus, setFilterStatus] = useState("all");
-  const [roomType, setRoomType] = useState("all");
+  
+  // 👈 UPDATED: Check for state passed from RoomTypeMenu
+  const [roomType, setRoomType] = useState(() => {
+    if (location.state && location.state.selectedRoomType) {
+      return location.state.selectedRoomType;
+    }
+    return "all";
+  });
+  
   const [building, setBuilding] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -51,7 +60,9 @@ const Rooms = () => {
     }
   };
 
-  const normalize = (v = "") => v?.toString().toLowerCase().replace(/[^a-z0-9]/g, "") || "";
+  // 👈 UPDATED: Normalizer now keeps spaces intact for matching multi-word room types
+  const normalize = (v = "") => v?.toString().toLowerCase().trim() || "";
+  
   const isSelected = (id) => selectedRooms.some((r) => r._id === id);
 
   // --- FILTERING & SORTING ---
@@ -255,7 +266,7 @@ const Rooms = () => {
                 <p className="text-[10px] uppercase text-slate-400 mb-2 font-bold tracking-widest flex items-center gap-1">
                   <BedDouble size={10} /> Room Type
                 </p>
-                {[{ val: "all", label: "All Types", icon: Layers }, { val: "Individual", label: "Individual", icon: User }, { val: "Individual with pullout", label: "Individual w/ Pullout", icon: User }, { val: "Dormitory", label: "Dormitory", icon: Users }].map((t) => (
+                {[{ val: "all", label: "All Types", icon: Layers }, { val: "Individual", label: "Individual", icon: User }, { val: "Individual with pullout", label: "Individual with Pullout", icon: User }, { val: "Dormitory", label: "Dormitory", icon: Users }].map((t) => (
                   <button key={t.val} onClick={() => setRoomType(t.val)} className={getFilterButtonClass(roomType === t.val)}>
                     <t.icon size={14} className={roomType === t.val ? "text-blue-400" : "text-slate-400 group-hover:text-slate-600"} />{t.label}
                   </button>
