@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react'; // Added useState
 import { assets } from '../assets/assets';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Star, Calendar } from 'lucide-react';
+import AvailabilityCalendar from './AvailabilityCalendar'; // Import your calendar component
 
 const Banner = () => {
   const navigate = useNavigate();
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+  // You would typically fetch these from your API or pass them as props
+  const [bookings, setBookings] = useState([]); 
 
   return (
     <div className="max-w-7xl mx-auto px-8 mt-16 mb-24">
@@ -15,7 +20,7 @@ const Banner = () => {
         {/* 1. TEXT CONTENT (5 Columns) */}
         <div className="lg:col-span-5 order-2 lg:order-1 flex flex-col justify-center space-y-8">
            
-           {/* 'Badge' - Adds a professional detail */}
+           {/* Badge */}
            <div className="flex items-center gap-2">
               <div className="h-px w-8 bg-slate-200"></div>
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400">
@@ -34,38 +39,36 @@ const Banner = () => {
            </div>
 
            <div className="pt-2 flex flex-col sm:flex-row gap-4">
+              {/* Updated Button to open Calendar instead of direct navigation */}
               <button
-                onClick={() => navigate('/rooms')}
+                onClick={() => setIsCalendarOpen(true)}
                 className="group inline-flex items-center justify-center gap-3 bg-[#0f172a] text-white px-8 py-4 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-blue-600 transition-all duration-300 shadow-xl shadow-slate-200"
               >
                 <Calendar size={14} /> Check Availability <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </button>
-                            
            </div>
         </div>
 
         {/* 2. IMAGE CONTENT (7 Columns) */}
         <div className="lg:col-span-7 order-1 lg:order-2 relative">
-           
-           {/* Main Image Frame */}
            <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-slate-100 aspect-[4/3] lg:aspect-auto lg:h-[500px] group">
               <img 
-                 src={assets.appointment_img} 
-                 alt="Sanctuary Interiors" 
-                 className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105" 
+                  src={assets.appointment_img} 
+                  alt="Sanctuary Interiors" 
+                  className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105" 
               />
-              
-              {/* Professional Overlay Gradient (Subtle) */}
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
-
-              
            </div>
-
-           {/* Decorative Background Element */}
            <div className="absolute -z-10 top-12 -right-12 w-full h-full border border-slate-100 rounded-[2.5rem] hidden lg:block"></div>
         </div>
-
       </div>
+
+      {/* RENDER MODAL */}
+      <AvailabilityCalendar 
+        isOpen={isCalendarOpen} 
+        onClose={() => setIsCalendarOpen(false)} 
+        bookings={bookings} 
+      />
     </div>
   );
 };

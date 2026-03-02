@@ -43,13 +43,25 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+    /* FIXED POSITIONING: 
+       Changed items-center to items-start + pt-32 to move it lower than the navbar.
+       Added overflow-y-auto so the Close button isn't cut off on small screens.
+    */
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center p-6 pt-32 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300 overflow-y-auto">
       
       <style>{`
+        /* GRID FIX: Prevents overlapping by ensuring the container is wide enough */
+        .pro-calendar-v4 .react-datepicker__month-container {
+          float: none !important;
+          width: 100% !important;
+          min-width: 320px !important;
+        }
+
         .pro-calendar-v4 .react-datepicker {
           border: none;
           font-family: inherit;
           background: transparent;
+          display: block !important;
         }
         .pro-calendar-v4 .react-datepicker__header {
           background: transparent;
@@ -60,16 +72,16 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
           color: #94a3b8;
           font-weight: 700;
           font-size: 0.75rem;
-          width: 3.4rem;
-          margin: 0.25rem;
+          width: 3rem; /* Adjusted to prevent overlapping */
+          margin: 0.3rem;
           text-transform: uppercase;
         }
         .pro-calendar-v4 .react-datepicker__day {
-          width: 3.4rem;
-          height: 3.4rem;
-          line-height: 3.4rem;
+          width: 3rem; /* Adjusted to prevent overlapping */
+          height: 3rem;
+          line-height: 3rem;
           border-radius: 9999px !important;
-          margin: 0.25rem;
+          margin: 0.3rem;
           font-weight: 500;
           font-size: 0.95rem;
           border: 1px solid transparent;
@@ -91,10 +103,10 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
           border: 1px solid #fde68a !important;
         }
 
-        /* TODAY INDICATOR - BLACK BACKGROUND, WHITE FONT */
+        /* TODAY INDICATOR */
         .pro-calendar-v4 .react-datepicker__day--today {
-          background-color: #0f172a !important; /* Solid black/slate */
-          color: #ffffff !important;           /* White text */
+          background-color: #0f172a !important; 
+          color: #ffffff !important;           
           font-weight: 800 !important;
           border: none !important;
           box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
@@ -110,7 +122,7 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
         }
       `}</style>
 
-      <div className="bg-white w-full max-w-xl rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col border border-slate-200">
+      <div className="bg-white w-full max-w-xl rounded-[2rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col border border-slate-200 mb-12">
         
         <div className="px-10 py-7 border-b border-slate-50 flex justify-between items-center bg-white">
           <div className="flex items-center gap-4">
@@ -137,14 +149,16 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
                 </span>
                 <div className="flex gap-2">
                   <button 
+                    type="button"
                     onClick={decreaseMonth} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-200 hover:border-slate-900 transition-all pointer-events-auto"
+                    className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-200 hover:border-slate-900 transition-all pointer-events-auto bg-white"
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button 
+                    type="button"
                     onClick={increaseMonth} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-200 hover:border-slate-900 transition-all pointer-events-auto"
+                    className="w-10 h-10 flex items-center justify-center rounded-full border border-slate-200 hover:border-slate-900 transition-all pointer-events-auto bg-white"
                   >
                     <ChevronRight size={18} />
                   </button>
@@ -157,11 +171,12 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
         <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-white border border-slate-300" />
+              {/* Added border-slate-300 to make white circle visible */}
+              <div className="w-3 h-3 rounded-full bg-white border border-slate-300" />
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Available</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+              <div className="w-3 h-3 rounded-full bg-amber-400 border border-amber-500" />
               <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">Reserved</span>
             </div>
           </div>
