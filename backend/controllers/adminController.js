@@ -11,6 +11,9 @@ import buildingModel from "../models/buildingModel.js";
 import roomTypeModel from "../models/roomTypeModel.js";
 import Notification from "../models/notificationModel.js";
 
+// Utils
+import sendEmail from "../utils/sendEmail.js";
+
 // ======================================================================
 // 🛠️ CLOUD HELPER
 // ======================================================================
@@ -36,10 +39,9 @@ const loginAdmin = async (req, res) => {
         const { email, password } = req.body;
 
         if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-            // ✅ Use a valid 24-character dummy ObjectId for the Admin
             const token = jwt.sign(
               { 
-                id: "000000000000000000000000", // 24 zeros!
+                id: "000000000000000000000000", 
                 role: "admin", 
                 name: "Administrator"
               }, 
@@ -242,7 +244,7 @@ const changeUserStatus = async (req, res) => {
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
 
-        user.disabled = !user.disabled; // Automatically toggles between true and false
+        user.disabled = !user.disabled; 
         await user.save();
 
         res.json({ success: true, message: `User is now ${user.disabled ? 'Disabled' : 'Enabled'}` });
@@ -392,7 +394,6 @@ const deleteRoom = async (req, res) => {
 const allBookings = async (req, res) => {
     try {
         const bookings = await bookingModel.find({})
-            // 👇 ADD 'phone' TO THIS LIST 👇
             .populate('user_id', 'firstName middleName lastName suffix email image phone') 
             .populate('room_ids')
             .populate('package_id')
@@ -407,10 +408,10 @@ const allBookings = async (req, res) => {
 const approveBooking = async (req, res) => {
     try {
         const { bookingId } = req.params;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true });
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true }).populate("user_id");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 NOTIFY GUEST: Booking Approved
+        // 🔔 Internal Notification
         await Notification.create({
             recipient: booking.user_id,
             type: "booking_update",
@@ -418,6 +419,15 @@ const approveBooking = async (req, res) => {
             link: "/my-bookings",
             isRead: false
         });
+
+        // 📧 Email Notification
+        await sendEmail(
+            booking.user_id.email,
+            "Booking Approved",
+            `<p>Peace be with you, ${booking.user_id.firstName},</p>
+             <p>Your booking request for ${new Date(booking.check_in).toLocaleDateString()} has been <b>Approved</b>.</p>
+             <p>You may now proceed with any necessary next steps shown in your dashboard.</p>`
+        );
 
         res.json({ success: true, message: "Booking Approved Successfully" });
     } catch (error) {
@@ -428,10 +438,10 @@ const approveBooking = async (req, res) => {
 const declineBooking = async (req, res) => {
     try {
         const { bookingId } = req.params;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true });
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate("user_id");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 NOTIFY GUEST: Booking Declined
+        // 🔔 Internal Notification
         await Notification.create({
             recipient: booking.user_id,
             type: "booking_update",
@@ -439,6 +449,15 @@ const declineBooking = async (req, res) => {
             link: "/my-bookings",
             isRead: false
         });
+
+        // 📧 Email Notification
+        await sendEmail(
+            booking.user_id.email,
+            "Booking Declined",
+            `<p>Hello ${booking.user_id.firstName},</p>
+             <p>We regret to inform you that your booking request for ${new Date(booking.check_in).toLocaleDateString()} was declined by the administration.</p>
+             <p>If you have questions, please contact us.</p>`
+        );
 
         res.json({ success: true, message: "Booking Declined" });
     } catch (error) {
@@ -449,10 +468,10 @@ const declineBooking = async (req, res) => {
 const paymentConfirmed = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true }, { new: true });
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true }, { new: true }).populate("user_id");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 NOTIFY GUEST: Payment Confirmed Manually
+        // 🔔 Internal Notification
         await Notification.create({
             recipient: booking.user_id,
             type: "payment_update",
@@ -460,6 +479,14 @@ const paymentConfirmed = async (req, res) => {
             link: "/my-bookings",
             isRead: false
         });
+
+        // 📧 Email Notification
+        await sendEmail(
+            booking.user_id.email,
+            "Payment Confirmed",
+            `<p>Hello ${booking.user_id.firstName},</p>
+             <p>Your payment for booking ID ${booking._id} has been manually confirmed by our staff. Thank you!</p>`
+        );
 
         res.json({ success: true, message: "Payment Status Updated to Confirmed" });
     } catch (error) {
@@ -474,7 +501,7 @@ const paymentConfirmed = async (req, res) => {
 const approveCancellationRequest = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId);
+        const booking = await bookingModel.findById(bookingId).populate("user_id");
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
@@ -482,6 +509,15 @@ const approveCancellationRequest = async (req, res) => {
         booking.payment = false; 
         
         await booking.save();
+
+        // 📧 Email Notification
+        await sendEmail(
+            booking.user_id.email,
+            "Cancellation Request Approved",
+            `<p>Hello ${booking.user_id.firstName},</p>
+             <p>Your request to cancel booking ID ${booking._id} has been approved.</p>`
+        );
+
         res.json({ success: true, message: "Cancellation Approved & Refunded (Simulated)" });
 
     } catch (error) {
@@ -503,13 +539,13 @@ const resolveCancellation = async (req, res) => {
             bookingId, 
             { status: newStatus }, 
             { new: true }
-        );
+        ).populate("user_id");
 
         if (!booking) {
             return res.json({ success: false, message: "Booking not found" });
         }
 
-        // 🔔 NOTIFY GUEST: Cancellation Request Resolved
+        // 🔔 Internal Notification
         const notificationMsg = action === 'approve' 
             ? `Your cancellation request was APPROVED.` 
             : `Your cancellation request was REJECTED. Your booking remains active.`;
@@ -521,6 +557,14 @@ const resolveCancellation = async (req, res) => {
             link: "/my-bookings",
             isRead: false
         });
+
+        // 📧 Email Notification
+        await sendEmail(
+            booking.user_id.email,
+            "Cancellation Request Update",
+            `<p>Hello ${booking.user_id.firstName},</p>
+             <p>${notificationMsg}</p>`
+        );
         
         res.json({ 
             success: true, 

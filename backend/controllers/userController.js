@@ -46,12 +46,10 @@ const sendOTP = async (req, res) => {
         let user = await userModel.findOne({ email });
 
         if (user) {
-            // Existing user (Reset Password or Re-verifying)
             user.otp = otp;
             user.otpExpires = otpExpires;
             await user.save();
         } else {
-            // New User (Registration): Create a temporary record to store the OTP
             const salt = await bcrypt.genSalt(10);
             const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
             
@@ -107,19 +105,16 @@ const requestPasswordReset = async (req, res) => {
 const resetPassword = async (req, res) => {
     try {
         const { email, otp, newPassword } = req.body;
-        
-        // Normalize email to ensure it matches the database entry
         const user = await userModel.findOne({ email: email.toLowerCase().trim() });
 
         if (!user) return res.json({ success: false, message: "User not found" });
 
-        // ✅ FIX: Force both to String to prevent type mismatch (e.g., Number vs String)
         const storedOtp = user.otp ? String(user.otp).trim() : null;
-const providedOtp = otp ? String(otp).trim() : null;
+        const providedOtp = otp ? String(otp).trim() : null;
 
-if (!storedOtp || storedOtp !== providedOtp) {
-    return res.json({ success: false, message: "Invalid reset code" });
-}
+        if (!storedOtp || storedOtp !== providedOtp) {
+            return res.json({ success: false, message: "Invalid reset code" });
+        }
 
         if (new Date() > new Date(user.otpExpires)) {
             return res.json({ success: false, message: "Code has expired" });
@@ -128,12 +123,19 @@ if (!storedOtp || storedOtp !== providedOtp) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
         
-        // Clear OTP fields after successful reset
         user.otp = null;
         user.otpExpires = null;
         user.isVerified = true; 
 
         await user.save();
+
+        // 📧 Email notification for password change security
+        await sendEmail(
+            user.email,
+            "Password Reset Successful",
+            `<p>Hello ${user.firstName},</p><p>Your password has been successfully updated. If you did not perform this action, please contact us immediately.</p>`
+        );
+
         res.json({ success: true, message: "Password updated successfully" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -169,6 +171,13 @@ const googleAuth = async (req, res) => {
                 isVerified: true 
             });
             await user.save();
+
+            // 📧 Welcome email for Google users
+            await sendEmail(
+                email,
+                "Welcome to Mercedarian Retreat House",
+                `<h3>Welcome, ${firstName}!</h3><p>Your account has been created via Google. We are happy to have you!</p>`
+            );
         }
 
         const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role);
@@ -195,7 +204,6 @@ const registerUser = async (req, res) => {
             if (existingUser.isVerified && existingUser.firstName !== "Pending") {
                 return res.json({ success: false, message: "User already exists" });
             }
-            // Update placeholder
             existingUser.firstName = firstName;
             existingUser.middleName = middleName || "";
             existingUser.lastName = lastName;
@@ -217,6 +225,13 @@ const registerUser = async (req, res) => {
             });
             await newUser.save();
         }
+
+        // 📧 Registration welcome email
+        await sendEmail(
+            email,
+            "Account Created Successfully",
+            `<h3>Welcome to Mercedarian Retreat House, ${firstName}!</h3><p>Your account is now active. You can start booking your stay with us.</p>`
+        );
 
         res.json({ success: true, message: "Account created successfully" });
 
@@ -248,7 +263,7 @@ const loginUser = async (req, res) => {
 
 const verifyOTP = async (req, res) => {
   try {
-    const { email, otp, isResetMode } = req.body; // Add isResetMode to body
+    const { email, otp, isResetMode } = req.body; 
     const user = await userModel.findOne({ email: email.toLowerCase().trim() });
 
     if (!user) return res.json({ success: false, message: "No verification request found" }); 
@@ -263,8 +278,6 @@ const verifyOTP = async (req, res) => {
 
     user.isVerified = true;
 
-    // ✅ FIX: Only clear the OTP if we ARE NOT resetting a password.
-    // If we are resetting, we need the OTP to stay there for the reset-password call.
     if (!isResetMode) {
         user.otp = null;
         user.otpExpires = null;
@@ -344,6 +357,19 @@ const createBooking = async (req, res) => {
 
         const newBooking = new bookingModel(bookingData);
         await newBooking.save();
+
+        // 📧 Booking Confirmation notification
+        const user = await userModel.findById(userId);
+        if (user) {
+            await sendEmail(
+                user.email,
+                "Booking Request Submitted",
+                `<p>Peace be with you, ${user.firstName},</p>
+                 <p>Your booking request for ${new Date(checkIn).toLocaleDateString()} has been received and is currently <b>pending approval</b>.</p>
+                 <p>Total Price: <b>PHP ${totalPrice}</b></p>`
+            );
+        }
+
         res.json({ success: true, message: "Booking Created" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -366,7 +392,7 @@ const getUserBookings = async (req, res) => {
 const cancelBooking = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId);
+        const booking = await bookingModel.findById(bookingId).populate("user_id");
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
@@ -378,6 +404,14 @@ const cancelBooking = async (req, res) => {
             res.json({ success: true, message: "Cancellation request sent for approval" });
         } else {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
+            
+            // 📧 Booking Cancellation notification
+            await sendEmail(
+                booking.user_id.email,
+                "Booking Cancelled",
+                `<p>Hello,</p><p>Your booking for ${new Date(booking.check_in).toLocaleDateString()} has been successfully cancelled.</p>`
+            );
+
             res.json({ success: true, message: "Booking Cancelled" });
         }
     } catch (error) {
@@ -434,11 +468,21 @@ const createCheckoutSession = async (req, res) => {
 const verifyPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        await bookingModel.findByIdAndUpdate(bookingId, { 
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
             payment: true, 
             paymentStatus: 'paid', 
             paymentMethod: 'online' 
-        });
+        }, { new: true }).populate("user_id");
+
+        // 📧 Payment Confirmation Email
+        if (booking) {
+            await sendEmail(
+                booking.user_id.email,
+                "Payment Received",
+                `<p>Hello ${booking.user_id.firstName},</p><p>Your payment for booking ID ${booking._id} has been verified. Thank you!</p>`
+            );
+        }
+
         res.json({ success: true, message: "Payment Verified" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -458,10 +502,20 @@ const markCashPayment = async (req, res) => {
 const confirmCashPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        await bookingModel.findByIdAndUpdate(bookingId, { 
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
             payment: true,
             paymentStatus: 'paid' 
-        });
+        }, { new: true }).populate("user_id");
+
+        // 📧 Cash Payment Confirmation Email
+        if (booking) {
+            await sendEmail(
+                booking.user_id.email,
+                "Payment Confirmed",
+                `<p>Hello ${booking.user_id.firstName},</p><p>Your cash payment has been confirmed by the administration. Your booking is now fully secured.</p>`
+            );
+        }
+
         res.json({ success: true, message: "Payment Confirmed by Admin" });
     } catch (error) {
         res.json({ success: false, message: error.message });
