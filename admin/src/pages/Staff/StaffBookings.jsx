@@ -22,8 +22,12 @@ const StatusBadge = ({ status }) => {
   } else if (s === 'pending' || s === 'cancellation_pending') {
     styles = "bg-amber-50 text-amber-700 border-amber-100";
     Icon = AlertCircle;
-  } else if (["cancelled", "declined"].includes(s)) {
+  } else if (s === "cancelled") {
     styles = "bg-rose-50 text-rose-700 border-rose-100";
+    Icon = XCircle;
+  } else if (s === "declined") {
+    // GRAY STYLE FOR DECLINED
+    styles = "bg-slate-100 text-slate-600 border-slate-200 shadow-sm";
     Icon = XCircle;
   }
 
@@ -257,7 +261,6 @@ const StaffBookings = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("All Buildings");
   const [typeFilter, setTypeFilter] = useState("All Room Types"); 
-  const [paymentFilter, setPaymentFilter] = useState("All Payments");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [sortOrder, setSortOrder] = useState("Newest First");
   
@@ -314,14 +317,6 @@ const StaffBookings = () => {
       filtered = filtered.filter((b) => b.status?.toLowerCase() === statusFilter.toLowerCase());
     }
 
-    if (paymentFilter !== "All Payments") {
-      filtered = filtered.filter((b) => {
-          if (paymentFilter === "paid") return b.paymentStatus?.toLowerCase() === 'paid' || b.payment === true;
-          if (paymentFilter === "unpaid") return b.paymentStatus?.toLowerCase() !== 'paid' && b.payment !== true;
-          return true;
-      });
-    }
-
     if (startDate || endDate) {
         filtered = filtered.filter((b) => {
           const rawDate = b.slotDate || b.check_in || b.date;
@@ -340,7 +335,7 @@ const StaffBookings = () => {
     });
 
     setFilteredBookings(filtered);
-  }, [searchTerm, buildingFilter, typeFilter, paymentFilter, statusFilter, startDate, endDate, sortOrder, bookings]);
+  }, [searchTerm, buildingFilter, typeFilter, statusFilter, startDate, endDate, sortOrder, bookings]);
 
   // Click outside to close date filter
   useEffect(() => {
@@ -358,7 +353,6 @@ const StaffBookings = () => {
     setSearchTerm("");
     setBuildingFilter("All Buildings");
     setTypeFilter("All Room Types");
-    setPaymentFilter("All Payments");
     setStatusFilter("All Status");
     setSortOrder("Newest First");
     setStartDate("");
@@ -380,11 +374,13 @@ const StaffBookings = () => {
     } catch (e) { return "N/A"; }
   };
 
-  // Stats calculation
+  // Stats matching the Admin Side logic exactly
   const stats = {
-    total: bookings.length,
-    activeStays: bookings.filter(b => ["approved", "checked_in"].includes(b.status?.toLowerCase())).length,
-    revenue: bookings.filter(b => b.paymentStatus === 'paid' || b.payment === true).reduce((acc, curr) => acc + (curr.total_price || curr.amount || 0), 0)
+    total: bookings.filter(b => ["approved", "confirmed", "checked_in"].includes(b.status?.toLowerCase())).length,
+    pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
+    revenue: bookings
+      .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
+      .reduce((acc, curr) => acc + (curr.total_price || curr.amount || 0), 0)
   };
 
   return (
@@ -442,15 +438,15 @@ const StaffBookings = () => {
       <div className="max-w-7xl mx-auto mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
           <div className="h-12 w-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600"><Layers size={20}/></div>
-          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Schedules</p><p className="text-xl font-black text-slate-800">{stats.total}</p></div>
+          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Bookings</p><p className="text-xl font-black text-slate-800">{stats.total}</p></div>
         </div>
         <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
-          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><CheckCircle2 size={20}/></div>
-          <div><p className="text-[10px] font-black text-slate-400 uppercase">Active / Confirmed</p><p className="text-xl font-black text-slate-800">{stats.activeStays}</p></div>
+          <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600"><Clock size={20}/></div>
+          <div><p className="text-[10px] font-black text-slate-400 uppercase">Awaiting Action</p><p className="text-xl font-black text-slate-800">{stats.pending}</p></div>
         </div>
         <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
-          <div className="h-12 w-12 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-600"><BarChart3 size={20}/></div>
-          <div><p className="text-[10px] font-black text-slate-400 uppercase">Generated Revenue</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><BarChart3 size={20}/></div>
+          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Revenue (Paid)</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
         </div>
       </div>
 
@@ -487,11 +483,6 @@ const StaffBookings = () => {
               <option value="approved">Approved</option>
               <option value="cancelled">Cancelled</option>
             </select>
-            <select className="px-3 py-2.5 bg-slate-50 border-none rounded-xl text-[11px] font-bold text-slate-600 outline-none cursor-pointer" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
-              <option value="All Payments">All Payments</option>
-              <option value="paid">Paid</option>
-              <option value="unpaid">Unpaid</option>
-            </select>
             <button onClick={resetFilters} className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
               <RotateCcw size={18} />
             </button>
@@ -508,8 +499,8 @@ const StaffBookings = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Profile</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-[250px]">Room Selection</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Stay Period</th>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</th>
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Billing</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -572,11 +563,6 @@ const StaffBookings = () => {
                         </div>
                       </td>
 
-                      {/* CURRENT STATUS */}
-                      <td className="px-6 py-5 align-top">
-                        <StatusBadge status={b.status} />
-                      </td>
-
                       {/* BILLING */}
                       <td className="px-6 py-5 align-top">
                         <p className="text-sm font-black text-slate-800">₱{(b.total_price || b.amount || 0).toLocaleString()}</p>
@@ -584,6 +570,11 @@ const StaffBookings = () => {
                             {(b.paymentStatus === 'paid' || b.payment === true) ? <CheckCircle2 size={10}/> : <Clock size={10}/>}
                             {(b.paymentStatus === 'paid' || b.payment === true) ? 'Paid' : 'Unpaid'}
                         </div>
+                      </td>
+
+                      {/* CURRENT STATUS */}
+                      <td className="px-6 py-5 align-top">
+                        <StatusBadge status={b.status} />
                       </td>
 
                     </tr>

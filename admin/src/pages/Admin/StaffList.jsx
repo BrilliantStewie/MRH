@@ -9,7 +9,9 @@ import {
   Mail, 
   PenBox, 
   Ban,     
-  UserCheck 
+  UserCheck,
+  ChevronDown,
+  ChevronUp 
 } from "lucide-react";
 import AddStaff from "./AddStaff";
 
@@ -19,12 +21,14 @@ const StaffList = () => {
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editData, setEditData] = useState(null);
+  
+  // ✅ Toggle for Show More/Less
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (aToken) getAllUsers();
   }, [aToken]);
 
-  // UPDATED: Added suffix support to the name display logic
   const getFullName = (u) => {
     if (u.firstName) {
       const middle = u.middleName ? `${u.middleName} ` : '';
@@ -53,17 +57,39 @@ const StaffList = () => {
 
   const staffList = useMemo(() => {
     const users = Array.isArray(allUsers) ? allUsers : [];
-    return users.filter((u) => {
-      // getFullName now includes suffix, making suffixes searchable
-      const fullName = getFullName(u).toLowerCase();
-      const matchRole = u.role === "staff"; 
-      const matchSearch = !search || 
-        fullName.includes(search.toLowerCase()) || 
-        u.email?.toLowerCase().includes(search.toLowerCase());
-      
-      return matchRole && matchSearch;
+    const searchTerm = search.toLowerCase().trim();
+
+    // 1. Filter the users first
+    const filtered = users.filter((u) => {
+      if (u.role !== "staff") return false;
+      if (!searchTerm) return true;
+
+      const fName = (u.firstName || "").toLowerCase();
+      const lName = (u.lastName || "").toLowerCase();
+      const mName = (u.middleName || "").toLowerCase();
+      const sfx = (u.suffix || "").toLowerCase();
+
+      return (
+        fName.includes(searchTerm) ||
+        lName.includes(searchTerm) ||
+        mName.includes(searchTerm) ||
+        sfx.includes(searchTerm)
+      );
     });
+
+    // 2. ✅ SORT: Display in Alphabetical Order (A-Z) by First Name
+    return filtered.sort((a, b) => {
+      const nameA = (a.firstName || "").toLowerCase();
+      const nameB = (b.firstName || "").toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
   }, [allUsers, search]);
+
+  // ✅ Limit display to 5
+  const displayedStaff = expanded ? staffList : staffList.slice(0, 5);
+  // ✅ Calculate how many are hidden
+  const hiddenCount = staffList.length - 5;
 
   return (
     <div className="p-6 max-w-7xl mx-auto min-h-screen">
@@ -83,7 +109,7 @@ const StaffList = () => {
           className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
         >
           <UserPlus size={18} />
-          Add New
+          Add Staff
         </button>
       </div>
 
@@ -115,7 +141,7 @@ const StaffList = () => {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {staffList.map((s) => (
+              {displayedStaff.map((s) => (
                 <tr key={s._id} className={`hover:bg-slate-50 transition-colors group ${s.disabled ? 'bg-slate-50/50' : ''}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -213,6 +239,22 @@ const StaffList = () => {
             </tbody>
           </table>
         </div>
+
+        {/* ✅ Show More (Count) / Show Less Button */}
+        {staffList.length > 5 && (
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+            <button 
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-bold transition-all active:scale-95"
+            >
+              {expanded ? (
+                <>Show Less <ChevronUp size={16} /></>
+              ) : (
+                <>Show More ({hiddenCount}) <ChevronDown size={16} /></>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {showAddModal && (

@@ -39,6 +39,8 @@ const RoomsList = () => {
   const [showMoreBuildings, setShowMoreBuildings] = useState(false);
   const [showMoreTypes, setShowMoreTypes] = useState(false);
 
+  const [deletingRoom, setDeletingRoom] = useState(null); // State for delete confirmation
+
   useEffect(() => {
     if (aToken) {
       handleRefresh();
@@ -243,6 +245,43 @@ const RoomsList = () => {
       
       {viewingRoom && (
         <RoomDetailsModal room={viewingRoom} onClose={() => setViewingRoom(null)} handleEdit={handleEdit}/>
+      )}
+
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {deletingRoom && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-8 border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 mb-6 mx-auto">
+              <Trash2 size={32} />
+            </div>
+            
+            <div className="text-center mb-8">
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Room?</h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                Are you sure you want to delete <span className="font-bold text-slate-800">"{deletingRoom.name}"</span>? 
+                This action is permanent and cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeletingRoom(null)}
+                className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  deleteRoom(deletingRoom._id);
+                  setDeletingRoom(null);
+                }}
+                className="flex-1 py-3.5 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 shadow-lg shadow-rose-200 transition-all active:scale-95"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* --- HEADER --- */}
@@ -476,7 +515,7 @@ const RoomsList = () => {
                   <button onClick={() => handleEdit(room)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
                     <Edit3 size={15} />
                   </button>
-                  <button onClick={() => deleteRoom(room._id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Delete">
+                  <button onClick={() => setDeletingRoom(room)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Delete">
                     <Trash2 size={15} />
                   </button>
                 </div>

@@ -19,8 +19,12 @@ const StatusBadge = ({ status }) => {
   } else if (s === 'pending' || s === 'cancellation_pending') {
     styles = "bg-amber-50 text-amber-700 border-amber-100";
     Icon = AlertCircle;
-  } else if (["cancelled", "declined"].includes(s)) {
+  } else if (s === "cancelled") {
     styles = "bg-rose-50 text-rose-700 border-rose-100";
+    Icon = XCircle;
+  } else if (s === "declined") {
+    // GRAY STYLE FOR DECLINED
+    styles = "bg-slate-100 text-slate-600 border-slate-200 shadow-sm";
     Icon = XCircle;
   }
 
@@ -34,11 +38,9 @@ const StatusBadge = ({ status }) => {
 
 // --- MODAL COMPONENT (High-End Details View) ---
 const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl }) => {
-  // State for toggling "See All"
   const [showAllRooms, setShowAllRooms] = useState(false);
   const [showAllPackages, setShowAllPackages] = useState(false);
 
-  // Reset toggles when modal opens or booking changes
   useEffect(() => {
     if (isOpen) {
       setShowAllRooms(false);
@@ -48,7 +50,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 
   if (!isOpen || !booking) return null;
 
-  // Normalize Packages Data (Handle single object or array)
   const getPackagesList = () => {
     if (Array.isArray(booking.packages)) return booking.packages;
     if (Array.isArray(booking.package_ids)) return booking.package_ids;
@@ -59,7 +60,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   const packagesList = getPackagesList();
   const roomList = booking.room_ids || [];
 
-  // Slice data based on toggle state
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
 
@@ -67,7 +67,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in duration-300">
         
-        {/* Header - X Button Removed */}
         <div className="relative h-28 bg-gradient-to-r from-slate-900 to-black p-6 flex items-end">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
@@ -79,37 +78,32 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
           </div>
         </div>
 
-        {/* Content Scrollable Area */}
         <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
           
-          {/* Customer Details */}
-<div className="space-y-3">
-  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Details</h3>
-  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
-        {booking.user_id?.image ? (
-          <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
-        ) : (booking.user_id?.firstName?.[0])}
-    </div>
-    <div className="overflow-hidden w-full">
-      <p className="text-sm font-black text-slate-800 truncate">{booking.user_id?.firstName} {booking.user_id?.lastName}</p>
-      
-      {/* Email Left | Phone Right */}
-      <div className="flex justify-between items-center mt-1 w-full">
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 truncate overflow-hidden">
-              <Mail size={10} className="shrink-0" /> 
-              <span className="truncate">{booking.user_id?.email}</span>
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Details</h3>
+            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
+                  {booking.user_id?.image ? (
+                    <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
+                  ) : (booking.user_id?.firstName?.[0])}
+              </div>
+              <div className="overflow-hidden w-full">
+                <p className="text-sm font-black text-slate-800 truncate">{booking.user_id?.firstName} {booking.user_id?.lastName}</p>
+                <div className="flex justify-between items-center mt-1 w-full">
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 truncate overflow-hidden">
+                        <Mail size={10} className="shrink-0" /> 
+                        <span className="truncate">{booking.user_id?.email}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0 font-bold ml-2">
+                        <Phone size={10} className="shrink-0" /> 
+                        <span>{booking.user_id?.phone || "No Phone"}</span>
+                    </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0 font-bold ml-2">
-              <Phone size={10} className="shrink-0" /> 
-              <span>{booking.user_id?.phone || "No Phone"}</span>
-          </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-          {/* Stay Period */}
           <div className="space-y-3">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stay Period</h3>
             <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
@@ -125,12 +119,9 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             </div>
           </div>
 
-          {/* Reserved Units (Limited to 2 with toggle) */}
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserved Units ({roomList.length})</h3>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-              </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {visibleRooms.map((room, i) => {
@@ -166,7 +157,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
               })}
             </div>
             
-            {/* Rooms See All Toggle */}
             {roomList.length > 2 && (
               <button 
                 onClick={() => setShowAllRooms(!showAllRooms)}
@@ -181,7 +171,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             )}
           </div>
 
-          {/* Package Availed (Limited to 1 with toggle) */}
           <div className="md:col-span-2 space-y-3">
              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Package Availed ({packagesList.length})</h3>
              
@@ -189,7 +178,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                 <div className="space-y-2">
                   {visiblePackages.map((pkg, idx) => (
                     <div key={idx} className="flex items-center gap-4 p-4 bg-violet-50 rounded-2xl border border-violet-100 relative overflow-hidden group">
-                      {/* Decorative Background Icon */}
                       <Package className="absolute -right-4 -bottom-4 text-violet-100 opacity-50 rotate-12" size={80} />
                       
                       <div className="h-12 w-12 rounded-xl bg-violet-100 flex items-center justify-center text-violet-600 shrink-0 border border-violet-200 relative z-10">
@@ -210,7 +198,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                     </div>
                   ))}
 
-                  {/* Packages See All Toggle */}
                   {packagesList.length > 1 && (
                     <button 
                       onClick={() => setShowAllPackages(!showAllPackages)}
@@ -236,7 +223,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 
         </div>
 
-        {/* Footer */}
         <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
           <div>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Billing</p>
@@ -332,10 +318,13 @@ const AllBookings = () => {
     setFilteredBookings(filtered);
   }, [searchTerm, buildingFilter, statusFilter, roomTypeFilter, sortOrder, startDate, endDate, monthFilter, yearFilter, bookings]);
 
+  // Total Bookings now only counts "approved", "confirmed", or "checked_in" statuses
   const stats = {
-    total: bookings.length,
+    total: bookings.filter(b => ["approved", "confirmed", "checked_in"].includes(b.status?.toLowerCase())).length,
     pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
-    revenue: bookings.filter(b => b.paymentStatus === 'paid' || b.payment === true).reduce((acc, curr) => acc + (curr.total_price || 0), 0)
+    revenue: bookings
+      .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
+      .reduce((acc, curr) => acc + (curr.total_price || 0), 0)
   };
 
   return (
@@ -411,7 +400,7 @@ const AllBookings = () => {
         </div>
         <div className="bg-white p-5 rounded-[24px] border border-slate-200 shadow-sm flex items-center gap-4 transition-transform hover:scale-[1.02]">
           <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600"><BarChart3 size={20}/></div>
-          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Revenue</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
+          <div><p className="text-[10px] font-black text-slate-400 uppercase">Total Revenue (Paid)</p><p className="text-xl font-black text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
         </div>
       </div>
 

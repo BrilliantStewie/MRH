@@ -87,7 +87,11 @@ adminRouter.post("/add-review-chat", authAdmin, addReviewChat);
 // 📦 PACKAGES
 adminRouter.get("/packages", authAdmin, getAllPackages);
 adminRouter.post("/add-package", authAdmin, upload.single("image"), addPackage);
-adminRouter.post("/update-package", authAdmin, upload.single("image"), updatePackage);
-adminRouter.post("/delete-package", authAdmin, deletePackage);
+
+// ✅ CHANGE 1: Added /:id so the backend can find which package to update
+adminRouter.post("/update-package/:id", authAdmin, upload.single("image"), updatePackage);
+
+// ✅ CHANGE 2: Added /:id so the backend knows which package to delete
+adminRouter.post("/delete-package/:id", authAdmin, deletePackage);
 
 export default adminRouter;

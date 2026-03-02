@@ -202,9 +202,16 @@ const Packages = () => {
                 finalAmenities.push(pendingAmenity);
             }
         }
+
         const submissionData = { ...formData, amenities: finalAmenities };
-        if (editingId) await updatePackage(editingId, submissionData);
-        else await addPackage(submissionData);
+
+        // ✅ LOGIC CHECK: We pass the ID and data separately to the Context
+        if (editingId) {
+            await updatePackage(editingId, submissionData);
+        } else {
+            await addPackage(submissionData);
+        }
+        
         await getAllPackages(); 
         setIsModalOpen(false);
     } catch (error) { console.error(error); }
@@ -447,6 +454,8 @@ const Packages = () => {
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleEdit(pkg)} className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-lg transition-colors"><Edit size={14} /></button>
+                        
+                        {/* ✅ FIXED: Ensure it passes pkg._id specifically */}
                         <button onClick={() => deletePackage(pkg._id)} className="p-2 bg-white/20 hover:bg-rose-500 text-white rounded-lg transition-colors"><Trash2 size={14} /></button>
                     </div>
                 </div>

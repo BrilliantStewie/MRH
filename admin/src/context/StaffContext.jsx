@@ -11,6 +11,8 @@ const StaffContextProvider = ({ children }) => {
     localStorage.getItem("sToken") || null
   );
 
+  const [staffData, setStaffData] = useState(null);
+
   /* =====================================================
      🛡️ AUTO LOGOUT INTERCEPTOR
   ===================================================== */
@@ -21,6 +23,7 @@ const StaffContextProvider = ({ children }) => {
         if (error.response && error.response.status === 401) {
           localStorage.removeItem("sToken");
           setSToken(null);
+          setStaffData(null); 
           toast.error(
             error.response.data.message || "Session expired. Please login again."
           );
@@ -31,6 +34,34 @@ const StaffContextProvider = ({ children }) => {
 
     return () => axios.interceptors.response.eject(interceptor);
   }, []);
+
+  /* =====================================================
+     ✅ CORRECTED: FETCH STAFF PROFILE DATA
+  ===================================================== */
+  const loadStaffData = async () => {
+    try {
+      // THIS URL IS NOW CORRECTLY POINTING TO staffRoute.js
+      const { data } = await axios.get(`${backendUrl}/api/staff/profile`, {
+        headers: { token: sToken }
+      });
+      
+      if (data.success) {
+        setStaffData(data.userData); // Based on your staffController.js response
+      } else {
+        console.error(data.message);
+      }
+    } catch (error) {
+      console.error("Failed to load staff data", error);
+    }
+  };
+
+  useEffect(() => {
+    if (sToken) {
+      loadStaffData();
+    } else {
+      setStaffData(null);
+    }
+  }, [sToken, backendUrl]);
 
   /* =====================================================
      STAFF LOGIN
@@ -151,6 +182,7 @@ const StaffContextProvider = ({ children }) => {
   const staffLogout = () => {
     localStorage.removeItem("sToken");
     setSToken(null);
+    setStaffData(null); 
     toast.info("Logged out");
   };
 
@@ -159,6 +191,9 @@ const StaffContextProvider = ({ children }) => {
       value={{
         sToken,
         setSToken,
+        staffData,
+        setStaffData,
+        loadStaffData,
         staffLogin,
         staffLogout,
         backendUrl,

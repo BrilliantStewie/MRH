@@ -14,6 +14,7 @@ import { toast } from "react-toastify";
 
 // ✅ VALIDATION LOGIC
 const TEXT_SUFFIXES = ["Jr.", "Sr."];
+// Strictly matches Roman Numerals I through C (1-100) and partials
 const ROMAN_REGEX = /^(X{0,3})(IX|IV|V?I{0,3})$|^XL[IXV]{0,3}$|^L[X]{0,3}[IXV]{0,3}$|^XC[IXV]{0,3}$|^C$/i;
 
 const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
@@ -25,7 +26,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
   const [suffix, setSuffix] = useState(""); 
-  const [suffixError, setSuffixError] = useState(""); 
 
   const [image, setImage] = useState(null); 
   const [previewUrl, setPreviewUrl] = useState("");
@@ -46,7 +46,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
       setFirstName(editData.firstName || "");
       setLastName(editData.lastName || "");
       setMiddleName(editData.middleName || "");
-      setSuffix(editData.suffix || ""); // Loads existing suffix
+      setSuffix(editData.suffix || ""); 
       
       setFormData(prev => ({ 
         ...prev, 
@@ -92,24 +92,27 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     let formatted = value;
 
     if (name === "suffix") {
-        formatted = value.replace(/[^a-zA-Z.]/g, "");
-        if (formatted.length > 0) {
-            const isRoman = /^[IVXLC]+$/i.test(formatted);
-            if (isRoman) formatted = formatted.toUpperCase();
-            else formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
-        }
-        setSuffix(formatted);
+      let cleaned = value.replace(/[^a-zA-Z.]/g, "");
 
-        if (formatted === "" || TEXT_SUFFIXES.includes(formatted) || ROMAN_REGEX.test(formatted)) {
-            setSuffixError("");
-        } else {
-            setSuffixError("Invalid Suffix");
-        }
+      if (cleaned.length > 0) {
+        const isRomanInput = /^[IVXLC]+$/i.test(cleaned);
+        if (isRomanInput) cleaned = cleaned.toUpperCase();
+        else cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+
+      // ✅ FIX: Allow "J", "Jr", and "Jr." by checking if cleaned is a START of the allowed suffixes
+      const isPartialSuffix = TEXT_SUFFIXES.some(s => s.startsWith(cleaned));
+      const isValidRoman = ROMAN_REGEX.test(cleaned);
+
+      if (cleaned === "" || isPartialSuffix || isValidRoman) {
+        setSuffix(cleaned);
+      }
+      return; 
     } else {
-        formatted = value.replace(/[^a-zA-Z-\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
-        if (name === "firstName") setFirstName(formatted);
-        else if (name === "lastName") setLastName(formatted);
-        else if (name === "middleName") setMiddleName(formatted);
+      formatted = value.replace(/[^a-zA-Z-\.\'\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
+      if (name === "firstName") setFirstName(formatted);
+      else if (name === "lastName") setLastName(formatted);
+      else if (name === "middleName") setMiddleName(formatted);
     }
 
     if (!isEdit && (name === "firstName" || name === "lastName")) {
@@ -138,7 +141,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!firstName || !lastName || !formData.phone) return toast.error("Please fill all required fields");
-    if (suffixError) return toast.error("Invalid suffix.");
     
     if (formData.password !== formData.confirmPassword) {
         return toast.error("Passwords do not match");
@@ -149,17 +151,11 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     }
 
     setLoading(true);
-    
     const data = new FormData();
     data.append("firstName", firstName);
     data.append("lastName", lastName);
-    data.append("middleName", middleName || ""); // Sending empty string if removed
-    
-    // ✅ CRITICAL FIX: Always append the suffix value. 
-    // If 'suffix' is empty because you removed it, this sends "" to the backend, 
-    // which tells MongoDB to clear the field.
+    data.append("middleName", middleName || ""); 
     data.append("suffix", suffix || ""); 
-    
     data.append("position", "Staff"); 
     data.append("phone", formData.phone);
     data.append("email", formData.email);
@@ -167,15 +163,13 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     if (image) data.append("image", image);
     else if (isImageRemoved) data.append("removeImage", "true");
     
-    if (formData.password) {
-        data.append("password", formData.password);
-    }
+    if (formData.password) data.append("password", formData.password);
 
     try {
       const success = isEdit ? await updateStaff(editData._id, data) : await createStaff(data);
       if (success) {
         await getAllUsers();
-        toast.success("Staff details updated successfully");
+        toast.success(isEdit ? "Staff details updated" : "Staff created successfully");
         onClose();
       }
     } catch (error) {
@@ -192,12 +186,10 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
         {/* LEFT COLUMN */}
         <div className="w-full md:w-[320px] bg-slate-900 text-white p-8 flex flex-col items-center justify-center text-center relative shrink-0">
           <button onClick={onClose} className="absolute top-4 left-4 md:hidden p-2 bg-white/10 rounded-full"><X size={20} /></button>
-
           <div className="mb-6">
             <h2 className="text-2xl font-bold tracking-tight">{isEdit ? "Edit Profile" : "New Account"}</h2>
             <p className="text-slate-400 text-sm mt-1">Staff Access Control</p>
           </div>
-
           <div className="mb-6 relative group">
             <label className="cursor-pointer block w-40 h-40 rounded-full border-4 border-slate-700 bg-slate-800 overflow-hidden shadow-2xl hover:border-slate-500 transition-colors relative">
                 {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" alt="Profile" /> : <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 group-hover:text-slate-400 transition-colors"><User size={48} className="mb-2" /><span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Upload</span></div>}
@@ -205,7 +197,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
             </label>
             {previewUrl && <button onClick={handleRemoveImage} className="absolute top-0 right-0 translate-x-1 -translate-y-1 bg-red-500 text-white p-2.5 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all z-10 border-2 border-slate-900"><Trash2 size={16} /></button>}
           </div>
-
           <div className="bg-slate-800/50 px-4 py-3 rounded-xl w-full border border-slate-700">
              <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider mb-1"><Mail size={12} /> Email Address</div>
              <p className="text-sm font-mono text-indigo-300 truncate">{formData.email || "waiting for names..."}</p>
@@ -215,11 +206,8 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
         {/* RIGHT COLUMN */}
         <div className="flex-1 bg-white flex flex-col relative">
           <button onClick={onClose} className="absolute top-5 right-5 text-slate-300 hover:text-slate-600 transition-colors hidden md:block"><X size={24} /></button>
-
           <div className="p-8 md:p-10 overflow-y-auto scrollbar-hide flex-1">
              <form id="split-form" onSubmit={handleSubmit} className="space-y-6">
-                
-                {/* Names */}
                 <div className="space-y-4">
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Personal Details</h3>
                    <div className="grid grid-cols-2 gap-4">
@@ -232,39 +220,37 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                          <input name="lastName" value={lastName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Doe" />
                       </div>
                    </div>
-
                    <div className="grid grid-cols-4 gap-4">
                       <div className="col-span-3 space-y-1">
                          <label className="text-xs font-semibold text-slate-600">Middle Name</label>
                          <input name="middleName" value={middleName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Optional" />
                       </div>
                       <div className="col-span-1 space-y-1 relative">
-                         <label className="text-xs font-semibold text-slate-600 flex justify-between">Suffix</label>
-                         <input name="suffix" maxLength={8} value={suffix} onChange={handleNameChange} className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${suffixError ? "border-red-500 bg-red-50" : "bg-slate-50 border-slate-200"}`} placeholder="Jr." />
-                         {suffixError && <span className="absolute -bottom-4 right-0 text-[9px] font-bold text-red-500 uppercase">{suffixError}</span>}
+                         <label className="text-xs font-semibold text-slate-600">Suffix</label>
+                         {/* ✅ CLEANED INPUT: Removed all error classes and logic */}
+                         <input 
+                            name="suffix" 
+                            maxLength={8} 
+                            value={suffix} 
+                            onChange={handleNameChange} 
+                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-sm outline-none transition-all focus:border-indigo-500" 
+                            placeholder="Jr." 
+                         />
                       </div>
                    </div>
                 </div>
 
-                {/* Contact Info */}
                 <div className="space-y-4">
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Contact Info</h3>
                    <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-600">Mobile Number <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">+63</span>
-                         <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 10)})} className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="912 345 6789" />
-                      </div>
+                      <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="09XXXXXXXXX" />
                    </div>
                 </div>
 
-                {/* Security */}
                 <div className="space-y-4">
                    <div className="flex justify-between items-center border-b pb-2">
                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Security</h3>
-                      {isEdit && <div className="flex items-center gap-1 text-[10px] text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded italic shadow-sm border border-amber-100">
-                        <AlertCircle size={10} /> Changing this will log out the staff member
-                      </div>}
                    </div>
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">

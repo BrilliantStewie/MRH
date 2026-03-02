@@ -5,7 +5,7 @@ import {
   Users, BedDouble, Wallet, 
   Clock, ArrowUpRight, 
   Zap, Bell, Search, Settings, Calendar,
-  TrendingUp, Moon
+  TrendingUp, ChevronRight
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, 
@@ -16,12 +16,10 @@ import { toast } from "react-toastify";
 const StaffDashboard = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
   
-  // State for raw data
   const [allBookings, setAllBookings] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
 
-  // Fetch real data on component mount
   useEffect(() => {
     const fetchOperationalData = async () => {
       try {
@@ -44,71 +42,59 @@ const StaffDashboard = () => {
     if (sToken) fetchOperationalData();
   }, [sToken, backendUrl]);
 
-  // --- REAL-TIME CALCULATIONS (Refined from Admin Logic) ---
+  // --- SYNCED DATA LOGIC (Matching Admin Dashboard) ---
   const stats = useMemo(() => {
-    const bookings = allBookings || [];
-    const rooms = allRooms || [];
+    const b = allBookings || [];
+    const r = allRooms || [];
 
-    // 1. Calculate Revenue (Total from confirmed/paid)
-    const revenue = bookings
-      .filter(b => b.status === "approved" || b.paymentStatus === "paid")
+    // 1. Revenue: Based on paid or approved bookings
+    const revenue = b
+      .filter(book => book.paymentStatus === 'paid' || book.status === 'approved')
       .reduce((acc, curr) => acc + (Number(curr.total_price || curr.amount) || 0), 0);
     
-    // 2. Occupancy Calculations
-    const occupiedCount = bookings.filter(b => 
-       b.status === "approved" && b.paymentStatus === "paid"
-    ).length;
-
-    const totalRooms = rooms.length || 1; 
-    const occupancyRate = Math.min(Math.round((occupiedCount / totalRooms) * 100), 100);
+    // 2. Occupancy: Based on room availability status
+    const occupiedCount = r.filter(room => room.available === false).length;
+    const totalRooms = r.length || 1; 
+    const occupancyRate = Math.round((occupiedCount / totalRooms) * 100);
 
     return {
       revenue,
-      totalGuests: (allUsers || []).length,
+      totalUsers: (allUsers || []).length,
       occupancy: occupiedCount,
-      totalRooms: totalRooms,
+      totalRooms: r.length,
       occupancyRate,
     };
-  }, [allBookings, allRooms, allUsers]);
+  }, [allRooms, allBookings, allUsers]);
 
-  // Chart data derived from real bookings (Grouped by Day)
   const chartData = useMemo(() => {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const dataMap = days.map(day => ({ name: day, bookings: 0 }));
-    
-    allBookings.slice(0, 50).forEach(b => {
-      const dayIndex = new Date(b.slotDate || b.date).getDay();
-      dataMap[dayIndex].bookings += 1;
+    allBookings?.forEach(b => {
+      const dateSource = b.slotDate || b.date || b.check_in;
+      if (dateSource) {
+        const dayIndex = new Date(dateSource).getDay();
+        dataMap[dayIndex].bookings += 1;
+      }
     });
-    
     return dataMap;
   }, [allBookings]);
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-6 font-sans">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-4 md:p-8 font-sans">
       
       {/* --- HEADER --- */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            {getGreeting()}, Staff
-          </h1>
-          <p className="text-slate-500 font-medium mt-1">Live operational data for {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Staff Terminal</h1>
+          <p className="text-slate-500 font-medium mt-1">Operational Overview & Real-time Analytics</p>
         </div>
         
-        <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
-          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-xl text-indigo-700 font-bold text-xs border border-indigo-100">
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
+          <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-xl text-indigo-700 font-bold text-[10px] tracking-widest border border-indigo-100">
              <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></div>
-             STAFF TERMINAL ACTIVE
+             LIVE FEED ACTIVE
           </div>
-          <button className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors">
+          <button className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400">
             <Bell size={20} />
           </button>
         </div>
@@ -121,36 +107,36 @@ const StaffDashboard = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard 
-              label="Approved Revenue" 
+              label="Gross Revenue" 
               value={`₱${stats.revenue.toLocaleString()}`} 
               icon={<Wallet size={20} />}
               color="indigo"
-              trend="+12%"
+              subValue="Approved/Paid"
             />
             <StatCard 
-              label="Registered Guests" 
-              value={stats.totalGuests} 
+              label="Total Guests" 
+              value={stats.totalUsers} 
               icon={<Users size={20} />}
               color="emerald"
-              trend="+5%"
+              subValue="Directory count"
             />
             
-            {/* Real-time Occupancy Card */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between group hover:shadow-md transition-all">
+            {/* Occupancy Card */}
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between">
                <div className="flex justify-between items-start">
                   <div className="p-2.5 rounded-xl bg-orange-50 text-orange-600 border border-orange-100">
                     <BedDouble size={20} />
                   </div>
                   <span className="text-2xl font-black text-slate-900">{stats.occupancyRate}%</span>
                </div>
-               <div>
+               <div className="mt-4">
                   <div className="flex justify-between items-end mb-2">
-                    <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Occupancy</p>
-                    <p className="text-[10px] text-slate-500 font-medium">{stats.occupancy}/{stats.totalRooms} Booked</p>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Occupancy</p>
+                    <p className="text-[10px] text-slate-500 font-bold">{stats.occupancy}/{stats.totalRooms} Units</p>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                     <div 
-                        className="bg-orange-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        className="bg-orange-500 h-full rounded-full transition-all duration-1000" 
                         style={{ width: `${stats.occupancyRate}%` }}
                     ></div>
                   </div>
@@ -158,66 +144,95 @@ const StaffDashboard = () => {
             </div>
           </div>
 
-          {/* REAL PERFORMANCE CHART */}
-          <div className="bg-white p-8 rounded-[32px] border border-slate-100 shadow-sm">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                <TrendingUp size={18} className="text-indigo-500"/> Activity Trends
+          {/* RECENT ACTIVITY TABLE (Synced with Admin Design) */}
+          <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+              <h2 className="font-black text-slate-800 text-lg flex items-center gap-2 uppercase tracking-tight">
+                <Clock size={18} className="text-indigo-500"/> Recent Logs
               </h2>
             </div>
-            <div className="h-[280px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorInd" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#5F6FFF" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#5F6FFF" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#cbd5e1'}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#cbd5e1'}} />
-                  <Tooltip contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                  <Area type="monotone" dataKey="bookings" stroke="#5F6FFF" strokeWidth={4} fillOpacity={1} fill="url(#colorInd)" />
-                </AreaChart>
-              </ResponsiveContainer>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-slate-50/50 text-slate-400 text-[9px] uppercase font-black tracking-[0.15em]">
+                  <tr>
+                    <th className="px-6 py-4">Guest Profile</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {allBookings?.slice(0, 5).map((booking, i) => (
+                    <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center font-black text-slate-400">
+                             {booking.user_id?.image ? (
+                                <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
+                             ) : (
+                                <span>{booking.user_id?.firstName?.[0] || "G"}</span>
+                             )}
+                          </div>
+                          <div>
+                            <p className="font-black text-slate-700 text-sm">
+                              {booking.user_id?.firstName} {booking.user_id?.lastName}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
+                                <Calendar size={10} /> {new Date(booking.check_in || booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <StatusBadge status={booking.status} />
+                      </td>
+                      <td className="px-6 py-5 text-right font-black text-slate-800 text-sm">
+                        ₱{Number(booking.total_price || booking.amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
         {/* --- RIGHT COLUMN --- */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-xl shadow-slate-200 overflow-hidden relative">
+          <div className="bg-slate-900 text-white p-8 rounded-[32px] shadow-2xl overflow-hidden relative group">
              <div className="relative z-10">
-                <h3 className="font-bold text-lg mb-1 flex items-center gap-2"><Zap size={18} className="text-yellow-400 fill-yellow-400"/> Quick Actions</h3>
-                <div className="space-y-2 mt-4">
-                    <SidebarButton icon={<Search size={16}/>} label="Search Bookings" />
-                    <SidebarButton icon={<Calendar size={16}/>} label="View Schedule" />
-                    <SidebarButton icon={<Settings size={16}/>} label="Terminal Settings" />
+                <h3 className="font-black text-xl mb-1 flex items-center gap-2 italic">
+                    <Zap size={20} className="text-yellow-400 fill-yellow-400"/> EXPRESS ACCESS
+                </h3>
+                <div className="space-y-3 mt-6">
+                    <SidebarButton icon={<Search size={18}/>} label="Search Records" />
+                    <SidebarButton icon={<Calendar size={18}/>} label="Duty Schedule" />
                 </div>
              </div>
-             <div className="absolute top-[-50px] right-[-50px] w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl"></div>
+             <div className="absolute top-[-20%] right-[-20%] w-64 h-64 bg-indigo-600/20 rounded-full blur-[80px] group-hover:bg-indigo-600/30 transition-all duration-700"></div>
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-            <h3 className="font-bold text-slate-800 text-sm uppercase tracking-widest flex items-center gap-2 mb-5">
-                <Clock size={16} className="text-indigo-500"/> Latest Bookings
+          {/* PERFORMANCE CHART */}
+          <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm">
+            <h3 className="font-black text-slate-800 text-[10px] uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                <TrendingUp size={16} className="text-indigo-500"/> Volume Trend
             </h3>
-            <div className="space-y-4">
-               {allBookings.slice(0, 5).map((booking, i) => (
-                  <div key={i} className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500">
-                            {booking.user_id?.name?.charAt(0) || "G"}
-                         </div>
-                         <div>
-                            <div className="text-xs font-bold text-slate-700">{booking.user_id?.name}</div>
-                            <div className="text-[10px] text-slate-400 capitalize">{booking.status}</div>
-                         </div>
-                      </div>
-                      <span className="text-[10px] font-bold text-indigo-600">₱{booking.total_price || booking.amount}</span>
-                  </div>
-               ))}
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorInd" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" hide />
+                  <YAxis hide />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '10px', fontWeight: 'bold' }} />
+                  <Area type="monotone" dataKey="bookings" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorInd)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
@@ -226,28 +241,56 @@ const StaffDashboard = () => {
   );
 };
 
-// Sub-components
-const StatCard = ({ label, value, icon, color, trend }) => {
-  const styles = { indigo: "bg-indigo-50 text-indigo-600 border-indigo-100", emerald: "bg-emerald-50 text-emerald-600 border-emerald-100" };
+// --- HELPER COMPONENTS ---
+
+const StatCard = ({ label, value, icon, color, subValue }) => {
+  const themes = {
+    indigo: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  };
+  const activeTheme = themes[color] || themes.indigo;
+
   return (
-    <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between h-32">
+    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
       <div className="flex justify-between items-start">
-         <div className={`p-2.5 rounded-xl border ${styles[color]}`}>{icon}</div>
-         <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full flex items-center gap-0.5">{trend} <ArrowUpRight size={10} /></span>
+         <div className={`p-3 rounded-2xl border ${activeTheme}`}>{icon}</div>
       </div>
       <div>
-        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-0.5">{label}</p>
+        <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">{label}</p>
         <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
+        <p className="text-[10px] text-slate-400 font-bold mt-1">{subValue}</p>
       </div>
     </div>
   );
 };
 
 const SidebarButton = ({ icon, label }) => (
-    <button className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 transition-colors text-left group">
-        <span className="text-slate-400 group-hover:text-white transition-colors">{icon}</span>
-        <span className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">{label}</span>
+    <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
+        <div className="flex items-center gap-4">
+            <span className="text-slate-500 group-hover:text-yellow-400 transition-colors">{icon}</span>
+            <span className="text-xs font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-widest">{label}</span>
+        </div>
+        <ArrowUpRight size={14} className="text-slate-600 group-hover:text-white" />
     </button>
 );
+
+const StatusBadge = ({ status }) => {
+    let styles = "bg-slate-100 text-slate-500 border-slate-200";
+    const s = (status || "").toLowerCase();
+
+    if (["approved", "confirmed", "checked_in"].includes(s)) 
+        styles = "bg-emerald-50 text-emerald-700 border-emerald-100";
+    else if (s === 'pending' || s === 'cancellation_pending') 
+        styles = "bg-amber-50 text-amber-700 border-amber-100";
+    else if (["cancelled", "declined"].includes(s)) 
+        styles = "bg-rose-50 text-rose-700 border-rose-100";
+
+    return (
+        <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border ${styles} inline-flex items-center gap-2`}>
+            <div className={`w-1 h-1 rounded-full bg-current`}></div>
+            {status?.replace('_', ' ')}
+        </span>
+    );
+};
 
 export default StaffDashboard;

@@ -10,6 +10,7 @@ import {
   CircleDot,
   XCircle,
   ChevronDown,
+  ChevronUp,
   Check,
   RefreshCcw,
   PenBox, 
@@ -96,6 +97,9 @@ const Users = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
+  // Expandable list state
+  const [expanded, setExpanded] = useState(false);
+
   useEffect(() => {
     if (aToken) getAllUsers();
   }, [aToken]); 
@@ -135,7 +139,10 @@ const Users = () => {
     const users = Array.isArray(allUsers) ? allUsers : [];
     const merged = [adminUser, ...users.filter((u) => u.email !== adminUser.email)];
     
-    return merged.filter((u) => {
+    // Sort logic mapping
+    const rolePriority = { admin: 1, staff: 2, user: 3 };
+
+    const filtered = merged.filter((u) => {
       const fullName = getFullName(u).toLowerCase();
       const matchSearch = !search || 
         fullName.includes(search.toLowerCase()) || 
@@ -145,11 +152,30 @@ const Users = () => {
 
       let matchStatus = true;
       if (statusFilter === "active") matchStatus = !u.disabled;
-      if (statusFilter === "disabled") matchStatus = u.disabled; // Updated from frozen
+      if (statusFilter === "disabled") matchStatus = u.disabled;
 
       return matchSearch && matchRole && matchStatus;
     });
+
+    // ✅ UPDATED SORTING LOGIC: Role Priority first, then Alphabetical within roles
+    return filtered.sort((a, b) => {
+      const priorityA = rolePriority[a.role] || 4;
+      const priorityB = rolePriority[b.role] || 4;
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      const nameA = getFullName(a).toLowerCase();
+      const nameB = getFullName(b).toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
   }, [allUsers, search, roleFilter, statusFilter, adminUser]);
+
+  // Limit display
+  const displayedUsers = expanded ? filteredUsers : filteredUsers.slice(0, 5);
+  const hiddenCount = filteredUsers.length - 5;
 
   const handleEdit = (user) => {
     setEditData(user);
@@ -165,7 +191,7 @@ const Users = () => {
   const statusOptions = [
     { value: "all", label: "All Status" },
     { value: "active", label: "Active", icon: CircleDot },
-    { value: "disabled", label: "Disabled", icon: XCircle }, // Updated from frozen
+    { value: "disabled", label: "Disabled", icon: XCircle }, 
   ];
 
   return (
@@ -243,8 +269,8 @@ const Users = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filteredUsers.length > 0 ? (
-                filteredUsers.map((u) => (
+            {displayedUsers.length > 0 ? (
+                displayedUsers.map((u) => (
                 <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50/80' : 'hover:bg-slate-50/60'}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -306,7 +332,7 @@ const Users = () => {
                             <button 
                                 onClick={() => changeUserStatus(u._id)}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
-                                    u.disabled 
+                                  u.disabled 
                                     ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
                                     : 'bg-white border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'
                                 }`}
@@ -335,9 +361,25 @@ const Users = () => {
             )}
           </tbody>
         </table>
+
+        {/* Show More / Less Toggle */}
+        {filteredUsers.length > 5 && (
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
+            <button 
+              onClick={() => setExpanded(!expanded)}
+              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-bold transition-all active:scale-95"
+            >
+              {expanded ? (
+                <>Show Less <ChevronUp size={16} /></>
+              ) : (
+                <>Show More ({hiddenCount}) <ChevronDown size={16} /></>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* ADD GUEST MODAL */}
+      {/* MODAL */}
       {showAddModal && (
         <AddGuestModal 
             onClose={() => { setShowAddModal(false); setEditData(null); }} 
@@ -369,7 +411,6 @@ const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUse
         try {
             let success = false;
             if (editData) {
-                // We use updateStaff for editing because it handles name rebuilding and optional fields
                 success = await updateStaff({ userId: editData._id, ...formData });
             } else {
                 success = await addGuestUser(formData);

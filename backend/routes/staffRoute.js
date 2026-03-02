@@ -8,6 +8,9 @@ import {
   getStaffBookings,
 } from "../controllers/staffController.js";
 
+// ✅ Import Admin controllers to reuse the logic for staff
+import { getAllRooms, getAllUsers } from "../controllers/adminController.js"; 
+
 // ✅ Import the chat controller
 import { addReviewChat } from "../controllers/bookingController.js"; 
 
@@ -37,6 +40,13 @@ router.post(
    STAFF VIEW ALL GUEST BOOKINGS
 ========================= */
 router.get("/bookings", authStaff, getStaffBookings);
+
+/* =========================
+   NEW: STAFF ACCESS TO ROOMS & USERS
+   (Required for Staff Dashboard Sync)
+========================= */
+router.get("/rooms", authStaff, getAllRooms);
+router.get("/users", authStaff, getAllUsers);
 
 /* =========================
    💬 STAFF REVIEW CHAT (Reply to Guest)

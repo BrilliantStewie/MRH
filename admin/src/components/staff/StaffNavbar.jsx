@@ -8,11 +8,10 @@ const StaffNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // ✅ Get data from the updated StaffContext
-  const { sToken, staffData, staffLogout } = useContext(StaffContext);
+  const { sToken, staffData, staffLogout, backendUrl } = useContext(StaffContext);
   
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [imgError, setImgError] = useState(false); // Track if image fails to load
+  const [imgError, setImgError] = useState(false); 
 
   // Close dropdown automatically when changing pages
   useEffect(() => {
@@ -25,11 +24,13 @@ const StaffNavbar = () => {
   }, [staffData]);
 
   const handleLogout = () => {
-    staffLogout(); // call the context function
+    staffLogout(); 
     navigate("/");
   };
 
-  // If not logged in (no token), you might want to hide the profile section or show nothing
+  // ✅ FIXED: Grabs your full first name (e.g., "Ken Melvin") but leaves out the last name
+  const firstName = staffData?.firstName || staffData?.name?.split('|')[0] || "Staff";
+
   if (!sToken) return null; 
 
   return (
@@ -59,84 +60,65 @@ const StaffNavbar = () => {
         {/* --- RIGHT: PROFILE SECTION --- */}
         <div className="flex items-center gap-4">
           
-          {/* Staff Name & Status */}
-          <div className="hidden sm:block text-right">
-            <p className="text-sm font-bold text-slate-700 leading-none mb-1">
-              {staffData && staffData.name ? staffData.name : "Staff Member"}
-            </p>
-            <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-tighter">
-              Active Now
-            </p>
-          </div>
+         
 
-          <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+         
 
           {/* Profile Circle Button */}
           <div className="relative">
             <button
               onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="flex items-center justify-center rounded-full transition-all active:scale-95 outline-none"
+              className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 hover:border-slate-300 transition-colors flex items-center justify-center bg-slate-50"
             >
-              <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center overflow-hidden border-2 border-emerald-500 ring-2 ring-emerald-50 shadow-md">
-                
-                {/* ✅ IMAGE LOGIC: 
-                    1. Check if staffData exists
-                    2. Check if image URL exists
-                    3. Check if we haven't encountered a load error (!imgError)
-                */}
-                {staffData && staffData.image && !imgError ? (
-                  <img 
-                    src={staffData.image} 
-                    alt="profile" 
-                    className="w-full h-full object-cover"
-                    onError={() => setImgError(true)} // ✅ If 404/Error, switch to Icon
-                  />
-                ) : (
-                  // ✅ Fallback Icon
-                  <User size={20} className="text-emerald-600" strokeWidth={2} />
-                )}
-
-              </div>
+              {staffData?.image && !imgError ? (
+                <img 
+                  src={staffData.image.startsWith('http') ? staffData.image : `${backendUrl}/${staffData.image}`} 
+                  alt="profile" 
+                  className="w-full h-full object-cover" 
+                  onError={() => setImgError(true)} 
+                />
+              ) : (
+                <User size={20} className="text-slate-400" />
+              )}
             </button>
 
             {/* --- DROPDOWN MENU --- */}
-            {showProfileMenu && (
-              <>
-                {/* Click-away backdrop */}
-                <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
-                
-                <div className="absolute right-0 mt-3 w-52 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
-                  
-                  {/* Mobile Name View */}
-                  <div className="sm:hidden px-5 py-3 border-b border-slate-50 mb-1">
-                     <p className="text-sm font-bold text-slate-800">
-                        {staffData?.name || "Staff Member"}
-                     </p>
-                     <p className="text-[10px] text-emerald-600 uppercase font-bold">Logged In</p>
-                  </div>
+{showProfileMenu && (
+  <>
+    {/* Click-away backdrop */}
+    <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
+    
+    <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
+      
+      {/* "SIGNED IN AS" Header */}
+      <div className="px-5 py-3 border-b border-slate-50 mb-1 bg-slate-50/50 rounded-t-2xl">
+          {/* Changed text to uppercase and added tracking for style */}
+          <p className="text-[10px] text-slate-500 font-bold mb-0.5 uppercase tracking-wider">
+            Signed In As
+          </p>
+          <p className="text-sm font-bold text-slate-800 truncate">
+            {firstName}
+          </p>
+      </div>
 
-                  <div className="hidden sm:block px-5 py-2 border-b border-slate-50 mb-1 bg-slate-50/50">
-                    <p className="text-[9px] text-slate-400 uppercase font-black tracking-widest leading-none">Account</p>
-                  </div>
+      <button 
+        onClick={() => navigate("/Staff-profile")} 
+        className="w-full text-left px-5 py-3 text-[12px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-3 transition-colors"
+      >
+        <UserCircle size={16} className="text-emerald-500"/> My Profile
+      </button>
 
-                  <button 
-                    onClick={() => navigate("/Staff-profile")} 
-                    className="w-full text-left px-5 py-3 text-[11px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-3 transition-colors"
-                  >
-                    <UserCircle size={16} className="text-emerald-500"/> My Profile
-                  </button>
+      <div className="h-px bg-slate-100 my-1 mx-3"></div>
 
-                  <div className="h-px bg-slate-100 my-1 mx-3"></div>
-
-                  <button 
-                    onClick={handleLogout} 
-                    className="w-full text-left px-5 py-3 text-[11px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                  >
-                    <LogOut size={16}/> Sign Out
-                  </button>
-                </div>
-              </>
-            )}
+      <button 
+        onClick={handleLogout} 
+        className="w-full text-left px-5 py-3 text-[12px] font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
+      >
+        <LogOut size={16}/> Sign Out
+      </button>
+    </div>
+  </>
+)}
           </div>
         </div>
 
