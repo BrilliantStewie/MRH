@@ -10,7 +10,6 @@ import Contact from "./pages/Contact";
 import MyProfile from "./pages/MyProfile";
 import MyBookings from "./pages/MyBookings";
 import RoomBooking from "./pages/RoomBooking";
-import UploadPayment from "./pages/UploadPayment";
 import RetreatBooking from "./pages/RetreatBooking";
 import Payment from "./pages/Payment";
 import ReviewPage from "./pages/ReviewPage"; 
@@ -19,6 +18,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import VerifyOtp from "./pages/VerifyOtp";
 
 // 👈 ADDED: ScrollToTop component
 const ScrollToTop = () => {
@@ -60,7 +60,7 @@ const App = () => {
     // 3. HEARTBEAT: Checks the server every 2 minutes even if user is idle
     const heartbeat = setInterval(() => {
       if (token) {
-        axios.get(`${backendUrl}/api/user/get-profile`, { headers: { token } })
+        axios.get(`${backendUrl}/api/user/profile`, { headers: { token } })
           .catch((err) => {
             if (err.response && err.response.status === 403) {
               logoutUser();
@@ -104,7 +104,7 @@ const App = () => {
                 <Route path="/rooms/:roomId" element={<RoomBooking />} />
                 <Route path="/payment/:id" element={<Payment />} />
                 <Route path="/review/:bookingId" element={<ReviewPage />} />
-                <Route path="/upload-payment" element={<UploadPayment />} />
+                <Route path="/verify-otp" element={<VerifyOtp />} />
               </Routes>
             </div>
           } />

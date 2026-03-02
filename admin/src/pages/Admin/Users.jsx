@@ -262,7 +262,7 @@ const Users = () => {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Identity</th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Email Address</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Contact Info</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500 text-right">Actions</th>
@@ -293,15 +293,28 @@ const Users = () => {
                     </td>
 
                     <td className="px-6 py-4">
-                      {!u.isSystem ? (
-                        <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
-                          <Mail size={14} className="text-slate-400 opacity-70"/> 
-                          <span className="truncate max-w-[200px]">{u.email || <span className="italic text-slate-300">No Email</span>}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400 italic">System Protected</span>
-                      )}
-                    </td>
+  {!u.isSystem ? (
+    <div className="flex flex-col gap-1.5">
+      {/* Email */}
+      <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
+        <Mail size={14} className="text-slate-400 opacity-70"/> 
+        <span className="truncate max-w-[200px]">
+          {u.email || <span className="italic text-slate-300">No Email</span>}
+        </span>
+      </div>
+      
+      {/* Phone */}
+      <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
+        <Phone size={14} className="text-slate-400 opacity-70"/> 
+        <span className="truncate max-w-[200px]">
+          {u.phone || <span className="italic text-slate-300">No Phone</span>}
+        </span>
+      </div>
+    </div>
+  ) : (
+    <span className="text-xs text-slate-400 italic">System Protected</span>
+  )}
+</td>
 
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${

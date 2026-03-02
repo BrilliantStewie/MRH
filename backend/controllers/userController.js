@@ -5,6 +5,7 @@ import axios from "axios";
 import userModel from "../models/userModel.js";
 import bookingModel from "../models/bookingModel.js";
 import cloudinary from "../config/cloudinary.js"; 
+import sendEmail from "../utils/sendEmail.js";
 
 // --- HELPERS ---
 const createToken = (id, name, role) => {
@@ -30,21 +31,125 @@ const streamUpload = (fileBuffer) => {
 
 // --- AUTHENTICATION ---
 
+// ✅ Send OTP for Email Verification or Password Reset
+const sendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!validator.isEmail(email)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+        let user = await userModel.findOne({ email });
+
+        if (user) {
+            // Existing user (Reset Password or Re-verifying)
+            user.otp = otp;
+            user.otpExpires = otpExpires;
+            await user.save();
+        } else {
+            // New User (Registration): Create a temporary record to store the OTP
+            const salt = await bcrypt.genSalt(10);
+            const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
+            
+            user = new userModel({
+                email,
+                otp,
+                otpExpires,
+                firstName: "Pending",
+                lastName: "Verification",
+                password: dummyPassword,
+                phone: "0000000000",
+                isVerified: false
+            });
+            await user.save();
+        }
+
+        await sendEmail(
+            email,
+            "Security Verification Code",
+            `
+                <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                    <h2 style="color: #1A2B32;">Security Verification</h2>
+                    <p>Use the following code to verify your identity. This code is valid for 10 minutes.</p>
+                    <h1 style="color:#2563EB; letter-spacing: 5px; background: #f3f4f6; padding: 10px; text-align: center;">${otp}</h1>
+                    <p style="color: #666; font-size: 12px;">If you did not request this code, please ignore this email.</p>
+                </div>
+            `
+        );
+
+        res.json({ success: true, message: "OTP sent to your email" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ Handle Password Reset Request
+const requestPasswordReset = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await userModel.findOne({ email });
+
+        if (!user) {
+            return res.json({ success: false, message: "No account found with this email" });
+        }
+
+        return sendOTP(req, res);
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const resetPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        
+        // Normalize email to ensure it matches the database entry
+        const user = await userModel.findOne({ email: email.toLowerCase().trim() });
+
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        // ✅ FIX: Force both to String to prevent type mismatch (e.g., Number vs String)
+        const storedOtp = user.otp ? String(user.otp).trim() : null;
+const providedOtp = otp ? String(otp).trim() : null;
+
+if (!storedOtp || storedOtp !== providedOtp) {
+    return res.json({ success: false, message: "Invalid reset code" });
+}
+
+        if (new Date() > new Date(user.otpExpires)) {
+            return res.json({ success: false, message: "Code has expired" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        
+        // Clear OTP fields after successful reset
+        user.otp = null;
+        user.otpExpires = null;
+        user.isVerified = true; 
+
+        await user.save();
+        res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 const googleAuth = async (req, res) => {
     try {
         const { email, displayName, photoURL } = req.body;
         let user = await userModel.findOne({ email });
 
         if (user) {
-            // 🛑 CHECK IF USER IS DISABLED
             if (user.disabled) {
-                return res.json({ 
-                    success: false, 
-                    message: "Your account has been disabled. Please contact administration." 
-                });
+                return res.json({ success: false, message: "Account disabled. Contact admin." });
             }
         } else {
-            // New user registration logic
             const parts = displayName.split(" ");
             const firstName = parts[0];
             const lastName = parts.length > 1 ? parts[parts.length - 1] : "User";
@@ -60,64 +165,62 @@ const googleAuth = async (req, res) => {
                 email,
                 image: photoURL,
                 password: hashedPassword,
-                phone: "0000000000" 
+                phone: "0000000000",
+                isVerified: true 
             });
             await user.save();
         }
 
-        const token = createToken(
-            user._id,
-            `${user.firstName} ${user.lastName}`,
-            user.role
-        );
+        const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role);
         res.json({ success: true, token });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, middleName, lastName, email, password, phone } = req.body;
+        const { firstName, middleName, lastName, suffix, email, password, phone } = req.body;
 
         if (!firstName || !lastName || !email || !password || !phone) {
             return res.json({ success: false, message: "Missing details" });
-        }
-        if (!validator.isEmail(email)) return res.json({ success: false, message: "Invalid email" });
-        if (password.length < 8) return res.json({ success: false, message: "Password too short" });
-
-        const exists = await userModel.findOne({ email });
-        if (exists) return res.json({ success: false, message: "User already exists" });
-
-        let imageUrl = "";
-        if (req.file) {
-            const result = await streamUpload(req.file.buffer);
-            imageUrl = result.secure_url;
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const newUser = new userModel({ 
-            firstName, 
-            middleName: middleName || "", 
-            lastName, 
-            email, 
-            password: hashedPassword, 
-            phone, 
-            image: imageUrl 
-        });
+        const existingUser = await userModel.findOne({ email });
 
-        const user = await newUser.save();
-        const token = createToken(
-    user._id,
-    `${user.firstName} ${user.lastName}`,
-    user.role
-);
-        res.json({ success: true, token });
+        if (existingUser) {
+            if (existingUser.isVerified && existingUser.firstName !== "Pending") {
+                return res.json({ success: false, message: "User already exists" });
+            }
+            // Update placeholder
+            existingUser.firstName = firstName;
+            existingUser.middleName = middleName || "";
+            existingUser.lastName = lastName;
+            existingUser.suffix = suffix || "";
+            existingUser.password = hashedPassword;
+            existingUser.phone = phone;
+            existingUser.isVerified = true; 
+            await existingUser.save();
+        } else {
+            const newUser = new userModel({
+                firstName,
+                middleName: middleName || "",
+                lastName,
+                suffix: suffix || "",
+                email,
+                password: hashedPassword,
+                phone,
+                isVerified: true 
+            });
+            await newUser.save();
+        }
+
+        res.json({ success: true, message: "Account created successfully" });
+
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -128,30 +231,50 @@ const loginUser = async (req, res) => {
         const user = await userModel.findOne({ email });
         
         if (!user) return res.json({ success: false, message: "User does not exist" });
-
-        // 🛑 CHECK IF USER IS DISABLED
-        if (user.disabled) {
-            return res.json({ 
-                success: false, 
-                message: "Your account has been disabled. Please contact administration." 
-            });
-        }
+        if (user.disabled) return res.json({ success: false, message: "Account disabled. Contact admin." });
+        if (!user.isVerified) return res.json({ success: false, message: "Please verify your email first." });
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
-            const token = createToken(
-                user._id,
-                `${user.firstName} ${user.lastName}`,
-                user.role
-            );
+            const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role);
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });
         }
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
+};
+
+const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp, isResetMode } = req.body; // Add isResetMode to body
+    const user = await userModel.findOne({ email: email.toLowerCase().trim() });
+
+    if (!user) return res.json({ success: false, message: "No verification request found" }); 
+
+    if (!user.otp || String(user.otp) !== String(otp).trim()) {
+      return res.json({ success: false, message: "Invalid OTP" });
+    }
+
+    if (new Date() > new Date(user.otpExpires)) {
+      return res.json({ success: false, message: "OTP expired" });
+    }
+
+    user.isVerified = true;
+
+    // ✅ FIX: Only clear the OTP if we ARE NOT resetting a password.
+    // If we are resetting, we need the OTP to stay there for the reset-password call.
+    if (!isResetMode) {
+        user.otp = null;
+        user.otpExpires = null;
+    }
+    
+    await user.save();
+    return res.json({ success: true, message: "OTP verified successfully" });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
+  }
 };
 
 const getUserData = async (req, res) => {
@@ -160,7 +283,6 @@ const getUserData = async (req, res) => {
         const userData = await userModel.findById(userId).select("-password");
         res.json({ success: true, userData });
     } catch (error) {
-        console.log(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -168,13 +290,14 @@ const getUserData = async (req, res) => {
 const updateUserProfile = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { firstName, middleName, lastName, phone, email, oldPassword, newPassword, removeImage } = req.body;
+        const { firstName, middleName, lastName, suffix, phone, oldPassword, newPassword, removeImage } = req.body;
 
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
 
         if (firstName) user.firstName = firstName;
         if (lastName) user.lastName = lastName;
+        if (suffix) user.suffix = suffix;
         if (typeof middleName !== 'undefined') user.middleName = middleName;
         if (phone) user.phone = phone;
 
@@ -195,7 +318,6 @@ const updateUserProfile = async (req, res) => {
         await user.save();
         res.json({ success: true, message: "Profile updated successfully", userData: user });
     } catch (error) {
-        console.error(error);
         res.json({ success: false, message: error.message });
     }
 };
@@ -205,11 +327,12 @@ const updateUserProfile = async (req, res) => {
 const createBooking = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { roomId, checkIn, checkOut, participants, totalPrice } = req.body;
+        const { roomId, packageId, checkIn, checkOut, participants, totalPrice } = req.body;
         
         const bookingData = {
             user_id: userId,
-            room_ids: [roomId],
+            room_ids: roomId ? [roomId] : [],
+            package_id: packageId || null,
             check_in: new Date(checkIn),
             check_out: new Date(checkOut),
             participants,
@@ -232,7 +355,7 @@ const getUserBookings = async (req, res) => {
         const userId = req.userId || req.body.userId;
         const bookings = await bookingModel.find({ user_id: userId })
             .populate("room_ids")
-            .populate("package_id", "name") // 👈 ADD THIS: To support the package name fallback
+            .populate("package_id", "name")
             .sort({ createdAt: -1 });
         res.json({ success: true, bookings });
     } catch (error) {
@@ -243,16 +366,10 @@ const getUserBookings = async (req, res) => {
 const cancelBooking = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        
-        // Find the booking first to check its current status
         const booking = await bookingModel.findById(bookingId);
 
-        if (!booking) {
-            return res.json({ success: false, message: "Booking not found" });
-        }
+        if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // Determine the new status based on current progress
-        // If it's already approved OR already paid, it requires admin approval to cancel
         const isApproved = booking.status === 'approved';
         const isPaid = booking.payment === true || booking.paymentStatus === 'paid';
 
@@ -260,7 +377,6 @@ const cancelBooking = async (req, res) => {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancellation_pending" });
             res.json({ success: true, message: "Cancellation request sent for approval" });
         } else {
-            // If it's still pending and unpaid, cancel it immediately
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
             res.json({ success: true, message: "Booking Cancelled" });
         }
@@ -274,8 +390,10 @@ const cancelBooking = async (req, res) => {
 const createCheckoutSession = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId).populate("room_ids");
+        const booking = await bookingModel.findById(bookingId).populate("room_ids").populate("package_id");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        const itemName = booking.room_ids[0]?.name || booking.package_id?.name || 'Reservation';
 
         const payload = {
             data: {
@@ -283,12 +401,12 @@ const createCheckoutSession = async (req, res) => {
                     send_email_receipt: true,
                     show_description: true,
                     show_line_items: true,
-                    description: `Booking for ${booking.room_ids[0]?.name}`,
+                    description: `Booking for ${itemName}`,
                     line_items: [{
                         currency: 'PHP',
                         amount: booking.total_price * 100,
-                        description: 'Room Reservation',
-                        name: booking.room_ids[0]?.name || 'Room Booking',
+                        description: 'Reservation Fee',
+                        name: itemName,
                         quantity: 1
                     }],
                     payment_method_types: ['gcash', 'card', 'paymaya', 'grab_pay'],
@@ -378,7 +496,6 @@ const rateBooking = async (req, res) => {
     }
 };
 
-// ✅ NEW: Logic to add a follow-up reply
 const addReviewChat = async (req, res) => {
     try {
         const { bookingId, message } = req.body;
@@ -404,7 +521,6 @@ const addReviewChat = async (req, res) => {
     }
 };
 
-// ✅ NEW: Logic to delete a guest's own reply
 const deleteReviewReply = async (req, res) => {
     try {
         const { bookingId, chatId } = req.body;
@@ -428,7 +544,7 @@ const deleteReviewReply = async (req, res) => {
 const getAllPublicReviews = async (req, res) => {
     try {
         const reviews = await bookingModel.find({ 
-            rating: { $gt: 0 } // Removed the empty text check
+            rating: { $gt: 0 } 
         })
         .populate("user_id", "firstName lastName image")
         .populate("room_ids", "name")
@@ -442,8 +558,24 @@ const getAllPublicReviews = async (req, res) => {
 };
 
 export {
-    registerUser, loginUser, googleAuth, getUserData, updateUserProfile,
-    getUserBookings, createBooking, cancelBooking,
-    createCheckoutSession, verifyPayment, markCashPayment, confirmCashPayment, 
-    rateBooking, addReviewChat, deleteReviewReply, getAllPublicReviews
+    registerUser, 
+    loginUser, 
+    sendOTP,
+    requestPasswordReset,
+    resetPassword,
+    verifyOTP,
+    googleAuth, 
+    getUserData, 
+    updateUserProfile,
+    getUserBookings, 
+    createBooking, 
+    cancelBooking,
+    createCheckoutSession, 
+    verifyPayment, 
+    markCashPayment, 
+    confirmCashPayment, 
+    rateBooking, 
+    addReviewChat, 
+    deleteReviewReply, 
+    getAllPublicReviews
 };

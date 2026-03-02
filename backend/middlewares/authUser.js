@@ -1,22 +1,21 @@
 import jwt from "jsonwebtoken";
-import userModel from "../models/userModel.js"; // 👈 Import your model
+import userModel from "../models/userModel.js";
 
-const authUser = async (req, res, next) => { // 👈 Make this async
+const authUser = async (req, res, next) => {
   try {
     const token = req.headers.token || req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ success: false, message: "Not authorized" });
+      return res.status(401).json({ success: false, message: "Not authorized. Please login again." });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // 🛑 THE SECURITY CHECK:
-    // Look up the user in the database to see if they are disabled
+    // Check DB for status and existence
     const user = await userModel.findById(decoded.id);
 
     if (!user) {
-      return res.status(401).json({ success: false, message: "User not found" });
+      return res.status(401).json({ success: false, message: "User account no longer exists." });
     }
 
     if (user.disabled) {
@@ -28,14 +27,17 @@ const authUser = async (req, res, next) => { // 👈 Make this async
 
     // ✅ Attach user info to request
     req.userId = decoded.id;
-    req.userRole = user.role || "guest"; // Use DB role for better accuracy
-    req.userName = `${user.firstName} ${user.lastName}`;
+    req.userRole = user.role || "guest";
+    // Safeguard for missing names
+    req.userName = user.firstName ? `${user.firstName} ${user.lastName || ''}` : "User";
 
     next();
 
   } catch (error) {
     console.error("User Auth Error:", error.message);
-    return res.status(401).json({ success: false, message: "Invalid token" });
+    // Specifically handle expired tokens for better frontend UX
+    const message = error.name === "TokenExpiredError" ? "Session expired. Please login." : "Invalid session.";
+    return res.status(401).json({ success: false, message });
   }
 };
 

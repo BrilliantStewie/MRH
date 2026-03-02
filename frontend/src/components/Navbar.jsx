@@ -3,7 +3,7 @@ import { assets } from "../assets/assets";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import {
-  Menu, X, User, LogOut, Calendar, ArrowRight, Bell, Trash2, Check
+  Menu, X, User, LogOut, Calendar, ArrowRight, Bell, Trash2, Check, Circle
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -18,6 +18,16 @@ const Navbar = () => {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+
+  /* ==========================================
+     NAVBAR UI LOGIC
+  ========================================== */
+  const logout = () => {
+    setToken(false);
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   /* ==========================================
      NOTIFICATION LOGIC
@@ -32,16 +42,14 @@ const Navbar = () => {
         setNotifications(data.notifications || []);
       }
     } catch (err) {
+      // ✅ Handle Security Rejections (401/403) from authUser middleware
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        toast.error(err.response.data.message || "Session expired");
+        logout();
+      }
       console.error(err);
     }
   };
-
-  // 🚀 ADD THIS RIGHT HERE! This runs the fetch automatically.
-  useEffect(() => {
-    if (token) {
-      fetchNotifications();
-    }
-  }, [token, backendUrl]);
 
   const markAsRead = async (id) => {
     try {
@@ -50,28 +58,24 @@ const Navbar = () => {
       });
       fetchNotifications();
     } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) logout();
       console.error(err);
     }
   };
 
+  // ✅ Unified effect for Notifications
   useEffect(() => {
-    fetchNotifications();
-    // Optional: Set up an interval to poll for new notifications every 60s
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [token]);
+    if (token) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+    }
+  }, [token, backendUrl]);
 
-  // Safe check using fallback array
   const unreadCount = (notifications || []).filter(n => !n.isRead).length;
-
-  /* ==========================================
-     NAVBAR UI LOGIC
-  ========================================== */
-  const logout = () => {
-    setToken(false);
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
+  const displayedNotifications = showAllNotifications ? notifications : notifications.slice(0, 5);
 
   const userProfileImage = userData?.image;
   const firstName = userData?.firstName 
@@ -88,6 +92,7 @@ const Navbar = () => {
     setShowProfileMenu(false);
     setShowNotifications(false);
     setShowMobileMenu(false);
+    setShowAllNotifications(false);
   }, [location.pathname]);
 
   const navLinks = [
@@ -124,13 +129,14 @@ const Navbar = () => {
 
           <div className="flex items-center gap-3 md:gap-5">
             
-            {/* 🔔 NOTIFICATION BELL */}
             {token && (
               <div className="relative">
                 <button 
                   onClick={() => {
-                    setShowNotifications(!showNotifications);
+                    const willShow = !showNotifications;
+                    setShowNotifications(willShow);
                     setShowProfileMenu(false);
+                    if (!willShow) setShowAllNotifications(false);
                   }}
                   className={`p-2 rounded-full transition-colors relative ${showNotifications ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}
                 >
@@ -142,38 +148,92 @@ const Navbar = () => {
                   )}
                 </button>
 
-                {/* ADDED top-full and z-50 to ensure it drops down below the header properly */}
                 {showNotifications && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
-                    <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex justify-between items-center">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-900">Notifications</h4>
-                      {unreadCount > 0 && <span className="text-[9px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">{unreadCount} New</span>}
-                    </div>
-                    
-                    <div className="max-h-[400px] overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-10 text-center">
-                          <p className="text-xs text-slate-400">All caught up!</p>
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div 
-                            key={n._id} 
-                            onClick={() => {
-                              markAsRead(n._id);
-                              if(n.link) navigate(n.link);
-                            }}
-                            className={`p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer relative ${!n.isRead ? 'bg-blue-50/20' : ''}`}
-                          >
-                            {!n.isRead && <div className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full"></div>}
-                            <p className="text-[11px] text-slate-700 leading-normal mb-1">{n.message}</p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">
-                              {new Date(n.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        ))
+                  <div className="absolute right-0 top-full mt-2 w-[350px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
+                    <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-900">Notifications</h4>
+                      </div>
+                      {unreadCount > 0 && (
+                        <span className="text-[9px] bg-blue-600 text-white px-2.5 py-1 rounded-full font-bold shadow-sm uppercase tracking-wide">
+                          {unreadCount} New
+                        </span>
                       )}
                     </div>
+                    
+                    <div className="max-h-[420px] overflow-y-auto hide-scrollbar">
+                      {notifications.length === 0 ? (
+                        <div className="p-10 flex flex-col items-center justify-center text-center gap-3">
+                          <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                            <Check size={24} />
+                          </div>
+                          <p className="text-xs font-semibold text-slate-500">You're all caught up!</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          {displayedNotifications.map((n) => (
+                            <div 
+                              key={n._id} 
+                              onClick={() => {
+                                markAsRead(n._id);
+                                if(n.link) navigate(n.link);
+                              }}
+                              className={`group p-4 border-b border-slate-50 hover:bg-slate-50 transition-all cursor-pointer flex gap-4 items-start ${!n.isRead ? 'bg-blue-50/40' : 'bg-white'}`}
+                            >
+                              <div className="relative flex-shrink-0 mt-0.5">
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${!n.isRead ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                  <Bell size={16} />
+                                </div>
+                                {!n.isRead && (
+                                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></span>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs leading-relaxed line-clamp-2 ${!n.isRead ? 'text-slate-900 font-bold' : 'text-slate-600 font-medium'}`}>
+                                  {n.message}
+                                </p>
+                                <div className="mt-2 flex items-center gap-1.5 text-slate-400">
+                                  <Calendar size={11} />
+                                  <p className="text-[10px] font-bold uppercase tracking-wider">
+                                    {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                  </p>
+                                </div>
+                              </div>
+                              {n.isRead && (
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-slate-300 mt-1">
+                                  <Check size={14} />
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {notifications.length > 0 && (
+                      <div className="flex bg-slate-50 border-t border-slate-100">
+                        {notifications.length > 5 && (
+                          <div 
+                            className="flex-1 p-3 text-center border-r border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors" 
+                            onClick={() => setShowAllNotifications(!showAllNotifications)}
+                          >
+                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">
+                              {showAllNotifications ? "Show Less" : "Show All"}
+                            </p>
+                          </div>
+                        )}
+                        <div 
+                          className="flex-1 p-3 text-center cursor-pointer hover:bg-slate-100 transition-colors" 
+                          onClick={() => {
+                            setShowNotifications(false);
+                            setShowAllNotifications(false);
+                          }}
+                        >
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Close</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -189,13 +249,13 @@ const Navbar = () => {
                   onClick={() => {
                     setShowProfileMenu((p) => !p);
                     setShowNotifications(false);
+                    setShowAllNotifications(false);
                   }}
                   className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 hover:border-slate-300 transition-colors flex items-center justify-center bg-slate-50"
                 >
                   {userProfileImage ? <img src={userProfileImage} alt="profile" className="w-full h-full object-cover" /> : <User size={20} className="text-slate-400" />}
                 </button>
 
-                {/* ADDED top-full and z-50 here as well */}
                 {showProfileMenu && (
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-2 animate-in fade-in zoom-in-95 duration-200 z-50">
                     <div className="px-4 py-2 border-b border-slate-50 mb-1">
@@ -226,7 +286,6 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* MOBILE MENU */}
         {showMobileMenu && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-t border-slate-100 shadow-xl p-4 flex flex-col gap-2 z-50">
              {navLinks.map((link) => (

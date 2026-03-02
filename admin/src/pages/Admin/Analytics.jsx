@@ -2,20 +2,16 @@ import React, { useContext, useEffect, useMemo } from 'react';
 import { AdminContext } from "../../context/AdminContext";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, 
-  ResponsiveContainer, BarChart, Bar, Cell 
+  ResponsiveContainer, BarChart, Bar, Cell,
+  LineChart, Line, Legend // Added for predictive chart
 } from 'recharts';
-import { TrendingUp, Calendar, Zap, BarChart3, Info, Loader2 } from 'lucide-react';
+import { TrendingUp, Calendar, Zap, BarChart3, Info, Loader2, Lightbulb, Target, Activity } from 'lucide-react';
 
 // --- THE FIX: GLOBAL CONSOLE SILENCER ---
-// We patch console.error to ignore the specific Recharts warning.
-// This must be outside the component to work immediately.
 const originalConsoleError = console.error;
 console.error = (...args) => {
-  // Filter out the specific Recharts width/height warning
   if (typeof args[0] === "string" && /width.*height.*greater than 0/.test(args[0])) return;
-  // Filter out defaultProps warnings (common in older libraries)
   if (typeof args[0] === "string" && /defaultProps/.test(args[0])) return;
-  
   originalConsoleError(...args);
 };
 
@@ -29,12 +25,15 @@ const Analytics = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aToken]); 
 
-  const { trendData, seasonalData, stats } = useMemo(() => {
+  const { trendData, seasonalData, stats, predictiveData } = useMemo(() => {
     const bookings = allBookings || [];
     const now = new Date();
     const oneDay = 24 * 60 * 60 * 1000;
+    const currentMonthIndex = now.getMonth();
 
-    // Velocity Logic
+    // ==========================================
+    // 1. VELOCITY LOGIC
+    // ==========================================
     const last7DaysCount = bookings.filter(b => (now - new Date(b.date || b.createdAt)) < 7 * oneDay).length;
     const prev7DaysCount = bookings.filter(b => {
       const diff = (now - new Date(b.date || b.createdAt));
@@ -44,7 +43,9 @@ const Analytics = () => {
     const velocityChange = prev7DaysCount === 0 ? (last7DaysCount > 0 ? 100 : 0) : 
       Math.round(((last7DaysCount - prev7DaysCount) / prev7DaysCount) * 100);
 
-    // Trend Data
+    // ==========================================
+    // 2. RECENT TREND DATA
+    // ==========================================
     const weeks = ['3 Wks Ago', '2 Wks Ago', 'Last Week', 'Current'];
     const weekTrends = weeks.map((name, i) => {
       const daysAgo = (3 - i) * 7;
@@ -55,11 +56,9 @@ const Analytics = () => {
       return { name, bookings: count };
     });
 
-    // Forecast
-    const forecastValue = Math.round(last7DaysCount * (1 + (velocityChange / 100)));
-    weekTrends.push({ name: 'Forecast', bookings: Math.max(0, forecastValue), isForecast: true });
-
-    // Seasonal Data
+    // ==========================================
+    // 3. SEASONAL & MONTHLY DATA
+    // ==========================================
     const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const monthlyCounts = new Array(12).fill(0);
     
@@ -75,6 +74,57 @@ const Analytics = () => {
       demand: monthlyCounts[i],
     }));
 
+    // ==========================================
+    // 4. PREDICTIVE ANALYTICS LOGIC
+    // ==========================================
+    
+    // Find Peak Month
+    let peakMonthIndex = 0;
+    let maxDemand = 0;
+    monthlyCounts.forEach((count, idx) => {
+      if(count > maxDemand) { maxDemand = count; peakMonthIndex = idx; }
+    });
+    const peakMonthName = maxDemand > 0 ? monthNames[peakMonthIndex] : "Insufficient Data";
+
+    // Generate Forecast Chart Data (Last 2 Months Actuals + Next 3 Months Predicted)
+    const forecastChartData = [];
+    const safeGrowthRate = Math.max(-0.5, Math.min(1.5, velocityChange / 100)); // Cap growth for realistic forecasts
+    
+    // Last 2 Months (Actuals)
+    for(let i = 2; i >= 0; i--) {
+        const mIdx = (currentMonthIndex - i + 12) % 12;
+        forecastChartData.push({
+            name: monthNames[mIdx],
+            Actual: monthlyCounts[mIdx],
+            Predicted: i === 0 ? monthlyCounts[mIdx] : null // Bridge the gap between actual and predicted lines
+        });
+    }
+
+    // Next 3 Months (Predicted)
+    let lastKnownVolume = monthlyCounts[currentMonthIndex] || (last7DaysCount * 4);
+    if (lastKnownVolume === 0) lastKnownVolume = 5; // Fallback baseline
+    
+    let nextMonthProjectedVolume = 0;
+
+    for(let i = 1; i <= 3; i++) {
+        const mIdx = (currentMonthIndex + i) % 12;
+        
+        // Base prediction on historical data for that month, or extrapolate if missing
+        const historicalBaseline = monthlyCounts[mIdx] || lastKnownVolume;
+        
+        // Compound the growth/decline rate slightly over time
+        const predictionValue = Math.max(0, Math.round(historicalBaseline * (1 + (safeGrowthRate / i))));
+        
+        if (i === 1) nextMonthProjectedVolume = predictionValue; // Save next month for the KPI card
+
+        forecastChartData.push({
+            name: monthNames[mIdx],
+            Actual: null,
+            Predicted: predictionValue
+        });
+        lastKnownVolume = predictionValue;
+    }
+
     return { 
       trendData: weekTrends, 
       seasonalData: seasons,
@@ -82,6 +132,12 @@ const Analytics = () => {
         velocity: `${velocityChange >= 0 ? '+' : ''}${velocityChange}%`,
         isPositive: velocityChange >= 0,
         recentCount: last7DaysCount
+      },
+      predictiveData: {
+        forecastChartData,
+        nextMonthVolume: nextMonthProjectedVolume,
+        peakMonth: peakMonthName,
+        expectedTrend: safeGrowthRate > 0 ? "Upward" : (safeGrowthRate < 0 ? "Downward" : "Stable")
       }
     };
   }, [allBookings]);
@@ -96,7 +152,7 @@ const Analytics = () => {
   }
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans">
+    <div className="p-6 bg-slate-50 min-h-screen font-sans pb-20">
       
       {/* Header */}
       <div className="mb-8">
@@ -136,9 +192,9 @@ const Analytics = () => {
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         
-        {/* Chart 1 */}
+        {/* Chart 1: Intake Trends */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -146,7 +202,6 @@ const Analytics = () => {
              </h3>
           </div>
           
-          {/* Defined height + w-full wrapper + explicit min-width to prevent flex collapse */}
           <div className="w-full h-[300px] min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -166,7 +221,7 @@ const Analytics = () => {
           </div>
         </div>
 
-        {/* Chart 2 */}
+        {/* Chart 2: Monthly Volume */}
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -196,6 +251,111 @@ const Analytics = () => {
         </div>
 
       </div>
+
+      {/* ==========================================
+          PREDICTIVE ANALYTICS SECTION 
+      ========================================== */}
+      <div className="mb-6 border-t border-slate-200 pt-10">
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+          <Lightbulb className="text-amber-500" fill="currentColor" size={28} /> 
+          Predictive Insights
+        </h2>
+        <p className="text-slate-500 font-medium mt-1">AI-driven forecasts based on your historical seasonal patterns and current growth trajectory.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Predictive KPIs Column */}
+        <div className="flex flex-col gap-6">
+          {/* Next Month Projection */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+                <Activity size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Next Month Projection</p>
+                <h4 className="text-lg font-bold text-slate-900">{predictiveData.expectedTrend} Trajectory</h4>
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-4xl font-black text-slate-900 tracking-tight">{predictiveData.nextMonthVolume}</h3>
+              <p className="text-sm text-slate-500 font-medium mt-1">Estimated total bookings expected next month.</p>
+            </div>
+          </div>
+
+          {/* Historical Peak Target */}
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
+                <Target size={20} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Peak Demand Season</p>
+                <h4 className="text-lg font-bold text-slate-900">Highest Historical Volume</h4>
+              </div>
+            </div>
+            <div className="mt-4">
+              <h3 className="text-4xl font-black text-slate-900 tracking-tight">{predictiveData.peakMonth}</h3>
+              <p className="text-sm text-slate-500 font-medium mt-1">Prepare marketing & staff capacity for this period.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Predictive Forecast Chart */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+          <div className="mb-6 flex justify-between items-center">
+             <h3 className="font-bold text-slate-800 flex items-center gap-2">
+               <TrendingUp size={20} className="text-purple-600" /> Future Demand Forecast
+             </h3>
+          </div>
+
+          <div className="w-full h-[300px] min-w-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={predictiveData.forecastChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 700}} dy={10} />
+                <YAxis hide />
+                <Tooltip 
+                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
+                  labelStyle={{fontWeight: 'bold', color: '#1e293b', marginBottom: '4px'}}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }} />
+                
+                {/* Actual Historical Line */}
+                <Line 
+                  type="monotone" 
+                  dataKey="Actual" 
+                  stroke="#cbd5e1" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, fill: '#cbd5e1' }} 
+                  activeDot={{ r: 6 }} 
+                  animationDuration={1000}
+                />
+                
+                {/* Dashed Predictive Line */}
+                <Line 
+                  type="monotone" 
+                  dataKey="Predicted" 
+                  stroke="#a855f7" 
+                  strokeWidth={3} 
+                  strokeDasharray="5 5"
+                  dot={{ r: 4, fill: '#a855f7' }} 
+                  activeDot={{ r: 6, fill: '#a855f7', stroke: '#fff', strokeWidth: 2 }} 
+                  animationDuration={1000}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-3 rounded-xl">
+             <Info size={14} className="text-purple-500 flex-shrink-0" />
+             <span>The <strong className="text-purple-600">Dashed Purple</strong> line plots your AI-estimated trajectory for the upcoming quarter based on your recent growth velocity.</span>
+          </div>
+        </div>
+
+      </div>
+
     </div>
   );
 };
