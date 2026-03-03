@@ -11,19 +11,60 @@ import {
 } from "../controllers/reviewController.js";
 
 import authUser from "../middlewares/authUser.js";
+import authAdmin from "../middlewares/authAdmin.js";
 
 const reviewRouter = express.Router();
 
+/* ===========================
+   PUBLIC
+=========================== */
 reviewRouter.get("/all-reviews", getAllReviews);
 
-// Main Review Routes
+/* ===========================
+   GUEST ONLY (Main Review)
+=========================== */
 reviewRouter.post("/", authUser, createReview);
-reviewRouter.put("/:reviewId", authUser, editReview); // <-- NEW
-reviewRouter.delete("/:reviewId", authUser, deleteReview); // <-- NEW
+reviewRouter.put("/:reviewId", authUser, editReview);
+reviewRouter.delete("/:reviewId", authUser, deleteReview);
 
-// Reply Routes
-reviewRouter.post("/reply/:reviewId", authUser, replyToReview);
-reviewRouter.put("/edit-reply/:replyId", authUser, editReply); // <-- UPDATED to match frontend
-reviewRouter.delete("/delete-reply/:replyId", authUser, deleteReply); // <-- UPDATED to match frontend
+/* ===========================
+   REPLIES (ADMIN OR GUEST)
+=========================== */
+
+// 🔥 Allow admin OR guest to reply
+reviewRouter.post(
+  "/reply/:reviewId",
+  (req, res, next) => {
+    authAdmin(req, res, (err) => {
+      if (!err) return next(); // admin/staff authenticated
+      authUser(req, res, next); // fallback to guest
+    });
+  },
+  replyToReview
+);
+
+// 🔥 Allow editing own reply (admin or guest)
+reviewRouter.put(
+  "/edit-reply/:replyId",
+  (req, res, next) => {
+    authAdmin(req, res, (err) => {
+      if (!err) return next();
+      authUser(req, res, next);
+    });
+  },
+  editReply
+);
+
+// 🔥 Allow deleting own reply (admin or guest)
+reviewRouter.delete(
+  "/delete-reply/:replyId",
+  (req, res, next) => {
+    authAdmin(req, res, (err) => {
+      if (!err) return next();
+      authUser(req, res, next);
+    });
+  },
+  deleteReply
+);
 
 export default reviewRouter;

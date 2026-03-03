@@ -1,6 +1,7 @@
 import Review from "../models/reviewModel.js";
 import Booking from "../models/bookingModel.js";
 import Notification from "../models/notificationModel.js";
+import sendEmail from "../utils/sendEmail.js";
 
 /* ============================================================
    1️⃣ GET ALL REVIEWS (Public)
@@ -238,17 +239,19 @@ export const replyToReview = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Reply cannot be empty." });
     }
 
-    const review = await Review.findById(reviewId);
+    const review = await Review.findById(reviewId)
+      .populate("userId", "firstName email");
+
     if (!review) {
       return res.status(404).json({ success: false, message: "Review not found." });
     }
 
-    // GUEST SECURITY: Guests only reply to their own review thread
-    if (role === "guest" && review.userId.toString() !== userId.toString()) {
+    // Guests can only reply to their own review
+    if (role === "guest" && review.userId._id.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: "Unauthorized." });
     }
 
-    // Add the message with the parent reference
+    // Save reply
     review.reviewChat.push({
       senderId: userId,
       senderRole: role,
@@ -258,20 +261,45 @@ export const replyToReview = async (req, res, next) => {
 
     await review.save();
 
-    // 🔔 NOTIFICATION LOGIC FOR REPLIES
+    // ==============================
+    // 📧 EMAIL + 🔔 NOTIFICATION
+    // ==============================
+
     if (role !== "guest") {
-      // If Admin/Staff replied, notify the guest
+      // ADMIN / STAFF replied → Email Guest
+
       await Notification.create({
-        recipient: review.userId,
+        recipient: review.userId._id,
         sender: userId,
         type: "new_reply",
         message: `Management has replied to your review.`,
-        link: "/my-bookings", 
+        link: "/my-bookings",
         isRead: false
       });
+
+      await sendEmail(
+        review.userId.email,
+        "Response to Your Review – Mercedarian Retreat House",
+        `
+        <p>Dear ${review.userId.firstName},</p>
+        <p>Our management team has responded to your review.</p>
+        <p><strong>Reply:</strong></p>
+        <blockquote style="border-left:3px solid #ccc;padding-left:10px;color:#555;">
+          ${response}
+        </blockquote>
+        <p>You may log in to your account to continue the conversation.</p>
+        <br/>
+        <p>Mercedarian Retreat House</p>
+        `
+      );
+
     } else {
-      // If Guest replied, notify the admins
-      const admins = await Booking.db.model("User").find({ role: "admin" });
+      // GUEST replied → Email Admins
+
+      const admins = await Booking.db.model("User")
+        .find({ role: "admin" })
+        .select("email firstName");
+
       const adminNotifications = admins.map((admin) => ({
         recipient: admin._id,
         sender: userId,
@@ -280,12 +308,33 @@ export const replyToReview = async (req, res, next) => {
         link: "/admin/reviews",
         isRead: false
       }));
+
       if (adminNotifications.length > 0) {
         await Notification.insertMany(adminNotifications);
+      }
+
+      // Send email to each admin
+      for (const admin of admins) {
+        await sendEmail(
+          admin.email,
+          "New Guest Reply – Review Thread",
+          `
+          <p>Dear ${admin.firstName || "Administrator"},</p>
+          <p>A guest has replied to a review thread.</p>
+          <p><strong>Guest Reply:</strong></p>
+          <blockquote style="border-left:3px solid #ccc;padding-left:10px;color:#555;">
+            ${response}
+          </blockquote>
+          <p>Please log in to the admin panel to respond.</p>
+          <br/>
+          <p>Mercedarian Retreat House System</p>
+          `
+        );
       }
     }
 
     res.status(200).json({ success: true, data: review });
+
   } catch (err) {
     next(err);
   }

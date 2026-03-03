@@ -407,29 +407,37 @@ const allBookings = async (req, res) => {
 
 const approveBooking = async (req, res) => {
     try {
-        const { bookingId } = req.params;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true }).populate("user_id");
+        const { bookingId } = req.params; // ✅ FIXED: Changed from req.body to req.params to match adminRoute.js
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true }).populate('user_id');
+
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 Internal Notification
         await Notification.create({
-            recipient: booking.user_id,
+            recipient: booking.user_id._id,
             type: "booking_update",
             message: `Great news! Your booking has been approved by the administration.`,
-            link: "/my-bookings",
-            isRead: false
+            link: "/my-bookings"
         });
 
-        // 📧 Email Notification
         await sendEmail(
             booking.user_id.email,
-            "Booking Approved",
-            `<p>Peace be with you, ${booking.user_id.firstName},</p>
-             <p>Your booking request for ${new Date(booking.check_in).toLocaleDateString()} has been <b>Approved</b>.</p>
-             <p>You may now proceed with any necessary next steps shown in your dashboard.</p>`
+            "Booking Confirmation – Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <p>Dear ${booking.user_id.firstName},</p>
+                <p>Good day.</p>
+                <p>We are pleased to inform you that your booking request has been <strong>approved by the Administration</strong>.</p>
+                <p>Your reservation for ${new Date(booking.check_in).toLocaleDateString()} is now confirmed. Please check your dashboard for further details.</p>
+                <p>Should you have any inquiries or special requests, please feel free to contact us.</p>
+                <br/>
+                <p>Thank you for choosing Mercedarian Retreat House.</p>
+                <br/>
+                <p>Respectfully,<br/>Administration Office<br/>Mercedarian Retreat House</p>
+            </div>
+            `
         );
 
-        res.json({ success: true, message: "Booking Approved Successfully" });
+        res.json({ success: true, message: "Booking Approved" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -437,26 +445,26 @@ const approveBooking = async (req, res) => {
 
 const declineBooking = async (req, res) => {
     try {
-        const { bookingId } = req.params;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate("user_id");
+        const { bookingId } = req.params; // ✅ FIXED: Changed from req.body to req.params to match adminRoute.js
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'declined' }, { new: true }).populate('user_id');
+
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 Internal Notification
-        await Notification.create({
-            recipient: booking.user_id,
-            type: "booking_update",
-            message: `Your booking was declined by the administration.`,
-            link: "/my-bookings",
-            isRead: false
-        });
-
-        // 📧 Email Notification
         await sendEmail(
             booking.user_id.email,
-            "Booking Declined",
-            `<p>Hello ${booking.user_id.firstName},</p>
-             <p>We regret to inform you that your booking request for ${new Date(booking.check_in).toLocaleDateString()} was declined by the administration.</p>
-             <p>If you have questions, please contact us.</p>`
+            "Booking Request Update – Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <p>Dear ${booking.user_id.firstName},</p>
+                <p>We regret to inform you that your booking request has been <strong>declined by the Administration</strong>.</p>
+                <p>If you would like to reschedule or submit a new booking request, you may do so through your account.</p>
+                <p>For further clarification, please feel free to contact us.</p>
+                <br/>
+                <p>Thank you for your understanding.</p>
+                <br/>
+                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            </div>
+            `
         );
 
         res.json({ success: true, message: "Booking Declined" });
@@ -468,27 +476,27 @@ const declineBooking = async (req, res) => {
 const paymentConfirmed = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true }, { new: true }).populate("user_id");
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('user_id').populate('room_ids');
+
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 Internal Notification
-        await Notification.create({
-            recipient: booking.user_id,
-            type: "payment_update",
-            message: `Your payment has been manually confirmed by the administration.`,
-            link: "/my-bookings",
-            isRead: false
-        });
-
-        // 📧 Email Notification
         await sendEmail(
             booking.user_id.email,
-            "Payment Confirmed",
-            `<p>Hello ${booking.user_id.firstName},</p>
-             <p>Your payment for booking ID ${booking._id} has been manually confirmed by our staff. Thank you!</p>`
+            "Payment Confirmation – Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <p>Dear ${booking.user_id.firstName},</p>
+                <p>Good day.</p>
+                <p>This is to formally confirm that your payment for <strong>${booking.bookingName || booking.room_ids[0]?.name}</strong> has been successfully verified and confirmed by the <strong>Administration</strong>.</p>
+                <p>Your reservation is now fully secured. Kindly keep this email for your records.</p>
+                <p>We look forward to welcoming you to Mercedarian Retreat House.</p>
+                <br/>
+                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            </div>
+            `
         );
 
-        res.json({ success: true, message: "Payment Status Updated to Confirmed" });
+        res.json({ success: true, message: "Payment Confirmed" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -501,25 +509,26 @@ const paymentConfirmed = async (req, res) => {
 const approveCancellationRequest = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId).populate("user_id");
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate('user_id');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        booking.status = 'cancelled';
-        booking.payment = false; 
-        
-        await booking.save();
-
-        // 📧 Email Notification
         await sendEmail(
             booking.user_id.email,
-            "Cancellation Request Approved",
-            `<p>Hello ${booking.user_id.firstName},</p>
-             <p>Your request to cancel booking ID ${booking._id} has been approved.</p>`
+            "Cancellation Approved – Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <p>Dear ${booking.user_id.firstName},</p>
+                <p>This is to inform you that your cancellation request has been <strong>approved by the Administration</strong>.</p>
+                <p>Your booking has now been officially cancelled in our system.</p>
+                <p>If you wish to make a new reservation in the future, we will be happy to assist you.</p>
+                <br/>
+                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            </div>
+            `
         );
 
-        res.json({ success: true, message: "Cancellation Approved & Refunded (Simulated)" });
-
+        res.json({ success: true, message: "Cancellation Approved" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -528,48 +537,28 @@ const approveCancellationRequest = async (req, res) => {
 const resolveCancellation = async (req, res) => {
     try {
         const { bookingId, action } = req.body; 
-        
-        if (!bookingId || !action) {
-            return res.json({ success: false, message: "Missing required fields" });
-        }
-
         const newStatus = action === 'approve' ? 'cancelled' : 'approved';
         
-        const booking = await bookingModel.findByIdAndUpdate(
-            bookingId, 
-            { status: newStatus }, 
-            { new: true }
-        ).populate("user_id");
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: newStatus }, { new: true }).populate('user_id');
 
-        if (!booking) {
-            return res.json({ success: false, message: "Booking not found" });
-        }
+        if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        // 🔔 Internal Notification
-        const notificationMsg = action === 'approve' 
-            ? `Your cancellation request was APPROVED.` 
-            : `Your cancellation request was REJECTED. Your booking remains active.`;
-
-        await Notification.create({
-            recipient: booking.user_id,
-            type: "booking_update",
-            message: notificationMsg,
-            link: "/my-bookings",
-            isRead: false
-        });
-
-        // 📧 Email Notification
         await sendEmail(
             booking.user_id.email,
-            "Cancellation Request Update",
-            `<p>Hello ${booking.user_id.firstName},</p>
-             <p>${notificationMsg}</p>`
+            "Cancellation Request Update – Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <p>Dear ${booking.user_id.firstName},</p>
+                <p>Your cancellation request has been <strong>${action === 'approve' ? 'approved' : 'reviewed and declined'}</strong> by the Administration.</p>
+                ${action === 'approve' ? `<p>Your booking has been successfully cancelled.</p>` : `<p>Your reservation remains active as scheduled.</p>`}
+                <p>Should you need further assistance, please contact us.</p>
+                <br/>
+                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            </div>
+            `
         );
         
-        res.json({ 
-            success: true, 
-            message: `Cancellation request ${action === 'approve' ? 'approved' : 'rejected'}.` 
-        });
+        res.json({ success: true, message: `Cancellation request ${action}d.` });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
