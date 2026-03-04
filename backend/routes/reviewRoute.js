@@ -29,42 +29,17 @@ reviewRouter.delete("/:reviewId", authUser, deleteReview);
 
 /* ===========================
    REPLIES (ADMIN OR GUEST)
+   ✅ Any logged-in user can reply/edit/delete
 =========================== */
 
-// 🔥 Allow admin OR guest to reply
-reviewRouter.post(
-  "/reply/:reviewId",
-  (req, res, next) => {
-    authAdmin(req, res, (err) => {
-      if (!err) return next(); // admin/staff authenticated
-      authUser(req, res, next); // fallback to guest
-    });
-  },
-  replyToReview
-);
+reviewRouter.post("/reply/:reviewId", authUser, replyToReview);
+reviewRouter.put("/edit-reply/:replyId", authUser, editReply);
+reviewRouter.delete("/delete-reply/:replyId", authUser, deleteReply);
 
-// 🔥 Allow editing own reply (admin or guest)
-reviewRouter.put(
-  "/edit-reply/:replyId",
-  (req, res, next) => {
-    authAdmin(req, res, (err) => {
-      if (!err) return next();
-      authUser(req, res, next);
-    });
-  },
-  editReply
-);
+/* ===========================
+   ADMIN ONLY (Visibility Toggle)
+=========================== */
 
-// 🔥 Allow deleting own reply (admin or guest)
-reviewRouter.delete(
-  "/delete-reply/:replyId",
-  (req, res, next) => {
-    authAdmin(req, res, (err) => {
-      if (!err) return next();
-      authUser(req, res, next);
-    });
-  },
-  deleteReply
-);
+reviewRouter.patch("/toggle/:reviewId", authAdmin, toggleReviewVisibility);
 
 export default reviewRouter;

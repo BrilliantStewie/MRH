@@ -86,6 +86,10 @@ const Packages = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
+  // --- DELETE MODAL STATE ---
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [packageToDelete, setPackageToDelete] = useState(null);
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
@@ -144,23 +148,19 @@ const Packages = () => {
 
   // --- FILTERING LOGIC ---
   const filteredPackages = allPackages.filter((pkg) => {
-    // 1. Search Logic
     const term = searchTerm.toLowerCase();
     const matchesName = pkg.name.toLowerCase().includes(term);
     const amenitiesList = (pkg.amenities || []).map(getAmenityString).filter(Boolean);
     const matchesSearch = matchesName || amenitiesList.some(txt => txt.toLowerCase().includes(term));
     
-    // 2. Tag Filter Logic
     const matchesTag = activeFilter === "ALL" || amenitiesList.some(txt => txt.toUpperCase() === activeFilter);
 
-    // 3. Price Logic
     const price = getPkgPrice(pkg);
     const matchesMin = minPrice === "" || price >= Number(minPrice);
     const matchesMax = maxPrice === "" || price <= Number(maxPrice);
 
     return matchesSearch && matchesTag && matchesMin && matchesMax;
   }).sort((a, b) => {
-    // 4. Sort Logic
     const priceA = getPkgPrice(a);
     const priceB = getPkgPrice(b);
     return priceSort === 'asc' ? priceA - priceB : priceB - priceA;
@@ -205,7 +205,6 @@ const Packages = () => {
 
         const submissionData = { ...formData, amenities: finalAmenities };
 
-        // ✅ LOGIC CHECK: We pass the ID and data separately to the Context
         if (editingId) {
             await updatePackage(editingId, submissionData);
         } else {
@@ -237,11 +236,10 @@ const Packages = () => {
         <p className="text-slate-500 mt-2 font-medium">Manage listing inventory and inclusions.</p>
       </div>
 
-      {/* --- CONTROL BAR (SEARCH, TAGS, PRICE) --- */}
+      {/* --- CONTROL BAR --- */}
       <div className="sticky top-4 z-40 max-w-7xl mx-auto mb-8">
         <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl shadow-slate-200/50 border border-white/50 p-1.5 flex flex-col md:flex-row items-center gap-2">
             
-            {/* Search Input */}
             <div className="relative flex-grow w-full group">
                 <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input 
@@ -276,62 +274,32 @@ const Packages = () => {
 
                     {isPriceDropdownOpen && (
                         <div className="absolute top-full right-0 mt-2 w-full md:w-[260px] bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                             {/* Sorting */}
                              <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-xl">
-                                <button 
-                                    onClick={() => setPriceSort('asc')}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
-                                        priceSort === 'asc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                                >
+                                <button onClick={() => setPriceSort('asc')} className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${priceSort === 'asc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                     Low-High <ArrowUp size={14}/>
                                 </button>
-                                <button 
-                                    onClick={() => setPriceSort('desc')}
-                                    className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${
-                                        priceSort === 'desc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                                >
+                                <button onClick={() => setPriceSort('desc')} className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${priceSort === 'desc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
                                     High-Low <ArrowDown size={14}/>
                                 </button>
                              </div>
-
-                             {/* Range */}
                              <div className="space-y-3">
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase">Min Price</label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₱</span>
-                                        <input 
-                                            type="number" 
-                                            value={minPrice} 
-                                            onChange={(e) => setMinPrice(e.target.value)} 
-                                            placeholder="0"
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500"
-                                        />
+                                        <input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500" />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase">Max Price</label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₱</span>
-                                        <input 
-                                            type="number" 
-                                            value={maxPrice} 
-                                            onChange={(e) => setMaxPrice(e.target.value)} 
-                                            placeholder="Any"
-                                            className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500"
-                                        />
+                                        <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Any" className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500" />
                                     </div>
                                 </div>
                              </div>
-
-                             {/* Actions */}
                              {isPriceFilterActive && (
-                                <button 
-                                    onClick={() => { setMinPrice(""); setMaxPrice(""); }}
-                                    className="w-full mt-4 text-xs font-bold text-rose-500 hover:bg-rose-50 py-2 rounded-lg transition-colors"
-                                >
+                                <button onClick={() => { setMinPrice(""); setMaxPrice(""); }} className="w-full mt-4 text-xs font-bold text-rose-500 hover:bg-rose-50 py-2 rounded-lg transition-colors">
                                     Clear Price Filter
                                 </button>
                              )}
@@ -351,80 +319,48 @@ const Packages = () => {
                     >
                         <div className="flex items-center gap-2 overflow-hidden">
                             {activeFilter === "ALL" ? <SlidersHorizontal size={16} /> : <Filter size={16} />}
-                            <span className="uppercase truncate max-w-[100px]">
-                            {activeFilter === "ALL" ? "Tags" : activeFilter}
-                            </span>
+                            <span className="uppercase truncate max-w-[100px]">{activeFilter === "ALL" ? "Tags" : activeFilter}</span>
                         </div>
-
                         <div className="flex items-center ml-2">
                         {activeFilter !== "ALL" ? (
-                            <div role="button" onClick={clearFilter} className="p-1 rounded-full hover:bg-indigo-200 text-indigo-500 transition-colors">
-                            <X size={14} />
-                            </div>
+                            <div role="button" onClick={clearFilter} className="p-1 rounded-full hover:bg-indigo-200 text-indigo-500 transition-colors"><X size={14} /></div>
                         ) : (
                             <ChevronDown size={16} className={`text-slate-400 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
                         )}
                         </div>
                     </button>
 
-                    {/* Amenity Dropdown Menu */}
                     {isFilterDropdownOpen && (
                         <div className="absolute top-full right-0 mt-2 w-full md:w-[280px] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
                             {uniqueAmenities.length === 0 ? (
                             <div className="px-4 py-8 flex flex-col items-center justify-center text-center">
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3">
-                                    <Tag size={18} className="text-slate-300" />
-                                </div>
+                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3"><Tag size={18} className="text-slate-300" /></div>
                                 <p className="text-xs font-bold text-slate-800 uppercase">No tags available</p>
-                                <p className="text-[10px] text-slate-400 mt-1 px-4 leading-relaxed">
-                                    Add amenities to your packages to filter by them here.
-                                </p>
+                                <p className="text-[10px] text-slate-400 mt-1 px-4 leading-relaxed">Add amenities to your packages to filter by them here.</p>
                             </div>
                             ) : (
                             <>
                                 <div className="p-3 bg-slate-50 border-b border-slate-100">
                                     <div className="relative">
                                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                                    <input 
-                                        autoFocus 
-                                        type="text" 
-                                        placeholder="Find a tag..." 
-                                        value={filterSearch} 
-                                        onChange={(e) => setFilterSearch(e.target.value)} 
-                                        className="w-full bg-white border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-xs font-bold uppercase outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10" 
-                                    />
+                                    <input autoFocus type="text" placeholder="Find a tag..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} className="w-full bg-white border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-xs font-bold uppercase outline-none focus:border-indigo-500" />
                                     </div>
                                 </div>
-
                                 <div className="max-h-[260px] overflow-y-auto no-scrollbar p-1">
                                     {!filterSearch && (
-                                        <button 
-                                        onClick={() => { setActiveFilter("ALL"); setIsFilterDropdownOpen(false); }} 
-                                        className={`w-full text-left px-3 py-2.5 mb-1 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${activeFilter === 'ALL' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}
-                                        >
+                                        <button onClick={() => { setActiveFilter("ALL"); setIsFilterDropdownOpen(false); }} className={`w-full text-left px-3 py-2.5 mb-1 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${activeFilter === 'ALL' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
                                         <span>SHOW ALL ITEMS</span>
                                         {activeFilter === "ALL" && <Check size={14} />}
                                         </button>
                                     )}
-                                    
                                     {visibleFilters.length > 0 ? visibleFilters.map(filter => (
-                                        <button 
-                                            key={filter} 
-                                            onClick={() => { setActiveFilter(filter); setIsFilterDropdownOpen(false); setFilterSearch(""); }} 
-                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold transition-all mb-1 ${
-                                            activeFilter === filter 
-                                                ? 'bg-indigo-50 text-indigo-700' 
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                            }`}
-                                        >
+                                        <button key={filter} onClick={() => { setActiveFilter(filter); setIsFilterDropdownOpen(false); setFilterSearch(""); }} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold transition-all mb-1 ${activeFilter === filter ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
                                             <span className="truncate">{filter}</span> 
                                             {activeFilter === filter && <Check size={14} className="text-indigo-600" />}
                                         </button>
                                     )) : (
                                         <div className="px-4 py-8 text-center flex flex-col items-center">
-                                            <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center mb-2">
-                                            <Search size={14} className="text-slate-300" />
-                                            </div>
+                                            <Search size={14} className="text-slate-300 mb-2" />
                                             <p className="text-xs text-slate-400 italic font-bold">No tags match "{filterSearch}"</p>
                                         </div>
                                     )}
@@ -454,9 +390,8 @@ const Packages = () => {
                     </div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleEdit(pkg)} className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-lg transition-colors"><Edit size={14} /></button>
-                        
-                        {/* ✅ FIXED: Ensure it passes pkg._id specifically */}
-                        <button onClick={() => deletePackage(pkg._id)} className="p-2 bg-white/20 hover:bg-rose-500 text-white rounded-lg transition-colors"><Trash2 size={14} /></button>
+                        {/* UPDATE: Delete button now opens confirmation modal */}
+                        <button onClick={() => { setPackageToDelete(pkg); setIsDeleteModalOpen(true); }} className="p-2 bg-white/20 hover:bg-rose-500 text-white rounded-lg transition-colors"><Trash2 size={14} /></button>
                     </div>
                 </div>
                 <div className="p-6 flex flex-col flex-grow">
@@ -468,7 +403,7 @@ const Packages = () => {
         ))}
       </div>
 
-      {/* MODAL */}
+      {/* MAIN MODAL (Create/Edit) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
@@ -477,9 +412,14 @@ const Packages = () => {
                  <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
               </div>
               <form onSubmit={handleSubmit} className="p-8 space-y-5">
-                 <input type="text" required placeholder="Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold outline-none" />
-                 <input type="number" required placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border rounded-xl font-bold outline-none" />
-                 <textarea rows={2} placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border rounded-xl text-sm outline-none" />
+                 <input type="text" required placeholder="Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 transition-colors" />
+                 
+                 <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><PhilippinePeso size={18} /></div>
+                    <input type="number" required placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 transition-colors" />
+                 </div>
+
+                 <textarea rows={2} placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors" />
                  
                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
                     <label className="text-[10px] font-bold text-slate-400 uppercase block mb-3">Manage Amenities</label>
@@ -491,13 +431,56 @@ const Packages = () => {
                         ))}
                     </div>
                     <div className="flex gap-2">
-                        <input type="text" placeholder="Add inclusion..." value={amenityInput} onChange={(e) => setAmenityInput(e.target.value)} onKeyDown={handleManualAdd} className="w-full bg-white border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-bold uppercase outline-none focus:border-indigo-500 shadow-inner" />
+                        <div className="relative flex-grow">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₱</span>
+                            <input type="text" placeholder="Add inclusion..." value={amenityInput} onChange={(e) => setAmenityInput(e.target.value)} onKeyDown={handleManualAdd} className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs font-bold uppercase outline-none focus:border-indigo-500 shadow-inner" />
+                        </div>
                         <button type="button" onClick={handleManualAdd} className="bg-slate-900 text-white p-2.5 rounded-xl hover:bg-indigo-600 transition-colors shadow-lg"><Plus size={20} /></button>
                     </div>
                  </div>
-                 <button type="submit" className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-xl hover:shadow-slate-900/20 uppercase tracking-widest text-xs">{editingId ? "Update Listing" : "Create Listing"}</button>
+                 <button type="submit" className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-xl uppercase tracking-widest text-xs">{editingId ? "Update Listing" : "Create Listing"}</button>
               </form>
            </div>
+        </div>
+      )}
+
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="p-8 text-center">
+              {/* Warning Icon */}
+              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 size={40} className="text-rose-500" />
+              </div>
+              
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Package?</h3>
+              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                Are you sure you want to delete <span className="font-bold text-slate-900">"{packageToDelete?.name}"</span>? 
+                This action cannot be undone and will remove this listing from the public view.
+              </p>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setIsDeleteModalOpen(false); setPackageToDelete(null); }}
+                  className="flex-1 px-6 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    await deletePackage(packageToDelete._id);
+                    setIsDeleteModalOpen(false);
+                    setPackageToDelete(null);
+                    await getAllPackages(); // Refresh the list after deletion
+                  }}
+                  className="flex-1 px-6 py-3.5 rounded-xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-200"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

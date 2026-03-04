@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import validator from "validator";
 import axios from "axios"; 
 import userModel from "../models/userModel.js";
 import bookingModel from "../models/bookingModel.js";
 import cloudinary from "../config/cloudinary.js"; 
 import sendEmail from "../utils/sendEmail.js";
+import sendSMS from "../utils/sendSMS.js";
 
 // --- HELPERS ---
 const createToken = (id, name, role) => {
@@ -40,10 +41,15 @@ const sendOTP = async (req, res) => {
             return res.json({ success: false, message: "Invalid email" });
         }
 
+        let user = await userModel.findOne({ email: email.toLowerCase().trim() });
+
+        // ✅ PREVENT SENDING OTP IF EMAIL IS ALREADY TAKEN BY A VERIFIED USER
+        if (user && user.isVerified && user.firstName !== "Pending") {
+            return res.json({ success: false, message: "Email already taken" });
+        }
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-        let user = await userModel.findOne({ email });
 
         if (user) {
             user.otp = otp;
@@ -86,17 +92,89 @@ const sendOTP = async (req, res) => {
     }
 };
 
-// ✅ Handle Password Reset Request
+// ✅ Send OTP via Phone (Registration/Login)
+const sendPhoneOTP = async (req, res) => {
+    try {
+        const { phone } = req.body;
+
+        if (!phone || phone.length < 11) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        let user = await userModel.findOne({ phone: phone.trim() });
+
+        // ✅ PREVENT SENDING OTP IF PHONE IS ALREADY TAKEN BY A VERIFIED USER
+        if (user && user.isVerified && user.firstName !== "Pending") {
+            return res.json({ success: false, message: "Phone number already taken" });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
+
+        if (user) {
+            user.otp = otp;
+            user.otpExpires = otpExpires;
+            await user.save();
+        } else {
+            const salt = await bcrypt.genSalt(10);
+            const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
+
+            user = new userModel({
+                phone,
+                email: `phone_${Date.now()}_${phone}@mrh.local`,
+                otp,
+                otpExpires,
+                firstName: "Pending",
+                lastName: "Phone User",
+                password: dummyPassword,
+                isVerified: false
+            });
+
+            await user.save();
+        }
+
+        // ✅ ACTUAL SMS SENDING
+        await sendSMS(
+            phone,
+            `Your MRH verification code is: ${otp}. Valid for 10 minutes.`
+        );
+
+        res.json({ success: true, message: "OTP sent to your phone" });
+
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ Handle Password Reset Request (Email)
 const requestPasswordReset = async (req, res) => {
     try {
         const { email } = req.body;
-        const user = await userModel.findOne({ email });
+        const user = await userModel.findOne({ 
+    email: email.toLowerCase().trim() 
+});
 
         if (!user) {
             return res.json({ success: false, message: "No account found with this email" });
         }
 
         return sendOTP(req, res);
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ Handle Password Reset Request (Phone)
+const requestPhoneReset = async (req, res) => {
+    try {
+        const { phone } = req.body;
+        const user = await userModel.findOne({ phone });
+
+        if (!user) {
+            return res.json({ success: false, message: "No account found with this phone number" });
+        }
+
+        return sendPhoneOTP(req, res);
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -129,7 +207,6 @@ const resetPassword = async (req, res) => {
 
         await user.save();
 
-        // 📧 Email notification for password change security
         await sendEmail(
             user.email,
             "Password Reset Successful",
@@ -172,7 +249,6 @@ const googleAuth = async (req, res) => {
             });
             await user.save();
 
-            // 📧 Welcome email for Google users
             await sendEmail(
                 email,
                 "Welcome to Mercedarian Retreat House",
@@ -226,7 +302,6 @@ const registerUser = async (req, res) => {
             await newUser.save();
         }
 
-        // 📧 Registration welcome email
         await sendEmail(
             email,
             "Account Created Successfully",
@@ -243,7 +318,9 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await userModel.findOne({ email });
+        const user = await userModel.findOne({
+    email: email.toLowerCase().trim()
+});
         
         if (!user) return res.json({ success: false, message: "User does not exist" });
         if (user.disabled) return res.json({ success: false, message: "Account disabled. Contact admin." });
@@ -358,7 +435,6 @@ const createBooking = async (req, res) => {
         const newBooking = new bookingModel(bookingData);
         await newBooking.save();
 
-        // 📧 Booking Confirmation notification
         const user = await userModel.findById(userId);
         if (user) {
             await sendEmail(
@@ -405,7 +481,6 @@ const cancelBooking = async (req, res) => {
         } else {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
             
-            // 📧 Booking Cancellation notification
             await sendEmail(
                 booking.user_id.email,
                 "Booking Cancelled",
@@ -474,7 +549,6 @@ const verifyPayment = async (req, res) => {
             paymentMethod: 'online' 
         }, { new: true }).populate("user_id");
 
-        // 📧 Payment Confirmation Email
         if (booking) {
             await sendEmail(
                 booking.user_id.email,
@@ -507,7 +581,6 @@ const confirmCashPayment = async (req, res) => {
             paymentStatus: 'paid' 
         }, { new: true }).populate("user_id");
 
-        // 📧 Cash Payment Confirmation Email
         if (booking) {
             await sendEmail(
                 booking.user_id.email,
@@ -611,13 +684,60 @@ const getAllPublicReviews = async (req, res) => {
     }
 };
 
+// ✅ CHECK EMAIL LOGIC
+const checkEmailExists = async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email || !validator.isEmail(email)) {
+            return res.json({ success: true, exists: false }); 
+        }
+
+        const user = await userModel.findOne({ email: email.toLowerCase().trim() });
+        
+        // If user exists and is fully registered (not just a pending OTP dummy)
+        if (user && user.isVerified && user.firstName !== "Pending") {
+            return res.json({ success: true, exists: true });
+        }
+        
+        res.json({ success: true, exists: false });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// ✅ CHECK PHONE LOGIC
+const checkPhoneExists = async (req, res) => {
+    try {
+        const { phone } = req.body;
+
+        if (!phone || phone.length < 11) {
+            return res.json({ success: true, exists: false });
+        }
+
+        const user = await userModel.findOne({ phone: phone.trim() });
+
+        if (user && user.isVerified && user.firstName !== "Pending") {
+            return res.json({ success: true, exists: true });
+        }
+
+        res.json({ success: true, exists: false });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 export {
     registerUser, 
     loginUser, 
     sendOTP,
+    sendPhoneOTP,
     requestPasswordReset,
+    requestPhoneReset,
     resetPassword,
     verifyOTP,
+    checkEmailExists,
+    checkPhoneExists, 
     googleAuth, 
     getUserData, 
     updateUserProfile,

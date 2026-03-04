@@ -1,23 +1,17 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import cron from "node-cron";
 
-// =======================
-// 📦 MODELS
-// =======================
+// MODELS
 import bookingModel from "./models/bookingModel.js";
 import userModel from "./models/userModel.js";
 
-// =======================
-// ☁️ CLOUDINARY
-// =======================
+// CONFIG
 import { connectCloudinary } from "./config/cloudinary.js";
+import connectDB from "./config/mongodb.js";
 
-// =======================
-// 🛣️ ROUTES
-// =======================
+// ROUTES
 import adminRouter from "./routes/adminRoute.js";
 import staffRouter from "./routes/staffRoute.js";
 import roomRouter from "./routes/roomRoute.js";
@@ -25,15 +19,14 @@ import userRouter from "./routes/userRoute.js";
 import bookingRouter from "./routes/bookingRoute.js";
 import paymentRouter from "./routes/paymentRoute.js";
 import packageRouter from "./routes/packageRoute.js";
-import reviewRouter from "./routes/reviewRoute.js"; 
-import notificationRouter from "./routes/notificationRoute.js"; // ✅ Added notification route
+import reviewRouter from "./routes/reviewRoute.js";
+import notificationRouter from "./routes/notificationRoute.js";
 
 // =======================
 // 🚀 APP INIT
 // =======================
 const app = express();
 const PORT = process.env.PORT || 4000;
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGODB_URL;
 
 // =======================
 // ✅ GLOBAL MIDDLEWARE
@@ -88,8 +81,7 @@ cron.schedule("0 * * * *", async () => {
 // =======================
 const startServer = async () => {
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log("✅ MongoDB Connected");
+    await connectDB(); // ✅ Use centralized DB config
 
     await connectCloudinary();
     

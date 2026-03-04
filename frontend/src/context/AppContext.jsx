@@ -18,25 +18,27 @@ const AppContextProvider = (props) => {
   });
 
   // ================= SECURITY INTERCEPTOR =================
-  // This ensures that IF any request fails with 403 (Disabled), 
-  // the state is cleared immediately across the whole app.
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response && error.response.status === 403) {
-          // Clear all guest data instantly
+useEffect(() => {
+  const interceptor = axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response && error.response.status === 403) {
+        // ONLY log out if the backend explicitly says the account is disabled
+        if (error.response.data.isAccountDisabled) {
           setToken(null);
           setUserData(null);
           localStorage.removeItem("token");
           toast.error("Account disabled. Logging out...");
+        } else {
+          // Otherwise, just show a normal error toast
+          toast.error(error.response.data.message || "Unauthorized action.");
         }
-        return Promise.reject(error);
       }
-    );
-
-    return () => axios.interceptors.response.eject(interceptor);
-  }, []);
+      return Promise.reject(error);
+    }
+  );
+  return () => axios.interceptors.response.eject(interceptor);
+}, []);
 
   useEffect(() => {
     localStorage.setItem("selectedRooms", JSON.stringify(selectedRooms));

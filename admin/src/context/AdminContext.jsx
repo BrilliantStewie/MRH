@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react"; // Added useEffect
+import { createContext, useState, useEffect, useMemo } from "react"; // Added useMemo
 import axios from "axios";
 import { toast } from "react-toastify";
 
@@ -478,6 +478,7 @@ const AdminContextProvider = ({ children }) => {
 
     if (data.success) {
       toast.success("Reply posted successfully");
+      getAllReviews(); // Refresh reviews to clear indicator
       return true;
     } else {
       toast.error(data.message);
@@ -489,6 +490,29 @@ const AdminContextProvider = ({ children }) => {
   }
 };
 
+  // ============================================================
+  // 🔔 NOTIFICATION INDICATOR LOGIC
+  // ============================================================
+  // These use useMemo to only recalculate when the data lists change
+  const hasNewBookings = useMemo(() => {
+    return allBookings.some(b => b.status === "Pending" || b.status === "Cancellation Requested");
+  }, [allBookings]);
+
+  const pendingReviewsCount = useMemo(() => {
+    // Counts reviews that have no replies yet
+    return allReviews.filter(r => !r.replies || r.replies.length === 0).length;
+  }, [allReviews]);
+
+  // AUTO-FETCH DATA ONCE ADMIN IS AUTHENTICATED
+  useEffect(() => {
+    if (aToken) {
+      getAllBookings();
+      getAllReviews();
+      getAllRooms();
+      getAllUsers();
+      getAllStaff();
+    }
+  }, [aToken]);
 
   // ============================================================
   // 📤 EXPORT CONTEXT VALUE
@@ -532,6 +556,7 @@ const AdminContextProvider = ({ children }) => {
     declineBooking,
     paymentConfirmed,
     approveCancellation,
+    hasNewBookings, // ✅ Exported for Sidebar
 
     // Packages
     allPackages,
@@ -543,7 +568,8 @@ const AdminContextProvider = ({ children }) => {
     // Reviews
     allReviews,
     getAllReviews,
-    postReviewReply
+    postReviewReply,
+    pendingReviewsCount // ✅ Exported for Sidebar
   };
 
   return (

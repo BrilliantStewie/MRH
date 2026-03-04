@@ -19,11 +19,12 @@ const authUser = async (req, res, next) => {
     }
 
     if (user.disabled) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Your account has been disabled. Please contact administration." 
-      });
-    }
+  return res.status(403).json({ 
+    success: false, 
+    isAccountDisabled: true, // <--- ADD THIS LINE
+    message: "Your account has been disabled. Please contact administration." 
+  });
+}
 
     // ✅ Attach user info to request
     req.userId = decoded.id;

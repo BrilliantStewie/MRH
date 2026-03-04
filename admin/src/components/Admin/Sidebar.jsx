@@ -13,14 +13,16 @@ import {
 } from "lucide-react";
 
 const Sidebar = () => {
-  const { aToken } = useContext(AdminContext);
+  // ✅ Get the actual notification data from your AdminContext
+  // Example: bookings.length where status is 'pending' or a specific unread count
+  const { aToken, bookings, reviews } = useContext(AdminContext);
 
-  // Mock Notification Data - Replace these with your actual state/context data
-  const notifications = {
-    bookings: true,      // Red dot for new bookings
-    reviews: 3,         // Number for pending reviews
-    users: false,       // No notification
-  };
+  // Logic to determine if we show a dot
+  // This checks if there are any bookings with status 'Pending'
+  const hasNewBookings = bookings?.some(b => b.status === 'Pending') || false;
+  
+  // This checks for reviews that haven't been replied to or seen
+  const pendingReviewsCount = reviews?.filter(r => !r.isRead).length || 0;
 
   if (!aToken) return null;
 
@@ -31,9 +33,18 @@ const Sidebar = () => {
         : "text-slate-600 hover:bg-slate-100"
     }`;
 
-  // Helper component for the Red Dot
-  const NotificationDot = ({ count }) => {
-    if (!count) return null;
+  // ✅ ENHANCED NOTIFICATION COMPONENT
+  const NotificationIndicator = ({ count, variant = "dot" }) => {
+    if (!count || count === 0) return null;
+
+    if (variant === "number") {
+      return (
+        <span className="flex items-center justify-center bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px]">
+          {count > 9 ? "9+" : count}
+        </span>
+      );
+    }
+
     return (
       <span className="relative flex h-2 w-2">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -44,7 +55,6 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-white border-r min-h-screen p-4 flex flex-col gap-1">
-      {/* OVERVIEW SECTION */}
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-2 mb-2">
         Overview
       </p>
@@ -68,11 +78,10 @@ const Sidebar = () => {
           <CalendarCheck size={18} />
           Bookings
         </div>
-        {/* Red dot for bookings */}
-        <NotificationDot count={notifications.bookings} />
+        {/* ✅ Shows an animated dot if there are pending bookings */}
+        <NotificationIndicator count={hasNewBookings} variant="dot" />
       </NavLink>
 
-      {/* MANAGEMENT SECTION */}
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
         Management
       </p>
@@ -96,11 +105,10 @@ const Sidebar = () => {
           <MessageSquare size={18} />
           Guest Reviews
         </div>
-        {/* Red dot for reviews */}
-        <NotificationDot count={notifications.reviews} />
+        {/* ✅ Shows a number badge for reviews */}
+        <NotificationIndicator count={pendingReviewsCount} variant="number" />
       </NavLink>
 
-      {/* PEOPLE SECTION */}
       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
         People
       </p>
@@ -117,7 +125,6 @@ const Sidebar = () => {
           <User size={18} />
           User Accounts
         </div>
-        <NotificationDot count={notifications.users} />
       </NavLink>
     </aside>
   );

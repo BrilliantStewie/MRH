@@ -4,8 +4,10 @@ import {
   loginUser, 
   googleAuth, 
   sendOTP, 
-  requestPasswordReset, // ✅ Added for Forgot Password
-  resetPassword,        // ✅ Added for Password Update
+  sendPhoneOTP,          // ✅ ADDED
+  requestPasswordReset, 
+  requestPhoneReset,     // ✅ ADDED
+  resetPassword,         
   verifyOTP, 
   getUserData, 
   updateUserProfile,
@@ -17,7 +19,9 @@ import {
   markCashPayment,
   rateBooking,
   addReviewChat, 
-  deleteReviewReply 
+  deleteReviewReply,
+  checkEmailExists,      // ✅ ADDED
+  checkPhoneExists       // ✅ ADDED
 } from "../controllers/userController.js";
 
 import authUser from "../middlewares/authUser.js"; 
@@ -29,12 +33,18 @@ const userRouter = express.Router();
 userRouter.post("/register", upload.single('image'), registerUser);
 userRouter.post("/login", loginUser);
 userRouter.post("/google-auth", googleAuth); 
-userRouter.post("/send-otp", sendOTP);     
+userRouter.post("/send-otp", sendOTP); 
+userRouter.post("/send-phone-otp", sendPhoneOTP);    // ✅ STEP 1: For Registration/Phone Login
 userRouter.post("/verify-otp", verifyOTP); 
 
+// ✅ New Check Routes
+userRouter.post("/check-email", checkEmailExists);   // ✅ ADDED
+userRouter.post("/check-phone", checkPhoneExists);   // ✅ ADDED
+
 // ✅ Forgot Password Routes
-userRouter.post("/request-reset", requestPasswordReset); // Step 1: Send OTP to email
-userRouter.post("/reset-password", resetPassword);       // Step 2: Verify OTP and update password
+userRouter.post("/request-reset", requestPasswordReset); 
+userRouter.post("/request-phone-reset", requestPhoneReset); // ✅ STEP 1: For Phone Reset
+userRouter.post("/reset-password", resetPassword); 
 
 userRouter.get("/profile", authUser, getUserData);
 userRouter.post("/update-profile", authUser, upload.single("image"), updateUserProfile);

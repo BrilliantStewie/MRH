@@ -13,6 +13,7 @@ import Notification from "../models/notificationModel.js";
 
 // Utils
 import sendEmail from "../utils/sendEmail.js";
+import sendSMS from "../utils/sendSMS.js";
 
 // ======================================================================
 // 🛠️ CLOUD HELPER
@@ -238,19 +239,79 @@ const updateStaff = async (req, res) => {
     }
 };
 
+const formatPHNumber = (number) => {
+  if (!number) return null;
+
+  if (number.startsWith("+63")) {
+    return "0" + number.substring(3);
+  }
+
+  return number;
+};
+
 const changeUserStatus = async (req, res) => {
-    try {
-        const { userId } = req.body;
-        const user = await userModel.findById(userId);
-        if (!user) return res.json({ success: false, message: "User not found" });
+  try {
+    const { userId } = req.body;
 
-        user.disabled = !user.disabled; 
-        await user.save();
-
-        res.json({ success: true, message: `User is now ${user.disabled ? 'Disabled' : 'Enabled'}` });
-    } catch (error) {
-        res.json({ success: false, message: error.message });
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.json({ success: false, message: "User not found" });
     }
+
+    // Toggle status
+    user.disabled = !user.disabled;
+    await user.save();
+
+    const statusText = user.disabled ? "disabled" : "re-enabled";
+
+    // 🔔 In-app notification
+    await Notification.create({
+      recipient: user._id,
+      type: "account_status",
+      message: `Your account has been ${statusText} by the administration.`,
+      link: "/login",
+      isRead: false
+    });
+
+    // 📧 Email
+    await sendEmail(
+      user.email,
+      `Account ${user.disabled ? "Suspension" : "Reactivation"} – Mercedarian Retreat House`,
+      `
+      <p>Dear ${user.firstName || "User"},</p>
+      ${
+        user.disabled
+          ? `<p>Your account has been <strong>disabled</strong>. Please contact administration.</p>`
+          : `<p>Your account has been <strong>re-activated</strong>. You may now log in.</p>`
+      }
+      <br/>
+      <p>Administration Office<br/>Mercedarian Retreat House</p>
+      `
+    );
+
+    // 📱 SMS (ONLY if phone exists)
+   if (user.phone) {
+  try {
+    await sendSMS(
+      formatPHNumber(user.phone),
+      user.disabled
+        ? "Your MRH account has been disabled. Contact administration."
+        : "Your MRH account has been reactivated."
+    );
+  } catch (smsError) {
+    console.error("SMS failed but continuing:", smsError.message);
+  }
+}
+
+    res.json({
+      success: true,
+      message: `User is now ${user.disabled ? "Disabled" : "Enabled"}`
+    });
+
+  } catch (error) {
+    console.error("Change User Status Error:", error);
+    res.json({ success: false, message: error.message });
+  }
 };
 
 // ======================================================================

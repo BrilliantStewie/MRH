@@ -243,12 +243,16 @@ export const replyToReview = async (req, res, next) => {
       .populate("userId", "firstName email");
 
     if (!review) {
-      return res.status(404).json({ success: false, message: "Review not found." });
+      return res.status(400).json({ success: false, message: "Review not found." });
     }
 
-    // Guests can only reply to their own review
+    // CHANGE: Use 400 (Bad Request) instead of 403 to avoid triggering 
+    // the frontend's "Account Disabled" auto-logout interceptor.
     if (role === "guest" && review.userId._id.toString() !== userId.toString()) {
-      return res.status(403).json({ success: false, message: "Unauthorized." });
+      return res.status(400).json({ 
+        success: false, 
+        message: "Guests can only reply to their own review threads." 
+      });
     }
 
     // Save reply
@@ -267,7 +271,6 @@ export const replyToReview = async (req, res, next) => {
 
     if (role !== "guest") {
       // ADMIN / STAFF replied → Email Guest
-
       await Notification.create({
         recipient: review.userId._id,
         sender: userId,
@@ -295,7 +298,6 @@ export const replyToReview = async (req, res, next) => {
 
     } else {
       // GUEST replied → Email Admins
-
       const admins = await Booking.db.model("User")
         .find({ role: "admin" })
         .select("email firstName");
