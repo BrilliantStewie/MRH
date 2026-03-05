@@ -1,488 +1,241 @@
-import React, { useContext, useState, useEffect, useRef } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
-import { 
-  Plus, Edit, Trash2, X, 
-  Search, Check, Box, ChevronDown, Filter, SlidersHorizontal, Tag,
-  PhilippinePeso, ArrowUp, ArrowDown // Changed to standard arrows
-} from 'lucide-react';
+import { Plus, Edit, Trash2 } from "lucide-react";
 
-// --- SMART COMPONENT: Calculates exactly how many tags are hidden ---
-const AmenitySection = ({ rawAmenities }) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [hiddenCount, setHiddenCount] = useState(0);
-  const containerRef = useRef(null);
-  const innerRef = useRef(null);
-
-  const getAmenityString = (a) => {
-    if (!a) return null;
-    if (typeof a === 'string') return a;
-    return a.text || a.label || String(a);
-  };
-
-  const amenities = (rawAmenities || []).map(getAmenityString).filter(Boolean);
-
-  useEffect(() => {
-    const checkVisibility = () => {
-      if (!containerRef.current || !innerRef.current) return;
-      const container = containerRef.current;
-      const tags = innerRef.current.children;
-      const containerBottom = container.getBoundingClientRect().bottom - 4;
-      let hidden = 0;
-      for (let tag of tags) {
-        if (tag.getBoundingClientRect().bottom > containerBottom) hidden++;
-      }
-      setHiddenCount(hidden);
-    };
-
-    checkVisibility();
-    window.addEventListener('resize', checkVisibility);
-    const timeout = setTimeout(checkVisibility, 50);
-    return () => {
-        window.removeEventListener('resize', checkVisibility);
-        clearTimeout(timeout);
-    };
-  }, [amenities]);
-
-  const handleScroll = (e) => {
-    setIsScrolled(e.target.scrollTop > 5);
-  };
-
-  return (
-    <div className="mt-auto">
-      <div className="flex items-center justify-between mb-2 h-5">
-        <div className="flex items-center gap-2">
-          <Box size={12} className="text-indigo-500" />
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Inclusions</span>
-        </div>
-        <div className={`transition-all duration-300 transform ${isScrolled ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'}`}>
-            {hiddenCount > 0 && (
-                <span className="text-[9px] font-black text-white bg-indigo-500 px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                    +{hiddenCount} MORE
-                </span>
-            )}
-        </div>
-      </div>
-      <div ref={containerRef} onScroll={handleScroll} className="bg-slate-50 p-3 rounded-xl border border-slate-100 h-[84px] overflow-y-auto no-scrollbar hover:cursor-ns-resize transition-colors hover:bg-slate-100/50">
-        <div ref={innerRef} className="flex flex-wrap gap-1.5">
-          {amenities.length > 0 ? (
-            amenities.map((am, i) => (
-              <span key={i} className="bg-white border border-slate-200 px-2 py-1 rounded text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1 shadow-sm">
-                <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div> 
-                {am}
-              </span>
-            ))
-          ) : (
-            <span className="text-[10px] text-slate-400 italic">Standard inclusions apply.</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- MAIN PAGE ---
 const Packages = () => {
-  const { allPackages, getAllPackages, addPackage, updatePackage, deletePackage } = useContext(AdminContext);
+
+  const {
+    allPackages,
+    getAllPackages,
+    addPackage,
+    updatePackage,
+    deletePackage,
+    roomTypes,
+    getRoomTypes
+  } = useContext(AdminContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
-  // --- DELETE MODAL STATE ---
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [packageToDelete, setPackageToDelete] = useState(null);
-  
-  // Search & Filter State
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilter, setActiveFilter] = useState("ALL");
-  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
-  const [filterSearch, setFilterSearch] = useState(""); 
-  
-  // Price Filter State
-  const [isPriceDropdownOpen, setIsPriceDropdownOpen] = useState(false);
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [priceSort, setPriceSort] = useState("asc"); // 'asc' or 'desc'
+  const initialForm = {
+    name: "",
+    roomType: "",
+    price: "",
+    description: "",
+    includesAC: false,
+    includesFood: false
+  };
 
-  // Form State
-  const [amenityInput, setAmenityInput] = useState("");
-  const initialFormState = { name: "", description: "", price: "", building: "All", amenities: [] };
-  const [formData, setFormData] = useState(initialFormState);
-  
-  const filterRef = useRef(null);
-  const priceRef = useRef(null);
+  const [formData, setFormData] = useState(initialForm);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (filterRef.current && !filterRef.current.contains(event.target)) {
-        setIsFilterDropdownOpen(false);
-      }
-      if (priceRef.current && !priceRef.current.contains(event.target)) {
-        setIsPriceDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    getAllPackages();
+    getRoomTypes();
   }, []);
 
-  useEffect(() => { getAllPackages(); }, []);
-
-  // Helper to safely get price number
-  const getPkgPrice = (pkg) => Number(pkg.price?.$numberDecimal || pkg.price || 0);
-
-  const getAmenityString = (a) => {
-    if (!a) return null;
-    if (typeof a === 'string') return a;
-    return a.text || a.label || String(a);
-  };
-
-  const uniqueAmenities = [
-    ...new Set(allPackages.flatMap(pkg => (pkg.amenities || []).map(a => {
-            const str = getAmenityString(a);
-            return str ? str.toUpperCase() : null;
-        }).filter(Boolean)))
-  ].sort();
-
-  const visibleFilters = filterSearch.trim() === "" 
-    ? uniqueAmenities 
-    : uniqueAmenities.filter(f => f.startsWith(filterSearch.toUpperCase()));
-
-  // --- FILTERING LOGIC ---
-  const filteredPackages = allPackages.filter((pkg) => {
-    const term = searchTerm.toLowerCase();
-    const matchesName = pkg.name.toLowerCase().includes(term);
-    const amenitiesList = (pkg.amenities || []).map(getAmenityString).filter(Boolean);
-    const matchesSearch = matchesName || amenitiesList.some(txt => txt.toLowerCase().includes(term));
-    
-    const matchesTag = activeFilter === "ALL" || amenitiesList.some(txt => txt.toUpperCase() === activeFilter);
-
-    const price = getPkgPrice(pkg);
-    const matchesMin = minPrice === "" || price >= Number(minPrice);
-    const matchesMax = maxPrice === "" || price <= Number(maxPrice);
-
-    return matchesSearch && matchesTag && matchesMin && matchesMax;
-  }).sort((a, b) => {
-    const priceA = getPkgPrice(a);
-    const priceB = getPkgPrice(b);
-    return priceSort === 'asc' ? priceA - priceB : priceB - priceA;
-  });
-
-  const handleOpenCreate = () => {
+  const closeModal = () => {
+    setIsModalOpen(false);
     setEditingId(null);
-    setFormData(initialFormState);
-    setAmenityInput("");
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (pkg) => {
-    setEditingId(pkg._id);
-    const normalizedAmenities = pkg.amenities ? pkg.amenities.map(getAmenityString).filter(Boolean) : [];
-    setFormData({ ...pkg, price: pkg.price?.$numberDecimal || pkg.price, amenities: normalizedAmenities });
-    setAmenityInput("");
-    setIsModalOpen(true);
-  };
-
-  const handleManualAdd = (e) => {
-    if ((e.key === 'Enter' || e.type === 'click') && amenityInput.trim() !== "") {
-      e.preventDefault();
-      const newAmenity = amenityInput.trim().toUpperCase();
-      if (!formData.amenities.includes(newAmenity)) {
-        setFormData(prev => ({ ...prev, amenities: [...prev.amenities, newAmenity] }));
-      }
-      setAmenityInput("");
-    }
+    setFormData(initialForm);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-        let finalAmenities = [...formData.amenities];
-        if (amenityInput.trim()) {
-            const pendingAmenity = amenityInput.trim().toUpperCase();
-            if (!finalAmenities.includes(pendingAmenity)) {
-                finalAmenities.push(pendingAmenity);
-            }
-        }
 
-        const submissionData = { ...formData, amenities: finalAmenities };
+    const data = {
+      ...formData,
+      price: Number(formData.price)
+    };
 
-        if (editingId) {
-            await updatePackage(editingId, submissionData);
-        } else {
-            await addPackage(submissionData);
-        }
-        
-        await getAllPackages(); 
-        setIsModalOpen(false);
-    } catch (error) { console.error(error); }
+    if (editingId) {
+      await updatePackage(editingId, data);
+    } else {
+      await addPackage(data);
+    }
+
+    closeModal();
+    getAllPackages();
   };
-
-  const clearFilter = (e) => {
-    e.stopPropagation();
-    setActiveFilter("ALL");
-  };
-
-  const isPriceFilterActive = minPrice !== "" || maxPrice !== "";
 
   return (
-    <div className="min-h-screen bg-slate-50/50 pt-6 pb-12 px-4 sm:px-6 lg:px-8 font-sans text-slate-800">
-      <style>{`
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
+    <div className="p-8 bg-slate-50 min-h-screen">
 
-      {/* HEADER */}
-      <div className="max-w-7xl mx-auto mb-6 text-center md:text-left">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Accommodations</h1>
-        <p className="text-slate-500 mt-2 font-medium">Manage listing inventory and inclusions.</p>
-      </div>
+      <div className="flex justify-between mb-6">
+        <h1 className="text-3xl font-bold">Packages</h1>
 
-      {/* --- CONTROL BAR --- */}
-      <div className="sticky top-4 z-40 max-w-7xl mx-auto mb-8">
-        <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-xl shadow-slate-200/50 border border-white/50 p-1.5 flex flex-col md:flex-row items-center gap-2">
-            
-            <div className="relative flex-grow w-full group">
-                <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                <input 
-                  type="text" 
-                  placeholder="Search packages or amenities..." 
-                  value={searchTerm} 
-                  onChange={(e) => setSearchTerm(e.target.value)} 
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border-transparent focus:bg-white rounded-xl outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium transition-all" 
-                />
-            </div>
-
-            <div className="hidden md:block h-8 w-px bg-slate-200 mx-1"></div>
-
-            <div className="flex w-full md:w-auto gap-2">
-                
-                {/* --- PRICE FILTER --- */}
-                <div className="relative w-full md:w-auto min-w-[140px]" ref={priceRef}>
-                    <button 
-                        onClick={() => setIsPriceDropdownOpen(!isPriceDropdownOpen)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold border transition-all duration-200 ${
-                            isPriceFilterActive
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm' 
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <PhilippinePeso size={16} />
-                            <span>Price</span>
-                        </div>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isPriceDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isPriceDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-full md:w-[260px] bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                             <div className="flex gap-2 mb-4 bg-slate-100 p-1 rounded-xl">
-                                <button onClick={() => setPriceSort('asc')} className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${priceSort === 'asc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    Low-High <ArrowUp size={14}/>
-                                </button>
-                                <button onClick={() => setPriceSort('desc')} className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-all ${priceSort === 'desc' ? 'bg-white shadow text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    High-Low <ArrowDown size={14}/>
-                                </button>
-                             </div>
-                             <div className="space-y-3">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Min Price</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₱</span>
-                                        <input type="number" value={minPrice} onChange={(e) => setMinPrice(e.target.value)} placeholder="0" className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500" />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase">Max Price</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₱</span>
-                                        <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Any" className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-7 pr-3 text-sm font-bold outline-none focus:border-indigo-500" />
-                                    </div>
-                                </div>
-                             </div>
-                             {isPriceFilterActive && (
-                                <button onClick={() => { setMinPrice(""); setMaxPrice(""); }} className="w-full mt-4 text-xs font-bold text-rose-500 hover:bg-rose-50 py-2 rounded-lg transition-colors">
-                                    Clear Price Filter
-                                </button>
-                             )}
-                        </div>
-                    )}
-                </div>
-
-                {/* --- AMENITY FILTER --- */}
-                <div className="relative w-full md:w-auto min-w-[200px]" ref={filterRef}>
-                    <button 
-                    onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)} 
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold border transition-all duration-200 ${
-                        activeFilter !== "ALL" 
-                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm' 
-                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                    >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            {activeFilter === "ALL" ? <SlidersHorizontal size={16} /> : <Filter size={16} />}
-                            <span className="uppercase truncate max-w-[100px]">{activeFilter === "ALL" ? "Tags" : activeFilter}</span>
-                        </div>
-                        <div className="flex items-center ml-2">
-                        {activeFilter !== "ALL" ? (
-                            <div role="button" onClick={clearFilter} className="p-1 rounded-full hover:bg-indigo-200 text-indigo-500 transition-colors"><X size={14} /></div>
-                        ) : (
-                            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
-                        )}
-                        </div>
-                    </button>
-
-                    {isFilterDropdownOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-full md:w-[280px] bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-                            {uniqueAmenities.length === 0 ? (
-                            <div className="px-4 py-8 flex flex-col items-center justify-center text-center">
-                                <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center mb-3"><Tag size={18} className="text-slate-300" /></div>
-                                <p className="text-xs font-bold text-slate-800 uppercase">No tags available</p>
-                                <p className="text-[10px] text-slate-400 mt-1 px-4 leading-relaxed">Add amenities to your packages to filter by them here.</p>
-                            </div>
-                            ) : (
-                            <>
-                                <div className="p-3 bg-slate-50 border-b border-slate-100">
-                                    <div className="relative">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                                    <input autoFocus type="text" placeholder="Find a tag..." value={filterSearch} onChange={(e) => setFilterSearch(e.target.value)} className="w-full bg-white border border-slate-200 pl-9 pr-3 py-2 rounded-lg text-xs font-bold uppercase outline-none focus:border-indigo-500" />
-                                    </div>
-                                </div>
-                                <div className="max-h-[260px] overflow-y-auto no-scrollbar p-1">
-                                    {!filterSearch && (
-                                        <button onClick={() => { setActiveFilter("ALL"); setIsFilterDropdownOpen(false); }} className={`w-full text-left px-3 py-2.5 mb-1 rounded-lg text-xs font-bold transition-colors flex items-center justify-between ${activeFilter === 'ALL' ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:bg-slate-50'}`}>
-                                        <span>SHOW ALL ITEMS</span>
-                                        {activeFilter === "ALL" && <Check size={14} />}
-                                        </button>
-                                    )}
-                                    {visibleFilters.length > 0 ? visibleFilters.map(filter => (
-                                        <button key={filter} onClick={() => { setActiveFilter(filter); setIsFilterDropdownOpen(false); setFilterSearch(""); }} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-bold transition-all mb-1 ${activeFilter === filter ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
-                                            <span className="truncate">{filter}</span> 
-                                            {activeFilter === filter && <Check size={14} className="text-indigo-600" />}
-                                        </button>
-                                    )) : (
-                                        <div className="px-4 py-8 text-center flex flex-col items-center">
-                                            <Search size={14} className="text-slate-300 mb-2" />
-                                            <p className="text-xs text-slate-400 italic font-bold">No tags match "{filterSearch}"</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-      </div>
-
-      {/* PACKAGE GRID */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        <button onClick={handleOpenCreate} className="group flex flex-col items-center justify-center min-h-[440px] rounded-2xl border-2 border-dashed border-slate-300 bg-white/50 hover:bg-white hover:border-indigo-400 hover:shadow-xl transition-all duration-300 gap-4">
-            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:text-indigo-600 group-hover:scale-110 transition-all"><Plus size={28} /></div>
-            <span className="font-bold text-slate-500 group-hover:text-indigo-600">New Package</span>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl"
+        >
+          <Plus size={18}/> Add Package
         </button>
-
-        {filteredPackages.map((pkg, idx) => (
-            <div key={pkg._id} className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 flex flex-col min-h-[440px] border border-slate-100">
-                <div className={`h-28 p-6 flex justify-between items-start ${idx % 3 === 0 ? 'bg-slate-800' : idx % 3 === 1 ? 'bg-indigo-900' : 'bg-slate-700'}`}>
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-bold text-white">₱{Number(pkg.price?.$numberDecimal || pkg.price).toLocaleString()}</span>
-                        <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Monthly Rate</span>
-                    </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleEdit(pkg)} className="p-2 bg-white/20 hover:bg-white/40 text-white rounded-lg transition-colors"><Edit size={14} /></button>
-                        {/* UPDATE: Delete button now opens confirmation modal */}
-                        <button onClick={() => { setPackageToDelete(pkg); setIsDeleteModalOpen(true); }} className="p-2 bg-white/20 hover:bg-rose-500 text-white rounded-lg transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                </div>
-                <div className="p-6 flex flex-col flex-grow">
-                    <h3 className="font-bold text-slate-900 text-lg mb-1">{pkg.name}</h3>
-                    <p className="text-sm text-slate-500 line-clamp-2 mb-6">{pkg.description || "No description provided."}</p>
-                    <AmenitySection rawAmenities={pkg.amenities} />
-                </div>
-            </div>
-        ))}
       </div>
 
-      {/* MAIN MODAL (Create/Edit) */}
+      <div className="bg-white rounded-xl shadow overflow-hidden">
+        <table className="w-full">
+
+          <thead className="bg-slate-100 text-left">
+            <tr>
+              <th className="p-4">Name</th>
+              <th className="p-4">Room Type</th>
+              <th className="p-4">AC</th>
+              <th className="p-4">Food</th>
+              <th className="p-4">Price</th>
+              <th className="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            {allPackages?.length === 0 && (
+              <tr>
+                <td colSpan="6" className="text-center p-6 text-gray-400">
+                  No packages created yet
+                </td>
+              </tr>
+            )}
+
+            {allPackages?.map(pkg => (
+              <tr key={pkg._id} className="border-t">
+
+                <td className="p-4 font-semibold">{pkg.name}</td>
+
+                <td className="p-4">
+                  {pkg.roomType?.name}
+                </td>
+
+                <td className="p-4">
+                  {pkg.includesAC ? "Aircon" : "Fan"}
+                </td>
+
+                <td className="p-4">
+                  {pkg.includesFood ? "With Food" : "No Food"}
+                </td>
+
+                <td className="p-4 font-bold">
+                  ₱ {Number(pkg.price).toLocaleString()}
+                </td>
+
+                <td className="p-4 flex justify-end gap-2">
+
+                  <button
+                    onClick={()=>{
+                      setEditingId(pkg._id);
+                      setFormData({
+                        ...pkg,
+                        roomType: pkg.roomType?._id
+                      });
+                      setIsModalOpen(true);
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <Edit size={16}/>
+                  </button>
+
+                  <button
+                    onClick={async ()=>{
+                      await deletePackage(pkg._id);
+                      getAllPackages();
+                    }}
+                    className="p-2 hover:bg-rose-100 text-rose-600 rounded-lg"
+                  >
+                    <Trash2 size={16}/>
+                  </button>
+
+                </td>
+
+              </tr>
+            ))}
+
+          </tbody>
+
+        </table>
+      </div>
+
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-              <div className="bg-slate-900 px-6 py-5 text-white flex justify-between items-center">
-                 <h2 className="font-bold uppercase tracking-widest text-sm">{editingId ? "Edit" : "New"} Listing</h2>
-                 <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
-              </div>
-              <form onSubmit={handleSubmit} className="p-8 space-y-5">
-                 <input type="text" required placeholder="Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 transition-colors" />
-                 
-                 <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><PhilippinePeso size={18} /></div>
-                    <input type="number" required placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:border-indigo-500 transition-colors" />
-                 </div>
 
-                 <textarea rows={2} placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors" />
-                 
-                 <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-3">Manage Amenities</label>
-                    <div className="flex flex-wrap gap-2 mb-4 max-h-32 overflow-y-auto no-scrollbar">
-                        {formData.amenities.map((am, i) => (
-                            <span key={i} className="bg-white border px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 uppercase shadow-sm">
-                                {am} <X size={12} className="cursor-pointer text-slate-400 hover:text-rose-500" onClick={() => setFormData({...formData, amenities: formData.amenities.filter((_, idx) => idx !== i)})} />
-                            </span>
-                        ))}
-                    </div>
-                    <div className="flex gap-2">
-                        <div className="relative flex-grow">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">₱</span>
-                            <input type="text" placeholder="Add inclusion..." value={amenityInput} onChange={(e) => setAmenityInput(e.target.value)} onKeyDown={handleManualAdd} className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs font-bold uppercase outline-none focus:border-indigo-500 shadow-inner" />
-                        </div>
-                        <button type="button" onClick={handleManualAdd} className="bg-slate-900 text-white p-2.5 rounded-xl hover:bg-indigo-600 transition-colors shadow-lg"><Plus size={20} /></button>
-                    </div>
-                 </div>
-                 <button type="submit" className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all shadow-xl uppercase tracking-widest text-xs">{editingId ? "Update Listing" : "Create Listing"}</button>
-              </form>
-           </div>
-        </div>
-      )}
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40">
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
-            <div className="p-8 text-center">
-              {/* Warning Icon */}
-              <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Trash2 size={40} className="text-rose-500" />
-              </div>
-              
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Package?</h3>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                Are you sure you want to delete <span className="font-bold text-slate-900">"{packageToDelete?.name}"</span>? 
-                This action cannot be undone and will remove this listing from the public view.
-              </p>
+          <div className="bg-white w-[420px] p-8 rounded-2xl">
 
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => { setIsDeleteModalOpen(false); setPackageToDelete(null); }}
-                  className="flex-1 px-6 py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={async () => {
-                    await deletePackage(packageToDelete._id);
-                    setIsDeleteModalOpen(false);
-                    setPackageToDelete(null);
-                    await getAllPackages(); // Refresh the list after deletion
-                  }}
-                  className="flex-1 px-6 py-3.5 rounded-xl bg-rose-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-200"
-                >
-                  Delete
-                </button>
+            <h2 className="text-xl font-bold mb-6">
+              {editingId ? "Edit Package" : "Add Package"}
+            </h2>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+
+              <input
+                type="text"
+                placeholder="Package name"
+                required
+                value={formData.name}
+                onChange={(e)=>setFormData({...formData,name:e.target.value})}
+                className="w-full border p-3 rounded-lg"
+              />
+
+              <select
+                required
+                value={formData.roomType}
+                onChange={(e)=>setFormData({...formData,roomType:e.target.value})}
+                className="w-full border p-3 rounded-lg"
+              >
+                <option value="">Select Room Type</option>
+                {roomTypes?.map(rt=>(
+                  <option key={rt._id} value={rt._id}>
+                    {rt.name}
+                  </option>
+                ))}
+              </select>
+
+              <textarea
+                placeholder="Description"
+                value={formData.description}
+                onChange={(e)=>setFormData({...formData,description:e.target.value})}
+                className="w-full border p-3 rounded-lg"
+              />
+
+              <input
+                type="number"
+                placeholder="Price per pax"
+                required
+                value={formData.price}
+                onChange={(e)=>setFormData({...formData,price:e.target.value})}
+                className="w-full border p-3 rounded-lg"
+              />
+
+              <div className="flex gap-4">
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.includesAC}
+                    onChange={()=>setFormData({...formData,includesAC:!formData.includesAC})}
+                  />
+                  Aircon
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.includesFood}
+                    onChange={()=>setFormData({...formData,includesFood:!formData.includesFood})}
+                  />
+                  With Food
+                </label>
+
               </div>
-            </div>
+
+              <button className="w-full bg-indigo-600 text-white py-3 rounded-lg">
+                Save Package
+              </button>
+
+            </form>
+
           </div>
+
         </div>
       )}
+
     </div>
   );
 };

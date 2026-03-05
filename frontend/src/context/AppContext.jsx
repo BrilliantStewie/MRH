@@ -18,27 +18,25 @@ const AppContextProvider = (props) => {
   });
 
   // ================= SECURITY INTERCEPTOR =================
-useEffect(() => {
-  const interceptor = axios.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response && error.response.status === 403) {
-        // ONLY log out if the backend explicitly says the account is disabled
-        if (error.response.data.isAccountDisabled) {
-          setToken(null);
-          setUserData(null);
-          localStorage.removeItem("token");
-          toast.error("Account disabled. Logging out...");
-        } else {
-          // Otherwise, just show a normal error toast
-          toast.error(error.response.data.message || "Unauthorized action.");
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 403) {
+          if (error.response.data.isAccountDisabled) {
+            setToken(null);
+            setUserData(null);
+            localStorage.removeItem("token");
+            toast.error("Account disabled. Logging out...");
+          } else {
+            toast.error(error.response.data.message || "Unauthorized action.");
+          }
         }
+        return Promise.reject(error);
       }
-      return Promise.reject(error);
-    }
-  );
-  return () => axios.interceptors.response.eject(interceptor);
-}, []);
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("selectedRooms", JSON.stringify(selectedRooms));
@@ -61,7 +59,6 @@ useEffect(() => {
       }
     } catch (error) {
       console.log("Profile Load Error:", error.message);
-      // The interceptor above handles 403 errors, so we don't need logic here
     }
   };
 
@@ -89,13 +86,30 @@ useEffect(() => {
 
   const addRoom = (room) => {
     setSelectedRooms((prev) =>
-      prev.some((r) => r._id === room._id) ? prev : [...prev, room]
+      prev.some((r) => r._id === room._id) 
+        ? prev 
+        : [...prev, { ...room, useAircon: false }] // 👈 Updated: Added default AC state
     );
   };
 
   const removeRoom = (roomId) => {
     setSelectedRooms((prev) => prev.filter((r) => r._id !== roomId));
   };
+
+  // 👈 NEW: Function to toggle AC state for a specific selected room
+  const toggleAircon = (roomId) => {
+    setSelectedRooms((prev) =>
+      prev.map((room) =>
+        room._id === roomId ? { ...room, useAircon: !room.useAircon } : room
+      )
+    );
+  };
+
+  const toggleAllAircon = (enable) => {
+  setSelectedRooms((prev) =>
+    prev.map((room) => ({ ...room, useAircon: enable }))
+  );
+};
 
   const clearRooms = () => setSelectedRooms([]);
 
@@ -105,6 +119,8 @@ useEffect(() => {
     selectedRooms,
     addRoom,
     removeRoom,
+    toggleAircon,
+    toggleAllAircon,
     clearRooms,
     currencySymbol,
     token,

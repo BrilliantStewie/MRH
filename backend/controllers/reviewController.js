@@ -243,7 +243,7 @@ export const replyToReview = async (req, res, next) => {
       .populate("userId", "firstName email");
 
     if (!review) {
-      return res.status(400).json({ success: false, message: "Review not found." });
+      return res.status(404).json({ success: false, message: "Review not found." });
     }
 
     // CHANGE: Use 400 (Bad Request) instead of 403 to avoid triggering 
