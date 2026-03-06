@@ -2,16 +2,33 @@ import mongoose from "mongoose";
 
 const packageSchema = new mongoose.Schema(
 {
-  name: { type: String, required: true, trim: true },
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
 
+  // flexible type (room, day, event, etc.)
+  packageType: {
+    type: String,
+    required: true,
+    trim: true
+  },
+
+  // optional because day retreat packages don't belong to rooms
   roomType: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "RoomType",
-    required: true
+    default: null
   },
 
-  includesAC: { type: Boolean, default: false },
-  includesFood: { type: Boolean, default: false },
+  // amenities stored as strings
+  amenities: [
+    {
+      type: String,
+      trim: true
+    }
+  ],
 
   price: {
     type: Number,
@@ -19,16 +36,13 @@ const packageSchema = new mongoose.Schema(
     min: 0
   },
 
-  description: { type: String, default: "" }
+  description: {
+    type: String,
+    default: ""
+  }
 
 },
 { timestamps: true }
-);
-
-// prevent duplicate packages
-packageSchema.index(
-{ roomType: 1, includesAC: 1, includesFood: 1 },
-{ unique: true }
 );
 
 const Package =

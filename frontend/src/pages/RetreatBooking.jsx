@@ -296,6 +296,55 @@ const RetreatBooking = () => {
     // Get unique package IDs currently in use to display in Step 3
     const uniqueSelectedPackageIds = [...new Set(Object.values(roomPackages).filter(Boolean))];
 
+    // Packages WITHOUT room types (for Step 3)
+
+// --- PACKAGE INCLUSION DISPLAY LOGIC ---
+
+const hasRooms = selectedRooms.length > 0;
+
+const isSameDay =
+  startDate &&
+  endDate &&
+  new Date(startDate).toDateString() === new Date(endDate).toDateString();
+
+// Venue packages
+const venuePackages = dbPackages.filter(
+  pkg => pkg.packageType?.toLowerCase() === "venue package"
+);
+
+// Other packages except room package
+const otherPackages = dbPackages.filter(
+  pkg => pkg.packageType?.toLowerCase() !== "room package"
+);
+
+let displayPackages = [];
+
+if (hasRooms) {
+
+  // Rooms booked → hide venue packages
+  displayPackages = otherPackages.filter(
+    pkg => pkg.packageType?.toLowerCase() !== "venue package"
+  );
+
+} else if (isSameDay) {
+
+  // Same day + no rooms → show venue + other packages
+  displayPackages = [
+    ...venuePackages,
+    ...otherPackages.filter(
+      pkg => pkg.packageType?.toLowerCase() !== "venue package"
+    )
+  ];
+
+} else {
+
+  // Default case
+  displayPackages = otherPackages.filter(
+    pkg => pkg.packageType?.toLowerCase() !== "venue package"
+  );
+
+}
+
     return (
         <div className="min-h-screen bg-slate-50 pt-8 pb-20 font-sans text-slate-900">
             <style>{`
@@ -505,20 +554,17 @@ const RetreatBooking = () => {
                             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Package Inclusions</h2>
                         </div>
                         
-                        {uniqueSelectedPackageIds.length === 0 ? (
+                        {displayPackages.length === 0 ? (
                             <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                                 <Info size={24} className="mx-auto text-slate-300 mb-2" />
                                 <p className="text-xs font-medium text-slate-500">Select rooms and assign packages above to see their inclusions here.</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {uniqueSelectedPackageIds.map((pkgId) => {
-                                    const pkg = dbPackages.find(p => p._id === pkgId);
+                                {displayPackages.map((pkg) => {
                                     if (!pkg) return null;
                                     const pkgPrice = getPrice(pkg.price);
-                                    
-                                    // See which rooms are using this package
-                                    const usedInRooms = selectedRooms.filter(r => roomPackages[r._id] === pkgId);
+                                
 
                                     return (
                                         <div key={pkg._id} className="border border-blue-100 bg-blue-50/20 rounded-xl p-5 relative flex flex-col h-full shadow-sm">
@@ -526,14 +572,23 @@ const RetreatBooking = () => {
                                                 <div className="p-2 rounded-lg bg-blue-100 text-blue-600"><Package size={18} /></div>
                                             </div>
                                             <h3 className="font-bold text-sm text-slate-900 mb-1">{pkg.name}</h3>
-                                            <p className="text-[10px] text-blue-600 font-bold mb-3 italic">
-                                                Assigned to: {usedInRooms.map(r => r.name).join(", ")}
-                                            </p>
                                             <p className="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">{pkg.description || "No description provided."}</p>
                                             <div className="flex flex-wrap gap-2 mb-3">
-                                                {pkg.includesFood && <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 uppercase"><Utensils size={10} /> Food</span>}
-                                                {pkg.includesAC && <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-sky-50 text-sky-700 px-2 py-1 rounded border border-sky-100 uppercase"><Wind size={10} /> AC</span>}
-                                            </div>
+  {pkg.amenities?.length > 0 ? (
+    pkg.amenities.map((amenity, index) => (
+      <span
+        key={index}
+        className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 uppercase"
+      >
+        {amenity}
+      </span>
+    ))
+  ) : (
+    <span className="text-[10px] text-slate-400 italic">
+      No amenities
+    </span>
+  )}
+</div>
                                             <div className="pt-3 border-t border-slate-200 mt-auto">
                                                 <p className="font-bold text-slate-900 text-sm">
                                                     {pkgPrice === 0 ? "Free / Included" : `+${currencySymbol}${pkgPrice}`}

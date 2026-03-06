@@ -4,35 +4,37 @@ import packageModel from "../models/packageModel.js";
 const addPackage = async (req, res) => {
   try {
 
-    const { name, roomType, description, price, includesFood, includesAC } = req.body;
+    const { name, packageType, roomType, description, price, amenities } = req.body;
 
-    if (!name || !roomType || price === undefined) {
+    // basic validation
+    if (!name || !packageType || price === undefined) {
       return res.json({
         success: false,
-        message: "Name, room type, and price are required"
+        message: "Name, package type, and price are required"
       });
     }
 
+    // prevent duplicate packages
     const existingPackage = await packageModel.findOne({
-      roomType,
-      includesAC,
-      includesFood
+      name: name.trim(),
+      packageType,
+      roomType: roomType || null
     });
 
     if (existingPackage) {
       return res.json({
         success: false,
-        message: "This package configuration already exists"
+        message: "This package already exists"
       });
     }
 
     const newPackage = new packageModel({
-      name,
-      roomType,
-      description,
+      name: name.trim(),
+      packageType: packageType.trim(),
+      roomType: roomType || null,
+      description: description || "",
       price: Number(price),
-      includesFood: Boolean(includesFood),
-      includesAC: Boolean(includesAC)
+      amenities: amenities || []
     });
 
     await newPackage.save();
@@ -74,19 +76,24 @@ const updatePackage = async (req, res) => {
   try {
 
     const { id } = req.params;
+    const { name, packageType, roomType, description, price, amenities } = req.body;
 
     const updated = await packageModel.findByIdAndUpdate(
       id,
       {
-        ...req.body,
-        price: Number(req.body.price)
+        name,
+        packageType,
+        roomType: roomType || null,
+        description,
+        price: Number(price),
+        amenities
       },
       { new: true }
     );
 
     res.json({
       success: true,
-      message: "Package updated",
+      message: "Package updated successfully",
       package: updated
     });
 
@@ -106,13 +113,14 @@ const deletePackage = async (req, res) => {
 
     res.json({
       success: true,
-      message: "Package deleted"
+      message: "Package deleted successfully"
     });
 
   } catch (error) {
     res.json({ success: false, message: error.message });
   }
 };
+
 
 export {
   addPackage,
