@@ -13,6 +13,12 @@ const AdminContextProvider = ({ children }) => {
     headers: { token: aToken }
   };
 
+  const logoutAdmin = () => {
+    localStorage.removeItem("aToken");
+    setAToken("");
+    toast.info("Logged out successfully");
+  };
+
   // ============================================================
   // 🛡️ GLOBAL SECURITY INTERCEPTOR (THE FIX)
   // ============================================================
@@ -67,12 +73,6 @@ const AdminContextProvider = ({ children }) => {
     } catch (error) {
       toast.error(error.response?.data?.message || error.message);
     }
-  };
-
-  const logoutAdmin = () => {
-    localStorage.removeItem("aToken");
-    setAToken("");
-    toast.info("Logged out successfully");
   };
 
   // ============================================================
@@ -578,3 +578,4 @@ const AdminContextProvider = ({ children }) => {
 };
 
 export default AdminContextProvider;
+

@@ -46,22 +46,23 @@ return res.json({success:false,message:"Invalid date range"});
 /* ---------- GET ROOM IDS ---------- */
 
 const roomIds = bookingItems.map(item=>item.room_id);
-const uniqueRooms=[...new Set(roomIds)];
+/* ---------- CHECK ROOM CONFLICT ---------- */
 
-/* ---------- CHECK DOUBLE BOOKING ---------- */
+const uniqueRooms = bookingItems.map(item => item.room_id);
 
 const conflict = await bookingModel.findOne({
-"bookingItems.room_id":{$in:uniqueRooms},
-status:"approved",
-check_in:{$lt:end},
-check_out:{$gt:start}
+  "bookingItems.room_id": { $in: uniqueRooms },
+  status: { $in: ["pending", "approved"] },
+  check_in: { $lt: end },
+  check_out: { $gt: start }
 });
 
-if(conflict)
-return res.json({
-success:false,
-message:"Rooms already booked for selected dates"
-});
+if (conflict) {
+  return res.json({
+    success: false,
+    message: "One or more selected rooms are already booked for those dates"
+  });
+}
 
 /* ---------- CALCULATE PRICE ---------- */
 
@@ -101,7 +102,7 @@ total_price,
 status:"pending",
 payment:false,
 paymentStatus:"unpaid",
-paymentMethod:"n/a"
+paymentMethod:""
 
 });
 
@@ -333,10 +334,10 @@ const start=normalizeDate(checkIn);
 const end=normalizeDate(checkOut);
 
 const conflict = await bookingModel.findOne({
-"bookingItems.room_id":{$in:roomIds},
-status:"approved",
-check_in:{$lt:end},
-check_out:{$gt:start}
+  "bookingItems.room_id": { $in: uniqueRooms },
+  status: { $in: ["pending", "approved"] }, // important
+  check_in: { $lt: end },
+  check_out: { $gt: start }
 });
 
 if(conflict)
@@ -361,7 +362,7 @@ const {roomIds=[]}=req.body;
 
 const bookings = await bookingModel.find({
 "bookingItems.room_id":{$in:roomIds},
-status:"approved"
+status: { $in: ["pending", "approved"] }
 });
 
 const blockedDates=[];
@@ -370,7 +371,10 @@ bookings.forEach(b=>{
 
 let current=new Date(b.check_in);
 
-while(current<b.check_out){
+const checkoutWithCleaning = new Date(b.check_out);
+checkoutWithCleaning.setDate(checkoutWithCleaning.getDate() + 1);
+
+while(current <= checkoutWithCleaning){
 
 blockedDates.push(new Date(current));
 
@@ -395,25 +399,53 @@ res.json({success:false,message:error.message});
 export const getOccupiedRooms = async (req,res)=>{
 try{
 
-const today=normalizeDate(new Date());
+const today = normalizeDate(new Date());
 
 const bookings = await bookingModel.find({
-status:"approved",
-check_in:{$lte:today},
-check_out:{$gt:today}
+status:"approved"
 });
 
-const occupiedRoomIds = bookings.flatMap(b =>
-b.bookingItems.map(item=>item.room_id)
-);
+const occupiedRoomIds = [];
+const cleaningRoomIds = [];
 
-res.json({success:true,occupiedRoomIds});
+bookings.forEach(b => {
+
+const checkin = normalizeDate(b.check_in);
+const checkout = normalizeDate(b.check_out);
+
+const cleaningDay = new Date(checkout);
+cleaningDay.setDate(cleaningDay.getDate() + 1);
+
+/* OCCUPIED */
+if(today >= checkin && today < checkout){
+
+b.bookingItems.forEach(item=>{
+occupiedRoomIds.push(item.room_id);
+});
+
+}
+
+/* CLEANING DAY */
+if(today.getTime() === cleaningDay.getTime()){
+
+b.bookingItems.forEach(item=>{
+cleaningRoomIds.push(item.room_id);
+});
+
+}
+
+});
+
+res.json({
+success:true,
+occupiedRoomIds,
+cleaningRoomIds
+});
 
 }catch(error){
 res.json({success:false,message:error.message});
 }
 };
-
 
 /* ======================================================
    GET USER BOOKED DATES

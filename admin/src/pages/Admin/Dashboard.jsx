@@ -165,106 +165,92 @@ const Dashboard = () => {
         bookings={allBookings || []} 
       />
 
-      {/* --- REPORT MODAL --- */}
-      {showReportModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col">
-            <div className="px-8 pt-8 pb-6 border-b border-slate-100 flex justify-between items-start print:pb-4 print:pt-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="bg-indigo-600 p-2 rounded-xl print:hidden shadow-sm">
-                    <BarChart3 size={20} className="text-white" />
-                  </div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                    {reportType === "monthly" ? "Monthly" : "Yearly"} Summary Report
-                  </h2>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-3 mt-4 print:hidden">
-                  <span className="text-slate-500 text-sm font-medium">Select Period:</span>
-                  <div className="flex gap-2">
-                    <select 
-                      value={reportType} 
-                      onChange={(e) => setReportType(e.target.value)} 
-                      className="bg-indigo-50 text-indigo-700 font-black rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all border-none"
-                    >
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+      {/* --- MODERN METRIC GRID REPORT --- */}
+{showReportModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:block">
+    
+    {/* Action Bar */}
+    <div className="fixed top-8 right-8 flex gap-3 print:hidden z-[110]">
+      <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-700 transition-all flex items-center gap-2 shadow-xl">
+        <Printer size={16} /> Print Report
+      </button>
+      <button onClick={() => setShowReportModal(false)} className="px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:bg-slate-100 transition-all shadow-xl">
+        Close
+      </button>
+    </div>
 
-                    {reportType === "monthly" && (
-                      <select 
-                        value={reportMonth} 
-                        onChange={(e) => setReportMonth(Number(e.target.value))} 
-                        className="bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-                      >
-                        {monthNames.map((month, index) => <option key={index} value={index}>{month}</option>)}
-                      </select>
-                    )}
-
-                    <select 
-                      value={reportYear} 
-                      onChange={(e) => setReportYear(Number(e.target.value))} 
-                      className="bg-slate-50 border border-slate-200 text-slate-800 text-sm font-bold rounded-lg px-3 py-2 outline-none focus:border-indigo-500 cursor-pointer transition-all"
-                    >
-                      {availableYears.map(year => <option key={year} value={year}>{year}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <p className="text-slate-800 text-sm mt-2 hidden print:block font-bold">
-                  Performance overview for {reportType === "monthly" ? `${monthNames[reportMonth]} ` : ""}{reportYear}
-                </p>
-                <p className="text-slate-400 text-xs mt-2 hidden print:block font-medium">Document generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
-              </div>
-              <button onClick={() => setShowReportModal(false)} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors print:hidden">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-8 bg-slate-50/50 flex-1 print:bg-white print:p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-3 bg-white p-8 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                   <div className="absolute -top-6 -right-6 text-slate-50 opacity-50 transform rotate-12 transition-transform duration-500 group-hover:scale-110 print:hidden"><Wallet size={160} /></div>
-                   <div className="relative z-10">
-                     <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-3">Total Gross Revenue</p>
-                     <div className="flex items-end gap-4 flex-wrap">
-                        <h3 className="text-5xl font-black text-slate-900 tracking-tighter">₱{reportStats.totalIncome.toLocaleString()}</h3>
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-lg mb-1.5">Approved & Paid</span>
-                     </div>
-                   </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex items-start justify-between mb-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Bookings</p>
-                    <div className="p-2.5 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl"><Calendar size={18} /></div>
-                  </div>
-                  <div><h4 className="text-3xl font-black text-slate-800">{reportStats.totalBookings}</h4><p className="text-xs text-slate-500 mt-1 font-medium">Reservations logged</p></div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex items-start justify-between mb-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Participants</p>
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl"><Users size={18} /></div>
-                  </div>
-                  <div><h4 className="text-3xl font-black text-slate-800">{reportStats.totalParticipants}</h4><p className="text-xs text-slate-500 mt-1 font-medium">Attendees recorded</p></div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-                  <div className="flex items-start justify-between mb-6">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Avg. Order Value</p>
-                    <div className="p-2.5 bg-amber-50 border border-amber-100 text-amber-600 rounded-xl"><TrendingUp size={18} /></div>
-                  </div>
-                  <div><h4 className="text-3xl font-black text-slate-800">₱{reportStats.avgValue.toLocaleString()}</h4><p className="text-xs text-slate-500 mt-1 font-medium">Per confirmed booking</p></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-8 py-5 border-t border-slate-100 bg-white flex justify-end gap-3 print:hidden">
-              <button onClick={() => setShowReportModal(false)} className="px-6 py-2.5 text-slate-600 font-bold text-sm hover:bg-slate-100 rounded-xl transition-all">Close Window</button>
-              <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl flex items-center gap-2 hover:bg-slate-800 shadow-lg shadow-slate-200 transition-all active:scale-95"><Printer size={16} /> Export / Print PDF</button>
-            </div>
-          </div>
+    {/* A4 Paper */}
+    <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-16 shadow-[0_20px_50px_rgba(0,0,0,0.1)] print:shadow-none print:p-8">
+      
+      {/* 1. Header */}
+      <div className="flex justify-between items-start mb-16">
+        <div>
+           <div className="w-10 h-10 bg-slate-900 rounded-xl mb-4 flex items-center justify-center">
+             <Zap className="text-white" size={20} />
+           </div>
+           <h1 className="text-3xl font-extrabold tracking-tighter text-slate-900">Performance Metrics</h1>
+           <p className="text-slate-500 text-sm font-medium">Monthly Audit & Financial Review</p>
         </div>
-      )}
+        <div className="text-right border-l border-slate-200 pl-8">
+           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Date Range</p>
+           <p className="text-lg font-bold text-slate-900">{reportType === "monthly" ? monthNames[reportMonth] : "Annual"}, {reportYear}</p>
+        </div>
+      </div>
+
+      {/* 2. Hero Data */}
+      <div className="bg-slate-50 rounded-3xl p-10 mb-8 border border-slate-100 print:bg-transparent print:border-none print:p-0">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Revenue Generated</p>
+        <h2 className="text-6xl font-black text-slate-900 tracking-tighter">
+          ₱{reportStats.totalIncome.toLocaleString()}
+        </h2>
+      </div>
+
+      {/* 3. Metric Grid */}
+      <div className="grid grid-cols-2 gap-4 mb-16">
+        <div className="p-6 rounded-2xl border border-slate-100 bg-white">
+           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Confirmed Bookings</p>
+           <p className="text-2xl font-bold text-slate-900">{reportStats.totalBookings}</p>
+        </div>
+        <div className="p-6 rounded-2xl border border-slate-100 bg-white">
+           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Guest Capacity</p>
+           <p className="text-2xl font-bold text-slate-900">{reportStats.totalParticipants}</p>
+        </div>
+      </div>
+
+      {/* 4. Data Table */}
+      <div className="mb-16">
+        <h3 className="text-sm font-bold text-slate-900 mb-6 uppercase tracking-wider">Detailed Breakdown</h3>
+        <table className="w-full">
+           <thead>
+             <tr className="text-[10px] uppercase text-slate-400 tracking-widest border-b border-slate-100">
+               <th className="pb-4 text-left">Category</th>
+               <th className="pb-4 text-right">Value</th>
+             </tr>
+           </thead>
+           <tbody className="divide-y divide-slate-100">
+             <tr>
+               <td className="py-4 text-sm font-medium text-slate-700">Gross Revenue</td>
+               <td className="py-4 text-sm font-bold text-slate-900 text-right">₱{reportStats.totalIncome.toLocaleString()}</td>
+             </tr>
+             <tr>
+               <td className="py-4 text-sm font-medium text-slate-700">Avg. Revenue/Booking</td>
+               <td className="py-4 text-sm font-bold text-slate-900 text-right">₱{reportStats.avgValue.toLocaleString()}</td>
+             </tr>
+           </tbody>
+        </table>
+      </div>
+
+      {/* 5. Footer */}
+      <div className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-center">
+         <p className="text-[10px] font-bold text-slate-400">Vantage Management System</p>
+         <div className="flex gap-4">
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Page 01</p>
+         </div>
+      </div>
+
+    </div>
+  </div>
+)}
 
       {/* --- TOP HEADER --- */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">

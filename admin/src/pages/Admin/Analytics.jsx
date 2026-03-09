@@ -22,7 +22,6 @@ const Analytics = () => {
     if (aToken) {
       getAllBookings();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aToken]); 
 
   const { trendData, seasonalData, stats, predictiveData } = useMemo(() => {

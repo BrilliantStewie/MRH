@@ -24,8 +24,9 @@ const Rooms = () => {
 
   // --- STATE ---
   const [filteredRooms, setFilteredRooms] = useState([]);
-  const [occupiedRooms, setOccupiedRooms] = useState([]);
-  const [viewingRoom, setViewingRoom] = useState(null); 
+const [occupiedRooms, setOccupiedRooms] = useState([]);
+const [cleaningRooms, setCleaningRooms] = useState([]);
+const [viewingRoom, setViewingRoom] = useState(null);
 
   // Filter States
   const [filterStatus, setFilterStatus] = useState("all");
@@ -49,16 +50,26 @@ const Rooms = () => {
   }, []);
 
   const fetchOccupiedRooms = async () => {
-    try {
-      const { data } = await axios.get(`${backendUrl}/api/booking/occupied`);
-      if (data.success) {
-        const safeList = data.occupiedRoomIds || [];
-        setOccupiedRooms(safeList.map(id => String(id)));
-      }
-    } catch (error) {
-      console.error("Error fetching occupied rooms:", error);
+  try {
+
+    const { data } = await axios.get(`${backendUrl}/api/booking/occupied`);
+
+    if (data.success) {
+
+      setOccupiedRooms(
+        (data.occupiedRoomIds || []).map(id => String(id))
+      );
+
+      setCleaningRooms(
+        (data.cleaningRoomIds || []).map(id => String(id))
+      );
+
     }
-  };
+
+  } catch (error) {
+    console.error("Error fetching occupied rooms:", error);
+  }
+};
 
   // 👈 UPDATED: Normalizer now keeps spaces intact for matching multi-word room types
   const normalize = (v = "") => v?.toString().toLowerCase().trim() || "";
@@ -343,10 +354,14 @@ const Rooms = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {filteredRooms.map((room) => {
-                const selected = isSelected(room._id);
-                const isUnderMaintenance = room.available === false;
-                const isBookedToday = occupiedRooms.some((oid) => String(oid) === String(room._id));
-                const isUnavailable = isUnderMaintenance || isBookedToday;
+                const isUnderMaintenance = room.status === "maintenance";
+const isCleaningDay = cleaningRooms.some((c) => c.room_id === room._id);
+
+// ✅ ADD THIS LINE:
+const isBookedToday = occupiedRooms.includes(room._id); 
+
+const isUnavailable = isUnderMaintenance || isCleaningDay || isBookedToday;
+const selected = selectedRooms.some((r) => r._id === room._id);
 
                 return (
                   <div
@@ -437,7 +452,17 @@ const Rooms = () => {
                               : "bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-200 hover:shadow-xl"
                           }`}
                       >
-                        {isUnderMaintenance ? "Maintenance" : isBookedToday ? "Occupied" : selected ? <><span className="hidden xl:inline">Remove</span><X size={14} className="stroke-[3]" /></> : <><span className="hidden xl:inline">Select</span><Plus size={14} className="stroke-[3]" /></>}
+                        {
+isUnderMaintenance
+? "Maintenance"
+: isCleaningDay
+? "Cleaning"
+: isBookedToday
+? "Occupied"
+: selected
+? "Remove"
+: "Select"
+}
                       </button>
                     </div>
                   </div>

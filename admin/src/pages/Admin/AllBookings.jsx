@@ -244,7 +244,7 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
 
 // --- MAIN PAGE ---
 const AllBookings = () => {
-  const { aToken, allBookings, getAllBookings, approveBooking, paymentConfirmed, approveCancellation, resolveCancellation, backendUrl } = useContext(AdminContext);
+ const { aToken, allBookings, getAllBookings, approveBooking, declineBooking, paymentConfirmed, approveCancellation, backendUrl } = useContext(AdminContext);
 
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
@@ -538,7 +538,7 @@ const AllBookings = () => {
                              <button 
                                  onClick={() => {
                                      if(window.confirm("Are you sure you want to DECLINE this booking request?")) {
-                                          approveCancellation(b._id, "decline"); 
+                                          declineBooking(b._id);
                                      }
                                  }} 
                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-rose-200 text-rose-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all"
@@ -570,7 +570,7 @@ const AllBookings = () => {
                               <Trash2 size={12}/> Approve Cancel
                             </button>
                             <button 
-                              onClick={() => resolveCancellation(b._id, "reject")} 
+                              onClick={() => approveCancellation(b._id, "reject")} 
                               className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
                             >
                               <X size={12}/> Reject Cancel

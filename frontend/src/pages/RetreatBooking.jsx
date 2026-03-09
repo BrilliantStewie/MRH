@@ -177,18 +177,32 @@ const RetreatBooking = () => {
     useEffect(() => {
         if (token) fetchUserBookedDates();
         fetchRoomUnavailableDates();
-        // eslint-disable-next-line
     }, [token, selectedRooms]);
 
     const fetchRoomUnavailableDates = async () => {
-        if (selectedRooms.length === 0) return;
-        try {
-            const { data } = await axios.post(backendUrl + "/api/booking/unavailable-dates", {
-                roomIds: selectedRooms.map(r => r._id)
-            });
-            if (data.success) setRoomUnavailableDates(data.blockedDates.map(toDateObj));
-        } catch (error) { console.error(error); }
-    };
+
+    if (selectedRooms.length === 0) return;
+
+    try {
+
+        const { data } = await axios.post(
+            backendUrl + "/api/booking/unavailable-dates",
+            { roomIds: selectedRooms.map(r => r._id) }
+        );
+
+        if (data.success) {
+
+            setRoomUnavailableDates(
+                data.blockedDates.map(toDateObj)
+            );
+
+        }
+
+    } catch (error) {
+        console.error(error);
+    }
+
+};
 
     const fetchUserBookedDates = async () => {
         try {
@@ -209,11 +223,22 @@ const RetreatBooking = () => {
     const allBlockedDates = [...roomUnavailableDates, ...userBookedDates];
 
     const getDayClass = (date) => {
-        const time = date.getTime();
-        if (userBookedDates.some(d => d.getTime() === time)) return "my-booking-date";
-        if (roomUnavailableDates.some(d => d.getTime() === time)) return "room-taken-date";
-        return "available-date";
-    };
+
+    const time = date.getTime();
+
+    // 🟢 Your own booking
+    if (userBookedDates.some(d => d.getTime() === time)) {
+        return "my-booking-date";
+    }
+
+    // 🟡 Other users booking (only if a room is selected)
+    if (selectedRooms.length > 0 &&
+        roomUnavailableDates.some(d => d.getTime() === time)) {
+        return "other-booking-date";
+    }
+
+    return "available-date";
+};
 
     const getDuration = () => {
         if (!startDate || !endDate) return 0;
@@ -446,9 +471,37 @@ const RetreatBooking = () => {
                 .react-datepicker-wrapper { width: 100%; }
                 .react-datepicker { font-family: inherit; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: none; overflow: hidden; }
                 .react-datepicker__header { background-color: #fff; border-bottom: 1px solid #f1f5f9; padding-top: 15px; }
-                .react-datepicker__day--disabled { opacity: 0.3; background-color: #e2e8f0; color: #94a3b8; cursor: not-allowed; text-decoration: line-through; }
-                .my-booking-date { background-color: #dbeafe !important; color: #2563eb !important; font-weight: bold; position: relative; }
-                .my-booking-date::after { content: ''; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #2563eb; border-radius: 50%; }
+                .react-datepicker__day--disabled {
+  opacity: 0.6;
+  background-color: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+                .my-booking-date {
+  background-color: #dcfce7 !important;
+  color: #15803d !important;
+  font-weight: bold;
+  border-radius: 6px;
+}
+                .my-booking-date::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background-color: #2563eb;
+  border-radius: 50%;
+}
+
+.other-booking-date {
+  background-color: #fef9c3 !important;
+  color: #854d0e !important;
+  font-weight: 600;
+  border-radius: 6px;
+}
                 .react-datepicker__day--selected, .react-datepicker__day--in-range { background-color: #0f172a !important; color: white !important; }
                 .custom-input { width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #334155; outline: none; transition: all 0.2s; background: white; }
                 .custom-input:focus { border-color: #0f172a; box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05); }

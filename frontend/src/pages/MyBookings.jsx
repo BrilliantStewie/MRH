@@ -348,7 +348,10 @@ const MyBookings = () => {
               const hasPassed = new Date() > checkOutDate;
               const isGCashPending = booking.paymentMethod === "gcash" && booking.paymentStatus === "pending";
               
-              const showPaymentButtons = isApproved && !isPaid && !hasPassed && !isGCashPending;
+              const showPaymentButtons =
+  booking.status === "approved" &&
+  booking.paymentStatus === "unpaid" &&
+  !hasPassed;
               const canRate = isApproved && (isPaid || isCash) && hasPassed && !booking.rating;
               const hasRated = booking.rating > 0;
 
@@ -461,6 +464,11 @@ const MyBookings = () => {
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                          {!isApproved && booking.status === "pending" && (
+                            <span className="flex-1 md:flex-none px-4 py-2.5 text-blue-700 bg-blue-50 font-bold text-xs rounded-xl border border-blue-100 flex items-center gap-2">
+                              <Clock size={14} /> Waiting for approval before payment
+                            </span>
+                          )}
                           {showPaymentButtons && (
                             <>
                               <button

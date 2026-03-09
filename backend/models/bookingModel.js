@@ -90,11 +90,11 @@ const bookingSchema = new mongoose.Schema({
     default: "unpaid"
   },
 
-  paymentMethod: {
-    type: String,
-    enum: ["cash", "gcash", "online", "n/a"],
-    default: "n/a"
-  },
+ paymentMethod: {
+  type: String,
+  enum: ["cash", "gcash", ""],
+  default: ""
+},
 
   payment: {
     type: Boolean,
