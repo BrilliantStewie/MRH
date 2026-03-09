@@ -433,8 +433,6 @@ const AdminContextProvider = ({ children }) => {
   };
 
   const deletePackage = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this package?")) return;
-    
     try {
       const { data } = await axios.post(
         `${backendUrl}/api/admin/delete-package/${id}`,

@@ -98,7 +98,7 @@ const MyBookings = () => {
   // Fetch Data
   const fetchUserBookings = async () => {
     try {
-      const { data } = await axios.get(backendUrl + `/api/user/bookings?t=${Date.now()}`, { headers: { token } });
+      const { data } = await axios.get(backendUrl + `/api/booking/user/bookings?t=${Date.now()}`, { headers: { token } });
       if (data.success) setBookings(data.bookings);
     } catch (error) { toast.error(error.message); } finally { setLoading(false); }
   };
@@ -211,30 +211,38 @@ const MyBookings = () => {
   }, [token]);
 
   const filteredBookings = useMemo(() => {
-    return bookings.filter(b => {
-      const mainRoom = (b.room_ids && b.room_ids.length > 0) ? b.room_ids[0] : {};
-      const date = new Date(b.date || Date.now());
+  return bookings.filter(b => {
 
-      if (activeTab !== 'all' && b.status !== activeTab) return false;
-      if (buildingFilter !== 'all' && mainRoom.building?.toLowerCase() !== buildingFilter.toLowerCase()) return false;
-      if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
-      if (yearFilter !== 'all' && date.getFullYear().toString() !== yearFilter) return false;
-      
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const roomName = mainRoom.name ? mainRoom.name.toLowerCase() : "";
-        if (!roomName.includes(query) && !b._id.toLowerCase().includes(query)) return false;
-      }
-      return true;
-    }).sort((a, b) => sortOrder === 'newest' 
-      ? new Date(b.date) - new Date(a.date) 
-      : new Date(a.date) - new Date(b.date));
-  }, [bookings, activeTab, searchQuery, buildingFilter, monthFilter, yearFilter, sortOrder]);
+    const mainRoom =
+  b.bookingItems && b.bookingItems.length > 0
+    ? b.bookingItems[0].room_id
+    : { name: "Room Details Unavailable" };
 
+    const date = new Date(b.check_in || Date.now());
+
+    if (activeTab !== 'all' && b.status !== activeTab) return false;
+    if (buildingFilter !== 'all' && mainRoom.building?.toLowerCase() !== buildingFilter.toLowerCase()) return false;
+    if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
+    if (yearFilter !== 'all' && date.getFullYear().toString() !== yearFilter) return false;
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const roomName = mainRoom.name ? mainRoom.name.toLowerCase() : "";
+      if (!roomName.includes(query) && !b._id.toLowerCase().includes(query)) return false;
+    }
+
+    return true;
+
+  }).sort((a, b) =>
+    sortOrder === 'newest'
+      ? new Date(b.check_in) - new Date(a.check_in)
+      : new Date(a.check_in) - new Date(b.check_in)
+  );
+}, [bookings, activeTab, searchQuery, buildingFilter, monthFilter, yearFilter, sortOrder]);
   const buildingOptions = [{ label: "Margarita", value: "Margarita" }, { label: "Nolasco", value: "Nolasco" }];
   
   const uniqueYears = useMemo(() => {
-    const years = bookings.map(b => new Date(b.date).getFullYear());
+    const years = bookings.map(b => new Date(b.check_in).getFullYear());
     return [...new Set(years)].sort((a, b) => b - a).map(y => ({ label: y.toString(), value: y.toString() }));
   }, [bookings]);
 
@@ -325,9 +333,10 @@ const MyBookings = () => {
             </div>
           ) : (
             filteredBookings.map((booking) => {
-              const mainRoom = (booking.room_ids && booking.room_ids.length > 0) 
-                  ? booking.room_ids[0] 
-                  : { name: "Room Details Unavailable" };
+              const mainRoom =
+  booking.bookingItems && booking.bookingItems.length > 0
+    ? booking.bookingItems[0].room_id
+    : { name: "Room Details Unavailable" };
               
               const checkInDate = booking.check_in ? new Date(booking.check_in) : new Date();
               const checkOutDate = booking.check_out ? new Date(booking.check_out) : new Date();
@@ -392,7 +401,9 @@ const MyBookings = () => {
                         {/* End of Addition */}
 
                         <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-xl font-bold text-slate-900 line-clamp-1 pr-4">{mainRoom.name}</h3>
+                          <h3 className="text-xl font-bold text-slate-900 line-clamp-1 pr-4">
+  {booking.bookingItems?.map(item => item.room_id?.name).join(", ") || "Room"}
+</h3>
                           {getStatusBadge(booking.status)}
                         </div>
 

@@ -23,20 +23,15 @@ const userId = req.userId;
 
 const {
 bookingName,
-room_ids=[],
+bookingItems=[],
 check_in,
-check_out,
-participants,
-package_id
+check_out
 } = req.body;
 
-if(!room_ids.length)
-return res.json({success:false,message:"Select at least one room"});
+if(!bookingItems.length)
+return res.json({success:false,message:"No rooms selected"});
 
-if(!participants || participants < 1)
-return res.json({success:false,message:"Invalid participants"});
-
-const uniqueRooms=[...new Set(room_ids)];
+/* ---------- NORMALIZE DATES ---------- */
 
 const start=normalizeDate(check_in);
 const end=normalizeDate(check_out);
@@ -48,6 +43,10 @@ return res.json({success:false,message:"Past dates not allowed"});
 if(end <= start)
 return res.json({success:false,message:"Invalid date range"});
 
+/* ---------- GET ROOM IDS ---------- */
+
+const roomIds = bookingItems.map(item=>item.room_id);
+const uniqueRooms=[...new Set(roomIds)];
 
 /* ---------- CHECK DOUBLE BOOKING ---------- */
 
@@ -64,34 +63,26 @@ success:false,
 message:"Rooms already booked for selected dates"
 });
 
-
-/* ---------- GET PACKAGE ---------- */
-
-const pkg = await packageModel.findById(package_id);
-
-if(!pkg)
-return res.json({success:false,message:"Invalid package selected"});
-
-
 /* ---------- CALCULATE PRICE ---------- */
 
 const days = Math.ceil((end-start)/(1000*60*60*24)) || 1;
 
-const subtotal = pkg.price * participants * days;
+let total_price = 0;
 
+for (const item of bookingItems){
 
-/* ---------- BUILD BOOKING ITEMS ---------- */
+const pkg = await packageModel.findById(item.package_id);
 
-const bookingItems = uniqueRooms.map(roomId=>({
-room_id:roomId,
-package_id:package_id,
-participants:participants,
-subtotal:subtotal
-}));
+if(!pkg)
+return res.json({success:false,message:"Invalid package selected"});
 
+const subtotal = pkg.price * item.participants * days;
 
-const total_price = bookingItems.reduce((sum,item)=>sum+item.subtotal,0);
+item.subtotal = subtotal;
 
+total_price += subtotal;
+
+}
 
 /* ---------- CREATE BOOKING ---------- */
 
@@ -113,7 +104,6 @@ paymentStatus:"unpaid",
 paymentMethod:"n/a"
 
 });
-
 
 /* ---------- NOTIFY ADMINS ---------- */
 
@@ -147,10 +137,10 @@ export const userBookings = async (req,res)=>{
 try{
 
 const bookings = await bookingModel
-.find({user_id:req.userId})
+.find({ user_id: req.userId })
 .populate("bookingItems.room_id")
 .populate("bookingItems.package_id")
-.sort({createdAt:-1});
+.sort({ createdAt: -1 });
 
 res.json({success:true,bookings});
 

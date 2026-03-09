@@ -51,14 +51,15 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   if (!isOpen || !booking) return null;
 
   const getPackagesList = () => {
-    if (Array.isArray(booking.packages)) return booking.packages;
-    if (Array.isArray(booking.package_ids)) return booking.package_ids;
-    if (booking.package_id) return Array.isArray(booking.package_id) ? booking.package_id : [booking.package_id];
-    return [];
-  };
+  if (!booking.bookingItems) return [];
+
+  return booking.bookingItems
+    .map(item => item.package_id)
+    .filter(pkg => pkg); // remove null
+};
 
   const packagesList = getPackagesList();
-  const roomList = booking.room_ids || [];
+  const roomList = booking.bookingItems || [];
 
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
@@ -125,9 +126,11 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {visibleRooms.map((room, i) => {
-                const roomImg = (Array.isArray(room.images) && room.images.length > 0) 
-                  ? room.images[0] 
-                  : room.cover_image;
+                const roomData = room.room_id;
+
+const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
+  ? roomData.images[0]
+  : roomData?.cover_image;
 
                 const imageUrl = (roomImg && typeof roomImg === 'string') 
                   ? (roomImg.startsWith('http') ? roomImg : `${backendUrl}/${roomImg}`)
@@ -144,12 +147,14 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                     </div>
                     <div className="flex-grow">
                       <div className="flex justify-between items-start">
-                        <p className="text-[11px] font-black text-slate-800">{room.name}</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">{room.building}</p>
+                        <p className="text-[11px] font-black text-slate-800">
+  {room.room_id?.name || "Room"}
+</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">{room.room_id?.building}</p>
                       </div>
                       <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[10px] text-slate-500 font-medium">{room.room_type}</p>
-                        <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.capacity}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{room.room_id?.room_type}</p>
+                        <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.room_id?.capacity}</p>
                       </div>
                     </div>
                   </div>
@@ -186,12 +191,12 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                       
                       <div className="flex-grow relative z-10">
                         <div className="flex justify-between items-start">
-                          <p className="text-sm font-black text-slate-800">{pkg.name}</p>
-                          <p className="text-sm font-black text-violet-600">₱{pkg.price?.toLocaleString()}</p>
+                          <p className="text-sm font-black text-slate-800">{pkg?.name || "Package"}</p>
+                          <p className="text-sm font-black text-violet-600">₱{pkg?.price ? pkg.price.toLocaleString() : "0"}</p>
                         </div>
                         {pkg.description && (
                           <p className="text-[11px] font-medium text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                            {pkg.description}
+                            {pkg?.description}
                           </p>
                         )}
                       </div>
@@ -289,14 +294,14 @@ const AllBookings = () => {
       filtered = filtered.filter(b => `${b.user_id?.firstName} ${b.user_id?.lastName}`.toLowerCase().includes(term) || b._id.toLowerCase().includes(term));
     }
     
-    if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.room_ids?.some(r => r.building === buildingFilter));
+    if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => r.building === buildingFilter));
     
     if (statusFilter !== "All Status") {
       filtered = filtered.filter(b => b.status?.toLowerCase() === statusFilter.toLowerCase());
     }
 
     if (roomTypeFilter !== "All Types") {
-      filtered = filtered.filter(b => b.room_ids?.some(r => r.room_type?.toLowerCase() === roomTypeFilter.toLowerCase()));
+      filtered = filtered.filter(b => b.bookingItems?.some(r => r.room_type?.toLowerCase() === roomTypeFilter.toLowerCase()));
     }
 
     if (startDate || endDate) {
@@ -484,16 +489,18 @@ const AllBookings = () => {
                   <td className="px-6 py-5">
                     <div className="flex flex-col gap-2">
                         <div className="flex flex-col gap-1 max-w-[200px]">
-                            {b.room_ids?.slice(0, 1).map((room, idx) => (
+                            {b.bookingItems?.slice(0, 1).map((room, idx) => (
                                 <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
                                     <Home size={10} className="text-slate-400" />
-                                    <span className="text-[10px] font-black text-slate-600 truncate">{room.name}</span>
-                                    {room.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.capacity}</span>}
+                                    <span className="text-[10px] font-black text-slate-600 truncate">
+  {room.room_id?.name || "Room"}
+</span>
+                                    {room.room_id?.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.room_id?.capacity}</span>}
                                 </div>
                             ))}
-                            {b.room_ids?.length > 1 && (
+                            {b.bookingItems?.length > 1 && (
                                 <span className="text-[9px] font-bold text-slate-400 px-1">
-                                    +{b.room_ids.length - 1} more room{b.room_ids.length - 1 > 1 ? 's' : ''}
+                                    +{b.bookingItems.length - 1} more room{b.bookingItems.length - 1 > 1 ? 's' : ''}
                                 </span>
                             )}
                         </div>

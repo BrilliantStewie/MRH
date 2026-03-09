@@ -14,7 +14,8 @@ import {
 const RetreatBooking = () => {
     const { backendUrl, token, selectedRooms, addRoom, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
     const navigate = useNavigate();
-    const [autoParticipants, setAutoParticipants] = useState("");
+    const [venueParticipants, setVenueParticipants] = useState("");
+
 
     // --- 1. STATE VARIABLES ---
     const [bookingName, setBookingName] = useState("");
@@ -38,6 +39,7 @@ const RetreatBooking = () => {
     const [roomUnavailableDates, setRoomUnavailableDates] = useState([]);
     const [userBookedDates, setUserBookedDates] = useState([]);
     const [capacityError, setCapacityError] = useState({});
+    const [selectedPackages, setSelectedPackages] = useState({});
 
     // Save session state
     useEffect(() => {
@@ -47,6 +49,48 @@ const RetreatBooking = () => {
     useEffect(() => {
         sessionStorage.setItem("draftRoomPackages", JSON.stringify(roomPackages));
     }, [roomPackages]);
+
+    const handleSelectPackage = (pkg) => {
+
+        const type = (pkg.packageType || "").toLowerCase();
+
+        setSelectedPackages(prev => {
+
+            // ---------- AMENITIES (MULTIPLE) ----------
+            if (type === "amenity") {
+
+                const current = prev[type] || [];
+
+                if (current.includes(pkg._id)) {
+                    return {
+                        ...prev,
+                        [type]: current.filter(id => id !== pkg._id)
+                    };
+                }
+
+                return {
+                    ...prev,
+                    [type]: [...current, pkg._id]
+                };
+            }
+
+            // ---------- OTHER PACKAGE TYPES (ONLY ONE) ----------
+            if (prev[type] === pkg._id) {
+
+                const copy = { ...prev };
+                delete copy[type];
+                return copy;
+
+            }
+
+            return {
+                ...prev,
+                [type]: pkg._id
+            };
+
+        });
+
+    };
 
     // --- 2. FETCH PACKAGES FROM API ---
     useEffect(() => {
@@ -95,7 +139,16 @@ const RetreatBooking = () => {
     }, [selectedRooms, dbPackages]);
 
     const getTotalParticipants = () => {
-        return selectedRooms.reduce((sum, room) => sum + Number(roomParticipants[room._id] || 0), 0);
+
+        if (selectedRooms.length === 0) {
+            return Number(venueParticipants) || 0;
+        }
+
+        return selectedRooms.reduce(
+            (sum, room) => sum + Number(roomParticipants[room._id] || 0),
+            0
+        );
+
     };
 
     // --- 4. HELPERS ---
@@ -177,26 +230,55 @@ const RetreatBooking = () => {
     // --- 6. CALCULATION LOGIC ---
     // ✅ FIXED: Calculates total dynamically based on EACH room's assigned package
     const calculateTotal = () => {
-        const days = getDuration();
+
+        const days = Math.max(getDuration(), 1);
         let total = 0;
+
+        // Room packages
         selectedRooms.forEach(room => {
+
             const pax = roomParticipants[room._id] || 0;
             const pkgId = roomPackages[room._id];
+
             if (pkgId) {
                 const pkg = dbPackages.find(p => p._id === pkgId);
                 if (pkg) {
                     total += pax * getPrice(pkg.price) * days;
                 }
             }
+
         });
+
+        // Extra packages
+        Object.values(selectedPackages).forEach(pkgId => {
+
+            if (Array.isArray(pkgId)) {
+
+                pkgId.forEach(id => {
+                    const pkg = dbPackages.find(p => p._id === id);
+                    if (pkg) total += getPrice(pkg.price) * getTotalParticipants() * days;
+                });
+
+            } else {
+
+                const pkg = dbPackages.find(p => p._id === pkgId);
+                if (pkg) total += getPrice(pkg.price) * getTotalParticipants() * days;
+
+            }
+
+        });
+
         return total;
+
     };
 
     const handleProceed = async () => {
         if (!startDate || !endDate) return toast.error("Please select dates.");
         if (!token) { toast.error("Please login first."); navigate("/login"); return; }
         if (!bookingName.trim()) return toast.error("Please enter an Event Name.");
-        if (selectedRooms.length === 0) return toast.error("Please select at least one room.");
+        if (selectedRooms.length === 0 && Number(venueParticipants) <= 0) {
+            return toast.error("Please enter venue participants.");
+        }
 
         for (const room of selectedRooms) {
             if (!roomPackages[room._id]) {
@@ -214,16 +296,18 @@ const RetreatBooking = () => {
 
         try {
             const bookingPayload = {
-                bookingName: bookingName,
+                bookingName,
                 room_ids: selectedRooms.map(r => r._id),
                 check_in: startDate,
                 check_out: endDate,
+
                 bookingItems: selectedRooms.map(room => ({
                     room_id: room._id,
-                    participants: roomParticipants[room._id] || 1,
-                    package_id: roomPackages[room._id] // ✅ Map specific package per item
+                    participants: Number(roomParticipants[room._id]) || 1,
+                    package_id: roomPackages[room._id]
                 })),
-                package_id: roomPackages[selectedRooms[0]._id] // Keep root package_id just in case backend expects it
+
+                extra_packages: Object.values(selectedPackages).flat()
             };
 
             const { data } = await axios.post(backendUrl + "/api/booking/create", bookingPayload, { headers: { token } });
@@ -245,15 +329,19 @@ const RetreatBooking = () => {
     };
 
     const handleAutoRoomSelection = async () => {
-        if (!autoParticipants) return toast.error("Enter number of participants");
-        if (autoParticipants < 1) return toast.error("Participants must be at least 1");
+
+        const participants = Number(venueParticipants);
+
+        if (!participants || participants <= 0) {
+            return toast.error("Enter venue participants first.");
+        }
 
         try {
             const { data } = await axios.get(backendUrl + "/api/room/list");
             if (!data.success) return;
 
             clearRooms();
-            let remaining = Number(autoParticipants);
+            let remaining = participants;
             const sortedRooms = [...data.rooms].sort((a, b) => b.capacity - a.capacity);
             const selected = [];
 
@@ -268,19 +356,18 @@ const RetreatBooking = () => {
 
             if (selected.length === 0) return toast.error("No suitable rooms found");
 
-            let remainingPax = Number(autoParticipants);
+            let remainingPax = participants;
             const newParticipantsObj = {};
-            
+
             selected.forEach(room => {
                 addRoom(room);
                 const capacity = Number(room.capacity);
                 const assigned = Math.min(capacity, remainingPax);
-                newParticipantsObj[room._id] = assigned; 
+                newParticipantsObj[room._id] = assigned;
                 remainingPax -= assigned;
             });
 
             setRoomParticipants(newParticipantsObj);
-            setAutoParticipants("");
             toast.success("Rooms auto selected");
         } catch (error) {
             console.log(error);
@@ -289,61 +376,69 @@ const RetreatBooking = () => {
     };
 
     const isInvalidBookingState =
-        !bookingName.trim() || !startDate || !endDate ||
-        selectedRooms.length === 0 || (isSameDayBooking && selectedRooms.length > 0) ||
+        !bookingName.trim() ||
+        !startDate ||
+        !endDate ||
+        (selectedRooms.length === 0 && venueParticipants <= 0) ||
+        (isSameDayBooking && selectedRooms.length > 0) ||
         selectedRooms.some(room => !roomPackages[room._id]);
 
     // Get unique package IDs currently in use to display in Step 3
-    const uniqueSelectedPackageIds = [...new Set(Object.values(roomPackages).filter(Boolean))];
+    const uniqueSelectedPackageIds = [
+        ...new Set([
+            ...Object.values(roomPackages),
+            ...Object.values(selectedPackages).flat()
+        ].filter(Boolean))
+    ];
 
     // Packages WITHOUT room types (for Step 3)
 
-// --- PACKAGE INCLUSION DISPLAY LOGIC ---
+    // --- PACKAGE INCLUSION DISPLAY LOGIC ---
 
-const hasRooms = selectedRooms.length > 0;
+    const hasRooms = selectedRooms.length > 0;
 
-const isSameDay =
-  startDate &&
-  endDate &&
-  new Date(startDate).toDateString() === new Date(endDate).toDateString();
+    const isSameDay =
+        startDate &&
+        endDate &&
+        new Date(startDate).toDateString() === new Date(endDate).toDateString();
 
-// Venue packages
-const venuePackages = dbPackages.filter(
-  pkg => pkg.packageType?.toLowerCase() === "venue package"
-);
+    // Venue packages
+    const venuePackages = dbPackages.filter(
+        pkg => pkg.packageType?.toLowerCase() === "venue package"
+    );
 
-// Other packages except room package
-const otherPackages = dbPackages.filter(
-  pkg => pkg.packageType?.toLowerCase() !== "room package"
-);
+    // Other packages except room package
+    const otherPackages = dbPackages.filter(
+        pkg => pkg.packageType?.toLowerCase() !== "room package"
+    );
 
-let displayPackages = [];
+    let displayPackages = [];
 
-if (hasRooms) {
+    if (hasRooms) {
 
-  // Rooms booked → hide venue packages
-  displayPackages = otherPackages.filter(
-    pkg => pkg.packageType?.toLowerCase() !== "venue package"
-  );
+        // Rooms booked → hide venue packages
+        displayPackages = otherPackages.filter(
+            pkg => pkg.packageType?.toLowerCase() !== "venue package"
+        );
 
-} else if (isSameDay) {
+    } else if (isSameDay) {
 
-  // Same day + no rooms → show venue + other packages
-  displayPackages = [
-    ...venuePackages,
-    ...otherPackages.filter(
-      pkg => pkg.packageType?.toLowerCase() !== "venue package"
-    )
-  ];
+        // Same day + no rooms → show venue + other packages
+        displayPackages = [
+            ...venuePackages,
+            ...otherPackages.filter(
+                pkg => pkg.packageType?.toLowerCase() !== "venue package"
+            )
+        ];
 
-} else {
+    } else {
 
-  // Default case
-  displayPackages = otherPackages.filter(
-    pkg => pkg.packageType?.toLowerCase() !== "venue package"
-  );
+        // Default case
+        displayPackages = otherPackages.filter(
+            pkg => pkg.packageType?.toLowerCase() !== "venue package"
+        );
 
-}
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 pt-8 pb-20 font-sans text-slate-900">
@@ -401,39 +496,96 @@ if (hasRooms) {
                                 </div>
                             </div>
 
-                            <div className="md:col-span-2">
-                                <label className="flex items-center justify-between text-xs font-bold uppercase text-slate-500 mb-2">
-                                    <span>Total Participants</span>
-                                </label>
-                                <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden bg-white focus-within:border-slate-900 focus-within:ring-1 focus-within:ring-slate-900 transition-all shadow-sm">
-                                    <div className="bg-slate-50 px-4 py-3 border-r border-slate-200 flex items-center gap-2 text-slate-600 font-bold text-sm min-w-[120px] justify-center">
-                                        <User size={18} className="text-slate-400" />
-                                        <span>Total: {getTotalParticipants()}</span>
-                                    </div>
-                                    <input type="number" placeholder="Auto-select rooms for how many people?" value={autoParticipants} onChange={(e) => setAutoParticipants(e.target.value)} className="flex-1 px-4 py-3 text-sm outline-none text-slate-700 font-medium bg-transparent min-w-[200px]" />
-                                    <button onClick={handleAutoRoomSelection} disabled={!autoParticipants} className={`px-6 text-xs font-bold uppercase tracking-wider transition-colors ${!autoParticipants ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-slate-900 text-white hover:bg-slate-800"}`}>
-                                        Auto Select
-                                    </button>
+                            <div className="md:col-span-1 max-w-xs"> {/* Restricted width to shorten length */}
+                                <div className="flex items-center justify-between mb-1.5 ml-1">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        Participants
+                                    </label>
+                                    {/* Compact Total Display as a Badge */}
+                                    <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md">
+                                        Total: {getTotalParticipants()}
+                                    </span>
                                 </div>
-                                <p className="text-[10px] text-slate-400 mt-2 ml-1">Type a number above to automatically assign rooms, or click "+ Add Room" below to pick manually.</p>
+
+                                <div className="group flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white focus-within:border-slate-900 transition-all shadow-sm">
+                                    {/* Icon Prefix */}
+                                    <div className="pl-4 pr-2 text-slate-400 group-focus-within:text-slate-900">
+                                        <User size={16} />
+                                    </div>
+
+                                    {selectedRooms.length === 0 ? (
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={venueParticipants}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                if (value === "" || Number(value) >= 0) setVenueParticipants(value);
+                                            }}
+                                            onKeyDown={(e) => ["-", "e"].includes(e.key) && e.preventDefault()}
+                                            className="w-full py-2.5 pr-4 text-sm outline-none text-slate-700 font-bold bg-transparent placeholder:text-slate-300 placeholder:font-normal"
+                                            placeholder="0"
+                                        />
+                                    ) : (
+                                        <div className="py-2.5 pr-4 text-sm font-bold text-slate-400 italic">
+                                            Rooms Selected
+                                        </div>
+                                    )}
+                                </div>
+
+                                <p className="text-[9px] leading-tight text-slate-400 mt-2 ml-1">
+                                    Enter count to auto-assign or add rooms manually.
+                                </p>
                             </div>
                         </div>
                     </div>
 
                     {/* 2. ROOMS & PACKAGES */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+
+                        {/* Auto Room Selection */}
+
+
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                                 <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">2</span>
                                 <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Rooms & Packages</h2>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-3">
+
+                                {Number(venueParticipants) > 0 && selectedRooms.length === 0 && !isSameDayBooking && (
+                                    <button
+                                        onClick={handleAutoRoomSelection}
+                                        className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-200"
+                                    >
+
+                                        Auto Select
+                                    </button>
+                                )}
+
                                 {selectedRooms.length > 0 && (
-                                    <button onClick={() => { clearRooms(); setRoomParticipants({}); setRoomPackages({}); toast.info("All rooms removed"); }} className="text-[10px] font-bold text-red-600 hover:text-red-700 uppercase">Remove All</button>
+                                    <button
+                                        onClick={() => {
+                                            clearRooms();
+                                            setRoomParticipants({});
+                                            setRoomPackages({});
+                                            toast.info("All rooms removed");
+                                        }}
+                                        className="text-[10px] font-bold text-slate-400 hover:text-red-600 uppercase tracking-tight transition-colors"
+                                    >
+                                        Remove All
+                                    </button>
                                 )}
+
                                 {selectedRooms.length > 0 && !isSameDayBooking && (
-                                    <button onClick={() => navigate('/rooms')} className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase">+ Add Another Room</button>
+                                    <button
+                                        onClick={() => navigate('/rooms')}
+                                        className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-tight"
+                                    >
+                                        <span className="text-sm">+</span> Add Another Room
+                                    </button>
                                 )}
+
                             </div>
                         </div>
 
@@ -456,7 +608,7 @@ if (hasRooms) {
                                     const capacity = Number(room.capacity) || 0;
                                     const isDorm = room.room_type?.toLowerCase().includes("dorm");
                                     const minPax = isDorm ? 3 : 1;
-                                    
+
                                     // Available packages for this specific room
                                     const availablePkgs = dbPackages.filter(pkg => pkg.roomType?.name?.toLowerCase() === room.room_type?.toLowerCase());
 
@@ -553,7 +705,7 @@ if (hasRooms) {
                             <span className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">3</span>
                             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-700">Package Inclusions</h2>
                         </div>
-                        
+
                         {displayPackages.length === 0 ? (
                             <div className="text-center py-6 bg-slate-50 rounded-xl border border-dashed border-slate-200">
                                 <Info size={24} className="mx-auto text-slate-300 mb-2" />
@@ -562,33 +714,50 @@ if (hasRooms) {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {displayPackages.map((pkg) => {
+                                    const type = pkg.packageType?.toLowerCase();
+
+                                    const isSelected =
+                                        type === "amenity"
+                                            ? (selectedPackages[type] || []).includes(pkg._id)
+                                            : selectedPackages[type] === pkg._id;
                                     if (!pkg) return null;
                                     const pkgPrice = getPrice(pkg.price);
-                                
+
 
                                     return (
-                                        <div key={pkg._id} className="border border-blue-100 bg-blue-50/20 rounded-xl p-5 relative flex flex-col h-full shadow-sm">
+                                        <div
+                                            key={pkg._id}
+                                            onClick={() => handleSelectPackage(pkg)}
+                                            className={`border rounded-xl p-5 relative flex flex-col h-full shadow-sm cursor-pointer transition
+  ${isSelected
+                                                    ? "border-green-500 bg-green-50"
+                                                    : "border-blue-100 bg-blue-50/20 hover:border-blue-400"}
+`}
+                                        >
+                                            {isSelected && (
+                                                <CheckCircle size={14} className="absolute top-2 right-2 text-green-500" />
+                                            )}
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="p-2 rounded-lg bg-blue-100 text-blue-600"><Package size={18} /></div>
                                             </div>
                                             <h3 className="font-bold text-sm text-slate-900 mb-1">{pkg.name}</h3>
                                             <p className="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">{pkg.description || "No description provided."}</p>
                                             <div className="flex flex-wrap gap-2 mb-3">
-  {pkg.amenities?.length > 0 ? (
-    pkg.amenities.map((amenity, index) => (
-      <span
-        key={index}
-        className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 uppercase"
-      >
-        {amenity}
-      </span>
-    ))
-  ) : (
-    <span className="text-[10px] text-slate-400 italic">
-      No amenities
-    </span>
-  )}
-</div>
+                                                {pkg.amenities?.length > 0 ? (
+                                                    pkg.amenities.map((amenity, index) => (
+                                                        <span
+                                                            key={index}
+                                                            className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded border border-emerald-100 uppercase"
+                                                        >
+                                                            {amenity}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-[10px] text-slate-400 italic">
+                                                        No amenities
+                                                    </span>
+                                                )}
+                                            </div>
                                             <div className="pt-3 border-t border-slate-200 mt-auto">
                                                 <p className="font-bold text-slate-900 text-sm">
                                                     {pkgPrice === 0 ? "Free / Included" : `+${currencySymbol}${pkgPrice}`}

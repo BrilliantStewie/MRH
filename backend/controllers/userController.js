@@ -456,7 +456,7 @@ const getUserBookings = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
         const bookings = await bookingModel.find({ user_id: userId })
-            .populate("room_ids")
+            .populate("bookingItems.room_id")
             .populate("package_id", "name")
             .sort({ createdAt: -1 });
         res.json({ success: true, bookings });
@@ -499,7 +499,7 @@ const cancelBooking = async (req, res) => {
 const createCheckoutSession = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId).populate("room_ids").populate("package_id");
+        const booking = await bookingModel.findById(bookingId).populate("bookingItems.room_id").populate("package_id");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
         const itemName = booking.room_ids[0]?.name || booking.package_id?.name || 'Reservation';

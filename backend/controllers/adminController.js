@@ -455,9 +455,9 @@ const deleteRoom = async (req, res) => {
 const allBookings = async (req, res) => {
     try {
         const bookings = await bookingModel.find({})
-            .populate('user_id', 'firstName middleName lastName suffix email image phone') 
-            .populate('room_ids')
-            .populate('package_id')
+            .populate('user_id', 'firstName middleName lastName suffix email image phone')
+            .populate('bookingItems.room_id')
+            .populate('bookingItems.package_id')
             .sort({ date: -1 });
 
         res.json({ success: true, bookings });
@@ -537,7 +537,7 @@ const declineBooking = async (req, res) => {
 const paymentConfirmed = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('user_id').populate('room_ids');
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('user_id').populate('bookingItems.room_id')
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
