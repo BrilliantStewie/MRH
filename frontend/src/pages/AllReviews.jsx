@@ -101,7 +101,11 @@ const AllReviews = () => {
 
     try {
       const { data } = await axios.post(`${backendUrl}/api/reviews/reply/${reviewId}`, 
-        { response: message, parentReplyId }, { headers: { token } });
+        { response: message, parentReplyId }, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
 
       if (data.success) {
         toast.success("Response posted", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
@@ -127,7 +131,11 @@ const AllReviews = () => {
       const { data } = await axios.put(`${backendUrl}/api/reviews/${reviewId}`, { 
         comment: editReviewText, 
         rating: editReviewRating 
-      }, { headers: { token } });
+      }, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
 
       if (data.success) {
         toast.success("Review updated", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
@@ -142,7 +150,11 @@ const AllReviews = () => {
   const handleEditReply = async (replyId) => {
     if (!editReplyText.trim()) return toast.warning("Reply cannot be empty.", customToastOptions);
     try {
-      const { data } = await axios.put(`${backendUrl}/api/reviews/edit-reply/${replyId}`, { message: editReplyText }, { headers: { token } });
+      const { data } = await axios.put(`${backendUrl}/api/reviews/edit-reply/${replyId}`, { message: editReplyText }, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
       if (data.success) {
         toast.success("Reply updated", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
         setEditingReplyId(null);
@@ -160,7 +172,11 @@ const AllReviews = () => {
         ? `${backendUrl}/api/reviews/delete-reply/${itemToDelete.id}`
         : `${backendUrl}/api/reviews/${itemToDelete.id}`; 
 
-      const { data } = await axios.delete(endpoint, { headers: { token } });
+      const { data } = await axios.delete(endpoint, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
       
       if (data.success) {
         toast.success(`${itemToDelete.type === 'reply' ? 'Reply' : 'Review'} deleted`, { ...customToastOptions, icon: <Trash2 size={18} className="text-red-400" /> });
@@ -212,6 +228,7 @@ const AllReviews = () => {
               // Identify if the logged-in user owns this main review
               const reviewOwnerId = review.userId?._id || review.userId;
               const isMyReview = reviewOwnerId === loggedInUserId;
+              const canReply = isMyReview || userData?.role === "admin" || userData?.role === "staff";
 
               return (
                 <div key={review._id} className="group bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200 overflow-hidden relative">
@@ -432,11 +449,17 @@ const AllReviews = () => {
                                 )}
 
                                 <div className="mt-3 flex justify-start items-center">
-                                  {(!activeReplyId || activeReplyId !== parentChat._id) && (
-                                    <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-2 py-1 rounded-md -ml-2 transition-colors hover:bg-blue-50">
-                                      <Reply size={14} /> Reply
-                                    </button>
-                                  )}
+                                  {canReply && (!activeReplyId || activeReplyId !== parentChat._id) && (
+  <button
+    onClick={() => {
+      setActiveReplyId(parentChat._id);
+      setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true }));
+    }}
+    className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-2 py-1 rounded-md -ml-2 transition-colors hover:bg-blue-50"
+  >
+    <Reply size={14} /> Reply
+  </button>
+)}
                                 </div>
                               </div>
 
@@ -524,7 +547,7 @@ const AllReviews = () => {
                                         )}
 
                                         <div className="mt-2 flex justify-start items-center">
-                                          {(!activeReplyId || activeReplyId !== parentChat._id) && (
+                                          {canReply && (!activeReplyId || activeReplyId !== parentChat._id) && (
                                             <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-2 py-1 rounded-md -ml-2 transition-colors hover:bg-blue-50">
                                               <Reply size={14} /> Reply
                                             </button>

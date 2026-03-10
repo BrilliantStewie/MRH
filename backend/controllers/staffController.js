@@ -223,23 +223,30 @@ export const updateStaffProfile = async (req, res) => {
 ===================================================== */
 export const getStaffBookings = async (req, res) => {
   try {
-    // ✅ UPDATED: Added package_id population
+
     const bookings = await bookingModel.find({})
-      .populate("user_id", "name firstName middleName lastName email phone image") 
-      .populate("room_ids") 
-      .populate("package_id") // <--- NEW POPULATE
+      .populate("user_id", "name firstName middleName lastName email phone image")
+      .populate({
+        path: "bookingItems.room_id",
+        model: "Room"
+      })
+      .populate({
+        path: "bookingItems.package_id",
+        model: "Package"
+      })
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
       success: true,
-      bookings,
+      bookings
     });
 
   } catch (error) {
     console.error("❌ getStaffBookings error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Failed to load bookings",
+      message: "Failed to load bookings"
     });
   }
 };

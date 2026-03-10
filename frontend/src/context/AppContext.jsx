@@ -22,7 +22,7 @@ const AppContextProvider = (props) => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 403) {
+        if (error.response?.data?.isAccountDisabled === true) {
           if (error.response.data.isAccountDisabled) {
             setToken(null);
             setUserData(null);

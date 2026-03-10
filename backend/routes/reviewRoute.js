@@ -16,30 +16,50 @@ import authAdmin from "../middlewares/authAdmin.js";
 const reviewRouter = express.Router();
 
 /* ===========================
-   PUBLIC
+   PUBLIC ROUTES
 =========================== */
+
+// Anyone can view reviews
 reviewRouter.get("/all-reviews", getAllReviews);
 
-/* ===========================
-   GUEST ONLY (Main Review)
-=========================== */
-reviewRouter.post("/", authUser, createReview);
-reviewRouter.put("/:reviewId", authUser, editReview);
-reviewRouter.delete("/:reviewId", authUser, deleteReview);
 
 /* ===========================
-   REPLIES (ADMIN OR GUEST)
-   ✅ Any logged-in user can reply/edit/delete
+   PROTECTED ROUTES (LOGGED IN USERS)
 =========================== */
 
-reviewRouter.post("/reply/:reviewId", authUser, replyToReview);
-reviewRouter.put("/edit-reply/:replyId", authUser, editReply);
-reviewRouter.delete("/delete-reply/:replyId", authUser, deleteReply);
+// Apply authUser middleware to everything below
+reviewRouter.use(authUser);
+
+/* -------- MAIN REVIEW -------- */
+
+// Guest creates a review
+reviewRouter.post("/", createReview);
+
+// Guest edits their review
+reviewRouter.put("/:reviewId", editReview);
+
+// Guest deletes their review
+reviewRouter.delete("/:reviewId", deleteReview);
+
+
+/* -------- REPLIES -------- */
+
+// Any logged-in user can reply
+reviewRouter.post("/reply/:reviewId", replyToReview);
+
+// Edit reply
+reviewRouter.put("/edit-reply/:replyId", editReply);
+
+// Delete reply
+reviewRouter.delete("/delete-reply/:replyId", deleteReply);
+
 
 /* ===========================
-   ADMIN ONLY (Visibility Toggle)
+   ADMIN ONLY
 =========================== */
 
+// Admin hide/unhide review
 reviewRouter.patch("/toggle/:reviewId", authAdmin, toggleReviewVisibility);
+
 
 export default reviewRouter;

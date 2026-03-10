@@ -54,14 +54,15 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   if (!isOpen || !booking) return null;
 
   const getPackagesList = () => {
-    if (Array.isArray(booking.packages)) return booking.packages;
-    if (Array.isArray(booking.package_ids)) return booking.package_ids;
-    if (booking.package_id) return Array.isArray(booking.package_id) ? booking.package_id : [booking.package_id];
-    return [];
-  };
+  if (!booking.bookingItems) return [];
+
+  return booking.bookingItems
+    .map(item => item.package_id)
+    .filter(pkg => pkg); // remove null packages
+};
 
   const packagesList = getPackagesList();
-  const roomList = booking.room_ids || [];
+  const roomList = booking.bookingItems || [];
 
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
@@ -132,7 +133,9 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserved Units ({roomList.length})</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {visibleRooms.map((room, i) => {
+              {visibleRooms.map((item, i) => {
+
+  const room = item.room_id;
                 const roomImg = (Array.isArray(room.images) && room.images.length > 0) 
                   ? room.images[0] 
                   : room.cover_image;
@@ -306,11 +309,19 @@ const StaffBookings = () => {
     }
 
     if (buildingFilter !== "All Buildings") {
-      filtered = filtered.filter((b) => b.room_ids?.some((r) => r.building === buildingFilter));
+      filtered = filtered.filter((b) =>
+  b.bookingItems?.some((item) =>
+    item.room_id?.building === buildingFilter
+  )
+);
     }
 
     if (typeFilter !== "All Room Types") {
-      filtered = filtered.filter((b) => b.room_ids?.some((r) => r.room_type?.toLowerCase() === typeFilter.toLowerCase()));
+      filtered = filtered.filter((b) =>
+  b.bookingItems?.some((item) =>
+    item.room_id?.room_type?.toLowerCase() === typeFilter.toLowerCase()
+  )
+);
     }
 
     if (statusFilter !== "All Status") {
@@ -537,16 +548,28 @@ const StaffBookings = () => {
                       <td className="px-6 py-5 align-top">
                         <div className="flex flex-col gap-2">
                           <div className="flex flex-col gap-1 max-w-[200px]">
-                              {b.room_ids?.slice(0, 1).map((room, idx) => (
-                                  <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
-                                      <Home size={10} className="text-slate-400" />
-                                      <span className="text-[10px] font-black text-slate-600 truncate">{room.name}</span>
-                                      {room.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.capacity}</span>}
-                                  </div>
-                              ))}
-                              {b.room_ids?.length > 1 && (
+                              {b.bookingItems?.slice(0, 1).map((item, idx) => {
+  const room = item.room_id;
+
+  return (
+    <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
+        <Home size={10} className="text-slate-400" />
+
+        <span className="text-[10px] font-black text-slate-600 truncate">
+          {room?.name || "Room"}
+        </span>
+
+        {room?.capacity && (
+          <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5">
+            <Users size={8}/> {room.capacity}
+          </span>
+        )}
+    </div>
+  );
+})}
+                              {b.bookingItems?.length > 1 && (
                                   <span className="text-[9px] font-bold text-slate-400 px-1">
-                                      +{b.room_ids.length - 1} more room{b.room_ids.length - 1 > 1 ? 's' : ''}
+                                      +{b.bookingItems.length - 1} more room{b.bookingItems.length - 1 > 1 ? 's' : ''}
                                   </span>
                               )}
                           </div>

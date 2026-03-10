@@ -101,8 +101,10 @@ const AdminReviews = () => {
   const fetchReviews = async () => {
     try {
       const response = await axios.get(`${backendUrl}/api/reviews/all-reviews`, {
-        headers: { token: aToken }
-      });
+  headers: {
+    Authorization: `Bearer ${aToken}`
+  }
+});
 
       if (response.data.success) {
         setReviews(response.data.reviews || []);
@@ -138,10 +140,14 @@ const AdminReviews = () => {
 
     try {
       const { data } = await axios.post(
-        `${backendUrl}/api/reviews/reply/${reviewId}`,
-        { response: message, parentReplyId: parentReplyId },
-        { headers: { token: aToken } }
-      );
+  `${backendUrl}/api/reviews/reply/${reviewId}`,
+  { response: message, parentReplyId: parentReplyId },
+  {
+    headers: {
+      Authorization: `Bearer ${aToken}`
+    }
+  }
+);
 
       if (data.success) {
         toast.success("Response sent successfully", { 
@@ -176,10 +182,14 @@ const AdminReviews = () => {
     const { reviewId, replyId } = itemToDelete;
 
     try {
-      const { data } = await axios.delete(
-        `${backendUrl}/api/reviews/reply/${reviewId}/${replyId}`,
-        { headers: { token: aToken } }
-      );
+      await axios.delete(
+  `${backendUrl}/api/reviews/delete-reply/${replyId}`,
+  {
+    headers: {
+      Authorization: `Bearer ${aToken}`
+    }
+  }
+);
 
       if (data.success) {
         toast.success("Reply permanently deleted", { 
@@ -203,7 +213,9 @@ const AdminReviews = () => {
       const { data } = await axios.put(
         `${backendUrl}/api/reviews/reply/${reviewId}/${replyId}`,
         { message: editText },
-        { headers: { token: aToken } }
+        { headers: {
+  Authorization: `Bearer ${aToken}`
+} }
       );
 
       if (data.success) {

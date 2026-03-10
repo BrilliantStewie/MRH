@@ -13,8 +13,8 @@ import {
 import { toast } from "react-toastify";
 
 // ✅ VALIDATION LOGIC
-const TEXT_SUFFIXES = ["Jr.", "Sr."];
-// Strictly matches Roman Numerals I through C (1-100) and partials
+const TEXT_SUFFIXES = ["Jr.", "Sr.", "Jr", "Sr"];
+// Strictly matches Roman Numerals I through C (1-100)
 const ROMAN_REGEX = /^(X{0,3})(IX|IV|V?I{0,3})$|^XL[IXV]{0,3}$|^L[X]{0,3}[IXV]{0,3}$|^XC[IXV]{0,3}$|^C$/i;
 
 const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
@@ -64,63 +64,78 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   }, [editData]);
 
   const generateUniqueEmail = (fName, lName) => {
-    if (!fName || !lName) return "";
-    const basePrefix = `${fName.toLowerCase().replace(/[\s-]/g, "")}.${lName.toLowerCase().replace(/[\s-]/g, "")}`;
-    const domain = "@mrh.com";
-    
-    const existingEmails = (allStaff || [])
-      .map(staff => staff.email.toLowerCase())
-      .filter(email => email.startsWith(basePrefix));
+  if (!fName || !lName) return "";
+  
+  // Clean names: lowercase and remove spaces/special characters
+  const cleanFirst = fName.toLowerCase().replace(/[^a-z]/g, "");
+  const cleanLast = lName.toLowerCase().replace(/[^a-z]/g, "");
+  
+  // Requirement: firstname.lastname_staff@gmail.com
+  const baseEmail = `${cleanFirst}.${cleanLast}_staff@gmail.com`;
 
-    if (existingEmails.length === 0) return `${basePrefix}${domain}`;
+  // Check if this email already exists in your staff list
+  const isDuplicate = allStaff?.some(staff => staff.email === baseEmail);
+  
+  if (isDuplicate) {
+    let counter = 1;
+    let newEmail = `${cleanFirst}.${cleanLast}${counter}_staff@gmail.com`;
+    // Keep incrementing until a unique one is found
+    while (allStaff.some(staff => staff.email === newEmail)) {
+      counter++;
+      newEmail = `${cleanFirst}.${cleanLast}${counter}_staff@gmail.com`;
+    }
+    return newEmail;
+  }
 
-    let maxSuffix = 0;
-    existingEmails.forEach(email => {
-      const namePart = email.split('@')[0];
-      const suffixNum = namePart.replace(basePrefix, "");
-      if (suffixNum !== "") {
-        const num = parseInt(suffixNum);
-        if (!isNaN(num)) maxSuffix = Math.max(maxSuffix, num);
-      }
-    });
-
-    return `${basePrefix}${maxSuffix + 1}${domain}`;
-  };
+  return baseEmail;
+};
 
   const handleNameChange = (e) => {
-    const { name, value } = e.target;
-    let formatted = value;
+  const { name, value } = e.target;
+  let formatted = value;
 
-    if (name === "suffix") {
-      let cleaned = value.replace(/[^a-zA-Z.]/g, "");
-
-      if (cleaned.length > 0) {
-        const isRomanInput = /^[IVXLC]+$/i.test(cleaned);
-        if (isRomanInput) cleaned = cleaned.toUpperCase();
-        else cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  // --- SUFFIX LOGIC ---
+  if (name === "suffix") {
+    let cleaned = value.replace(/[^a-zA-Z.]/g, "");
+    if (cleaned.length > 0) {
+      const isRomanInput = /^[IVXLC]+$/i.test(cleaned);
+      if (isRomanInput) {
+        cleaned = cleaned.toUpperCase();
+      } else {
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
       }
-
-      // ✅ FIX: Allow "J", "Jr", and "Jr." by checking if cleaned is a START of the allowed suffixes
-      const isPartialSuffix = TEXT_SUFFIXES.some(s => s.startsWith(cleaned));
-      const isValidRoman = ROMAN_REGEX.test(cleaned);
-
-      if (cleaned === "" || isPartialSuffix || isValidRoman) {
-        setSuffix(cleaned);
-      }
-      return; 
-    } else {
-      formatted = value.replace(/[^a-zA-Z-\.\'\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
-      if (name === "firstName") setFirstName(formatted);
-      else if (name === "lastName") setLastName(formatted);
-      else if (name === "middleName") setMiddleName(formatted);
     }
 
-    if (!isEdit && (name === "firstName" || name === "lastName")) {
-      const f = name === "firstName" ? formatted : firstName;
-      const l = name === "lastName" ? formatted : lastName;
-      setFormData(p => ({ ...p, email: generateUniqueEmail(f, l) }));
+    const isPartialSuffix = TEXT_SUFFIXES.some(s => s.startsWith(cleaned));
+    const isValidRoman = ROMAN_REGEX.test(cleaned);
+
+    if (cleaned === "" || isPartialSuffix || isValidRoman) {
+      setSuffix(cleaned);
     }
-  };
+    return; 
+  } 
+  
+  // --- NAME FORMATTING ---
+  else {
+    formatted = value.replace(/[^a-zA-Z-\.\'\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
+    if (name === "firstName") setFirstName(formatted);
+    else if (name === "lastName") setLastName(formatted);
+    else if (name === "middleName") setMiddleName(formatted);
+  }
+
+  // --- EMAIL AUTO-GENERATION ---
+  // Only runs when creating a new staff (not editing)
+  if (!isEdit && (name === "firstName" || name === "lastName")) {
+    const f = name === "firstName" ? formatted : firstName;
+    const l = name === "lastName" ? formatted : lastName;
+    
+    // Only generate if both fields have content
+    if (f && l) {
+      const autoEmail = generateUniqueEmail(f, l);
+      setFormData(prev => ({ ...prev, email: autoEmail }));
+    }
+  }
+};
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -227,15 +242,22 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                       </div>
                       <div className="col-span-1 space-y-1 relative">
                          <label className="text-xs font-semibold text-slate-600">Suffix</label>
-                         {/* ✅ CLEANED INPUT: Removed all error classes and logic */}
+                         {/* ✅ RE-ADDED: Validation visual feedback for Suffix */}
                          <input 
                             name="suffix" 
                             maxLength={8} 
                             value={suffix} 
                             onChange={handleNameChange} 
-                            className="w-full px-4 py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-sm outline-none transition-all focus:border-indigo-500" 
+                            className={`w-full px-4 py-2.5 border rounded-lg text-sm outline-none transition-all ${
+                              suffix && (TEXT_SUFFIXES.includes(suffix) || ROMAN_REGEX.test(suffix))
+                                ? "border-emerald-500 bg-emerald-50/10 focus:ring-1 focus:ring-emerald-500" 
+                                : "border-slate-200 bg-slate-50 focus:border-indigo-500"
+                            }`} 
                             placeholder="Jr." 
                          />
+                         {suffix && (TEXT_SUFFIXES.includes(suffix) || ROMAN_REGEX.test(suffix)) && (
+                            <CheckCircle2 size={12} className="absolute right-2 top-9 text-emerald-500" />
+                         )}
                       </div>
                    </div>
                 </div>

@@ -26,7 +26,7 @@ const AdminContextProvider = ({ children }) => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        if (error.response && error.response.status === 401) {
           const msg = error.response.data.message || "";
           if (msg.toLowerCase().includes("not authorized") || msg.toLowerCase().includes("disabled")) {
             toast.error(msg);
@@ -471,12 +471,16 @@ const AdminContextProvider = ({ children }) => {
     const { data } = await axios.post(
       `${backendUrl}/api/reviews/reply/${reviewId}`,
       { response: message },
-      { headers: { token: aToken } }
+      {
+        headers: {
+          Authorization: `Bearer ${aToken}`
+        }
+      }
     );
 
     if (data.success) {
       toast.success("Reply posted successfully");
-      getAllReviews(); // Refresh reviews to clear indicator
+      getAllReviews();
       return true;
     } else {
       toast.error(data.message);

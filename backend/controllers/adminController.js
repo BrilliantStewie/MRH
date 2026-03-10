@@ -36,29 +36,58 @@ const streamUpload = (fileBuffer, folderName = "mrh_rooms") => {
 // ======================================================================
 
 const loginAdmin = async (req, res) => {
-    try {
-        const { email, password } = req.body;
+  try {
 
-        if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
-            const token = jwt.sign(
-              { 
-                id: "000000000000000000000000", 
-                role: "admin", 
-                name: "Administrator"
-              }, 
-              process.env.JWT_SECRET, 
-              { expiresIn: "1d" }
-            );
+    const { email, password } = req.body;
 
-            res.json({ success: true, token });
-        } else {
-            res.json({ success: false, message: "Invalid credentials" });
-        }
-    } catch (error) {
-        console.error(error);
-        res.json({ success: false, message: error.message });
+    // Find admin in database
+    const admin = await userModel.findOne({
+      email,
+      role: "admin"
+    });
+
+    if (!admin) {
+      return res.json({
+        success: false,
+        message: "Admin not found"
+      });
     }
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, admin.password);
+
+    if (!isMatch) {
+      return res.json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+
+    // Create token
+    const token = jwt.sign(
+      {
+        id: admin._id,
+        role: admin.role
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      success: true,
+      token
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.json({
+      success: false,
+      message: error.message
+    });
+  }
 };
+
+export default loginAdmin;
 
 // ======================================================================
 // 📊 DASHBOARD & ANALYTICS

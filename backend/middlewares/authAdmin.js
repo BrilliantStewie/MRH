@@ -6,10 +6,7 @@ const authAdmin = async (req, res, next) => {
     // ==============================
     // 1️⃣ Extract Token
     // ==============================
-    const token =
-      req.headers.token ||
-      req.headers.atoken ||
-      req.headers.authorization?.split(" ")[1];
+    const token = req.headers.authorization?.split(" ")[1] || req.headers.token;
 
     if (!token) {
       return res.status(401).json({
