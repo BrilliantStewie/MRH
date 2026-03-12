@@ -165,89 +165,74 @@ const Dashboard = () => {
         bookings={allBookings || []} 
       />
 
-      {/* --- MODERN METRIC GRID REPORT --- */}
+      {/* --- COMPACT REPORT MODAL --- */}
 {showReportModal && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:block">
+  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
     
-    {/* Action Bar */}
-    <div className="fixed top-8 right-8 flex gap-3 print:hidden z-[110]">
-      <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-700 transition-all flex items-center gap-2 shadow-xl">
-        <Printer size={16} /> Print Report
-      </button>
-      <button onClick={() => setShowReportModal(false)} className="px-6 py-2.5 bg-white text-slate-900 rounded-full font-bold text-sm hover:bg-slate-100 transition-all shadow-xl">
-        Close
-      </button>
-    </div>
-
-    {/* A4 Paper */}
-    <div className="bg-white w-full max-w-[210mm] min-h-[297mm] p-16 shadow-[0_20px_50px_rgba(0,0,0,0.1)] print:shadow-none print:p-8">
+    <div className="bg-white w-full max-w-lg rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
       
-      {/* 1. Header */}
-      <div className="flex justify-between items-start mb-16">
+      {/* Modal Header */}
+      <div className="px-8 py-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
         <div>
-           <div className="w-10 h-10 bg-slate-900 rounded-xl mb-4 flex items-center justify-center">
-             <Zap className="text-white" size={20} />
-           </div>
-           <h1 className="text-3xl font-extrabold tracking-tighter text-slate-900">Performance Metrics</h1>
-           <p className="text-slate-500 text-sm font-medium">Monthly Audit & Financial Review</p>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Performance Report</h2>
+          <p className="text-xs text-slate-500 font-medium">Analytics for {reportType === "monthly" ? monthNames[reportMonth] : "Yearly"}, {reportYear}</p>
         </div>
-        <div className="text-right border-l border-slate-200 pl-8">
-           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Date Range</p>
-           <p className="text-lg font-bold text-slate-900">{reportType === "monthly" ? monthNames[reportMonth] : "Annual"}, {reportYear}</p>
+        <button 
+          onClick={() => setShowReportModal(false)}
+          className="p-2 hover:bg-slate-200 rounded-full text-slate-400 transition-colors"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="p-8">
+        {/* Metric Grid - Compact */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+            <p className="text-[9px] font-black uppercase text-indigo-500 tracking-widest mb-1">Total Revenue</p>
+            <p className="text-xl font-black text-slate-900">₱{reportStats.totalIncome.toLocaleString()}</p>
+          </div>
+          <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+            <p className="text-[9px] font-black uppercase text-emerald-500 tracking-widest mb-1">Avg. Per Booking</p>
+            <p className="text-xl font-black text-slate-900">₱{reportStats.avgValue.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Breakdown List */}
+        <div className="space-y-3 mb-8">
+          <div className="flex justify-between items-center py-2 border-b border-slate-50">
+            <span className="text-sm font-bold text-slate-500">Confirmed Bookings</span>
+            <span className="text-sm font-black text-slate-900">{reportStats.totalBookings}</span>
+          </div>
+          <div className="flex justify-between items-center py-2 border-b border-slate-50">
+            <span className="text-sm font-bold text-slate-500">Guest Count</span>
+            <span className="text-sm font-black text-slate-900">{reportStats.totalParticipants}</span>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex gap-3">
+          <button 
+            onClick={() => window.print()}
+            className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-200"
+          >
+            <Printer size={16} /> Print PDF
+          </button>
+          <button 
+            onClick={() => setShowReportModal(false)}
+            className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-2xl font-bold text-xs uppercase tracking-widest transition-all"
+          >
+            Close
+          </button>
         </div>
       </div>
-
-      {/* 2. Hero Data */}
-      <div className="bg-slate-50 rounded-3xl p-10 mb-8 border border-slate-100 print:bg-transparent print:border-none print:p-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Total Revenue Generated</p>
-        <h2 className="text-6xl font-black text-slate-900 tracking-tighter">
-          ₱{reportStats.totalIncome.toLocaleString()}
-        </h2>
+      
+      {/* Print-only Hidden Text (Optional) */}
+      <div className="hidden print:block p-8">
+        <p className="text-[10px] text-center text-slate-400 font-bold uppercase tracking-widest">
+          Official Property Audit • Generated on {new Date().toLocaleDateString()}
+        </p>
       </div>
-
-      {/* 3. Metric Grid */}
-      <div className="grid grid-cols-2 gap-4 mb-16">
-        <div className="p-6 rounded-2xl border border-slate-100 bg-white">
-           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Confirmed Bookings</p>
-           <p className="text-2xl font-bold text-slate-900">{reportStats.totalBookings}</p>
-        </div>
-        <div className="p-6 rounded-2xl border border-slate-100 bg-white">
-           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Guest Capacity</p>
-           <p className="text-2xl font-bold text-slate-900">{reportStats.totalParticipants}</p>
-        </div>
-      </div>
-
-      {/* 4. Data Table */}
-      <div className="mb-16">
-        <h3 className="text-sm font-bold text-slate-900 mb-6 uppercase tracking-wider">Detailed Breakdown</h3>
-        <table className="w-full">
-           <thead>
-             <tr className="text-[10px] uppercase text-slate-400 tracking-widest border-b border-slate-100">
-               <th className="pb-4 text-left">Category</th>
-               <th className="pb-4 text-right">Value</th>
-             </tr>
-           </thead>
-           <tbody className="divide-y divide-slate-100">
-             <tr>
-               <td className="py-4 text-sm font-medium text-slate-700">Gross Revenue</td>
-               <td className="py-4 text-sm font-bold text-slate-900 text-right">₱{reportStats.totalIncome.toLocaleString()}</td>
-             </tr>
-             <tr>
-               <td className="py-4 text-sm font-medium text-slate-700">Avg. Revenue/Booking</td>
-               <td className="py-4 text-sm font-bold text-slate-900 text-right">₱{reportStats.avgValue.toLocaleString()}</td>
-             </tr>
-           </tbody>
-        </table>
-      </div>
-
-      {/* 5. Footer */}
-      <div className="mt-auto pt-8 border-t border-slate-100 flex justify-between items-center">
-         <p className="text-[10px] font-bold text-slate-400">Vantage Management System</p>
-         <div className="flex gap-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Page 01</p>
-         </div>
-      </div>
-
     </div>
   </div>
 )}

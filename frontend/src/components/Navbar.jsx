@@ -149,7 +149,7 @@ const Navbar = () => {
                 </button>
 
                 {showNotifications && (
-                  <div className="absolute right-0 top-full mt-2 w-[350px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
+                  <div className="absolute right-0 top-full mt-2 w-[400px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-50">
                     <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                       <div className="flex items-center gap-2">
                         <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-900">Notifications</h4>
@@ -161,7 +161,7 @@ const Navbar = () => {
                       )}
                     </div>
                     
-                    <div className="max-h-[420px] overflow-y-auto hide-scrollbar">
+                    <div className="max-h-[500px] overflow-y-auto hide-scrollbar">
                       {notifications.length === 0 ? (
                         <div className="p-10 flex flex-col items-center justify-center text-center gap-3">
                           <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">

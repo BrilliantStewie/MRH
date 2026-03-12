@@ -45,7 +45,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   const [password, setPassword] = useState(""); // State for password
   const [roomType, setRoomType] = useState("");
   const [building, setBuilding] = useState("");
-  const [capacity, setCapacity] = useState("");
+  const [capacity, setCapacity] = useState(1);
   const [description, setDescription] = useState("");
   const [amenities, setAmenities] = useState([]);
   const [currentAmenity, setCurrentAmenity] = useState("");
@@ -78,6 +78,22 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   };
 
   // --- INITIALIZATION & CLICK OUTSIDE ---
+  useEffect(() => {
+
+  if (roomType === "Individual") {
+    setCapacity(1);
+  }
+
+  else if (roomType === "Individual with Pullout") {
+    setCapacity(2);
+  }
+
+  else if (roomType === "Dormitory") {
+    setCapacity(prev => (prev < 3 ? 3 : prev));
+  }
+
+}, [roomType]);
+
   useEffect(() => {
     getBuildings();
     getRoomTypes();
@@ -228,6 +244,19 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     if (!building) return toast.error("Please select or add a building");
     if (!roomType) return toast.error("Please select a room category");
     if ((files.length + existingImages.length) === 0) return toast.error("Upload at least one image");
+
+    // Room Type Capacity Validation
+if (roomType === "Individual" && capacity !== 1) {
+  return toast.error("Individual rooms must have exactly 1 guest capacity.");
+}
+
+if (roomType === "With Pullout" && capacity !== 2) {
+  return toast.error("Rooms with pullout must have exactly 2 guest capacity.");
+}
+
+if (roomType === "Dormitory" && capacity < 3) {
+  return toast.error("Dormitory rooms must have at least 3 guest capacity.");
+}
 
     setLoading(true);
     try {
@@ -396,8 +425,41 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
                   
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Guest Capacity</label>
-                    <input type="number" value={capacity} onChange={(e) => setCapacity(e.target.value)} required min="1" placeholder="0"
-                      className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50" />
+                    <input
+  type="number"
+  value={capacity}
+  onChange={(e) => {
+
+  const value = e.target.value;
+
+  // If backspace (empty input)
+  if (value === "") {
+    setCapacity("");
+    setRoomType("");
+    return;
+  }
+
+  const num = Number(value);
+  setCapacity(num);
+
+  if (num === 1) {
+    setRoomType("Individual");
+  }
+
+  else if (num === 2) {
+    setRoomType("Individual with Pullout");
+  }
+
+  else if (num >= 3) {
+    setRoomType("Dormitory");
+  }
+
+}}
+  required
+  min="1"
+  placeholder="0"
+  className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+/>
                   </div>
                 </div>
 
