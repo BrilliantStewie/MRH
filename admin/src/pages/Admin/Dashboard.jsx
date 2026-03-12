@@ -33,7 +33,14 @@ const MONTH_NAMES = [
 
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+
 const formatCurrency = (value) => `\u20B1${Number(value || 0).toLocaleString()}`;
+const formatLongDate = (date) => LONG_DATE_FORMATTER.format(date);
 
 const Dashboard = () => {
   const {
@@ -182,17 +189,49 @@ const Dashboard = () => {
     };
   }, [allBookings, reportMonth, reportType, reportYear]);
 
+  const trendInsight = useMemo(() => {
+    if (!chartData.length) {
+      return {
+        peakLabel: "N/A",
+        peakRevenue: 0,
+        averageRevenue: 0,
+      };
+    }
+
+    const peakMonth = chartData.reduce((peak, month) => (month.revenue > peak.revenue ? month : peak), chartData[0]);
+    const totalRevenue = chartData.reduce((sum, month) => sum + month.revenue, 0);
+
+    return {
+      peakLabel: peakMonth.label,
+      peakRevenue: peakMonth.revenue,
+      averageRevenue: Math.round(totalRevenue / chartData.length),
+    };
+  }, [chartData]);
+
+  const reportWindow = useMemo(() => {
+    if (reportType === "monthly") {
+      return {
+        start: new Date(reportYear, reportMonth, 1),
+        end: new Date(reportYear, reportMonth + 1, 0),
+      };
+    }
+
+    return {
+      start: new Date(reportYear, 0, 1),
+      end: new Date(reportYear, 11, 31),
+    };
+  }, [reportMonth, reportType, reportYear]);
+
   const reportLabel =
     reportType === "monthly" ? `${MONTH_NAMES[reportMonth]} ${reportYear}` : `Annual ${reportYear}`;
 
-  const reportRange =
-    reportType === "monthly"
-      ? `${MONTH_NAMES[reportMonth]} 1, ${reportYear} and ${MONTH_NAMES[reportMonth]} ${new Date(
-          reportYear,
-          reportMonth + 1,
-          0
-        ).getDate()}, ${reportYear}`
-      : `January 1, ${reportYear} and December 31, ${reportYear}`;
+  const reportRange = `${formatLongDate(reportWindow.start)} to ${formatLongDate(reportWindow.end)}`;
+  const reportDescriptor =
+    reportType === "monthly" ? "Monthly operating digest" : "Annual operating digest";
+  const revenuePerGuest =
+    reportStats.totalParticipants > 0 ? Math.round(reportStats.totalIncome / reportStats.totalParticipants) : 0;
+  const generatedOn = formatLongDate(new Date());
+  const auditId = `VPMS-${reportYear}-${reportType === "monthly" ? String(reportMonth + 1).padStart(2, "0") : "YR"}-${String(reportStats.totalBookings).padStart(3, "0")}`;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -203,71 +242,173 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] p-4 font-sans text-slate-800 md:p-8 print:bg-white print:p-0">
-      <div className="hidden min-h-screen w-full flex-col bg-white p-20 font-serif text-slate-800 print:flex">
-        <div className="mb-16 flex items-center justify-between border-b-4 border-slate-900 pb-10">
-          <div>
-            <p className="text-5xl font-extrabold uppercase tracking-tighter text-slate-950">
-              FINANCIAL <br /> STATEMENT
-            </p>
-            <p className="mt-2 text-sm font-bold text-slate-600">VANTAGE PROPERTY MANAGEMENT SYSTEMS</p>
-          </div>
-          <div className="flex flex-col items-end text-right">
-            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-900 text-white">
-              <Zap size={30} />
+      <div className="hidden bg-white text-slate-900 print:block">
+        <div className="print-sheet flex flex-col gap-6 px-[14mm] py-[15mm]">
+          <div className="grid grid-cols-[1.45fr_0.85fr] gap-4">
+            <div className="rounded-[30px] border-2 border-slate-950 px-8 py-7">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">
+                    Mercedarian Retreat House
+                  </p>
+                  <h1 className="mt-5 text-[30px] font-black uppercase leading-none tracking-[-0.08em] text-slate-950">
+                    Trend
+                    <br />
+                    Overview
+                  </h1>
+                  <p className="mt-4 max-w-md text-[12px] leading-6 text-slate-600">
+                    Six-month booking revenue trend used as the lead visual for this {reportDescriptor.toLowerCase()}.
+                  </p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-950 text-white">
+                  <Zap size={24} />
+                </div>
+              </div>
+
+              <div className="mt-8 rounded-[24px] bg-slate-50 px-6 py-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      Last Six Months
+                    </p>
+                    <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                      <span className="inline-flex h-2.5 w-2.5 rounded-sm bg-blue-600"></span>
+                      <span>Monthly revenue bar indicator</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      Peak Month
+                    </p>
+                    <p className="mt-1 text-sm font-black text-blue-700">
+                      {trendInsight.peakLabel} {formatCurrency(trendInsight.peakRevenue)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="relative h-[180px]">
+                  <div className="absolute inset-0 flex flex-col justify-between">
+                    {[...Array(5)].map((_, index) => (
+                      <div key={index} className="border-t border-dashed border-slate-200"></div>
+                    ))}
+                  </div>
+
+                  <div className="relative z-10 flex h-full items-end justify-between gap-3 pt-4">
+                    {chartData.map((month) => (
+                      <div key={`${month.year}-${month.month}`} className="flex h-full flex-1 flex-col items-center justify-end">
+                        <div className="mb-2 text-[10px] font-bold text-slate-500">
+                          {month.revenue > 0 ? formatCurrency(month.revenue) : "0"}
+                        </div>
+                        <div
+                          className="relative w-full max-w-[50px] rounded-t-[14px] bg-blue-600"
+                          style={{ height: month.revenue > 0 ? `${Math.max(month.height, 10)}%` : "6px" }}
+                        >
+                          <div className="absolute inset-x-0 top-0 h-1/3 rounded-t-[14px] bg-blue-300/40"></div>
+                        </div>
+                        <div className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                          {month.label}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200 pt-4">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      Period
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{reportLabel}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      Avg. Monthly
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">
+                      {formatCurrency(trendInsight.averageRevenue)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                      Generated
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-slate-900">{generatedOn}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Date Range</p>
-            <p className="text-2xl font-bold text-slate-900">{reportLabel}</p>
+
+            <div className="rounded-[30px] border border-slate-200 bg-slate-50 px-6 py-7">
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                Executive Signal
+              </p>
+              <p className="mt-4 text-4xl font-black leading-none tracking-[-0.08em] text-slate-950">
+                {formatCurrency(reportStats.totalIncome)}
+              </p>
+              <p className="mt-3 text-[12px] leading-6 text-slate-600">
+                Confirmed revenue captured from {reportStats.totalBookings} bookings between{" "}
+                {formatLongDate(reportWindow.start)} and {formatLongDate(reportWindow.end)}.
+              </p>
+
+              <div className="mt-6 space-y-3 border-t border-slate-200 pt-5">
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="font-semibold text-slate-500">Average booking value</span>
+                  <span className="font-black text-slate-900">{formatCurrency(reportStats.avgValue)}</span>
+                </div>
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="font-semibold text-slate-500">Current occupancy</span>
+                  <span className="font-black text-slate-900">{stats.occupancyRate}%</span>
+                </div>
+                <div className="flex items-center justify-between text-[12px]">
+                  <span className="font-semibold text-slate-500">Pending actions</span>
+                  <span className="font-black text-slate-900">{stats.pendingRequests}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
-          Executive Summary
-        </p>
-        <div className="mb-16 rounded-2xl border border-slate-100 bg-slate-100/50 p-10">
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Total Confirmed Gross Revenue
-          </p>
-          <h1 className="mb-4 text-7xl font-black tracking-tighter text-slate-900">
-            {formatCurrency(reportStats.totalIncome)}
-          </h1>
-          <p className="max-w-2xl text-base leading-relaxed text-slate-600">
-            This audit statement reflects performance metrics collected between {reportRange}. Data
-            includes fully processed and approved transactions.
-          </p>
-        </div>
+          <div className="grid grid-cols-[1.15fr_0.85fr] gap-4">
+            <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5">
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                Summary
+              </p>
+              <p className="mt-3 text-[12px] leading-7 text-slate-700">
+                The property generated {formatCurrency(reportStats.totalIncome)} from{" "}
+                {reportStats.totalBookings} confirmed bookings during {reportLabel}. Average booking
+                value closed at {formatCurrency(reportStats.avgValue)}, with the strongest recent month
+                recorded in <span className="font-black text-blue-700">{trendInsight.peakLabel}</span>.
+              </p>
+            </div>
 
-        <table className="w-full text-slate-800">
-          <thead>
-            <tr className="border-b-2 border-slate-200">
-              <th className="py-5 text-left text-xs font-bold uppercase tracking-wider">
-                Accounting Category
-              </th>
-              <th className="py-5 text-right text-xs font-bold uppercase tracking-wider">Value</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            <tr>
-              <td className="py-5 text-base font-medium">Total Transactions Processed</td>
-              <td className="py-5 text-right text-lg font-bold">{reportStats.totalBookings} Bookings</td>
-            </tr>
-            <tr>
-              <td className="py-5 text-base font-medium">Guest Capacity Handled</td>
-              <td className="py-5 text-right text-lg font-bold">{reportStats.totalParticipants} Pax</td>
-            </tr>
-            <tr>
-              <td className="py-5 text-base font-medium">Avg. System Revenue Per Booking</td>
-              <td className="py-5 text-right text-lg font-bold">{formatCurrency(reportStats.avgValue)}</td>
-            </tr>
-            <tr>
-              <td className="py-5 text-base font-medium">Taxes and Processing Fees</td>
-              <td className="py-5 text-right text-lg font-bold">Calculated Separately</td>
-            </tr>
-          </tbody>
-        </table>
+            <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-5">
+              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
+                Report Meta
+              </p>
+              <div className="mt-4 space-y-3 text-[12px]">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-500">Period</span>
+                  <span className="font-black text-slate-900">{reportLabel}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-500">Coverage</span>
+                  <span className="text-right font-black text-slate-900">{reportRange}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-500">Generated</span>
+                  <span className="font-black text-slate-900">{generatedOn}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-500">Audit ID</span>
+                  <span className="font-black text-slate-900">{auditId}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-        <div className="mt-auto flex justify-between border-t border-slate-100 pt-10 text-center text-slate-400">
-          <p className="text-[10px] font-bold uppercase tracking-widest">{"\u00A9"} Vantage Systems 2024</p>
-          <p className="text-[10px] font-bold uppercase tracking-widest">Audit ID: {Date.now()}</p>
+          <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-4 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">
+            <p>Official internal performance statement</p>
+            <p>{"\u00A9"} Vantage Systems 2024</p>
+          </div>
         </div>
       </div>
 
@@ -402,72 +543,6 @@ const Dashboard = () => {
             >
               <FileDown size={18} /> Generate Report
             </button>
-
-            <div className="relative flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-2 text-[10px] font-bold tracking-widest text-emerald-700">
-                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></div> LIVE
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative rounded-xl p-2.5 text-slate-400 transition-colors hover:bg-slate-50 focus:outline-none"
-              >
-                <Bell size={20} className={stats.pendingRequests > 0 ? "text-slate-800" : ""} />
-                {stats.pendingRequests > 0 && (
-                  <span className="absolute right-2 top-2 h-2.5 w-2.5 animate-bounce rounded-full border-2 border-white bg-rose-500"></span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div className="absolute right-0 top-full z-50 mt-3 w-72 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
-                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-4">
-                    <span className="text-xs font-black uppercase tracking-widest text-slate-500">
-                      Action Center
-                    </span>
-                    <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-black text-rose-600">
-                      {stats.pendingRequests} New
-                    </span>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto p-2">
-                    {stats.pendingRequests === 0 ? (
-                      <div className="p-4 text-center text-sm font-medium text-slate-400">
-                        All caught up! No actions required.
-                      </div>
-                    ) : (
-                      <>
-                        {stats.pendingBookings > 0 && (
-                          <div className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-3 transition-colors hover:border-slate-100 hover:bg-slate-50">
-                            <div className="rounded-lg bg-amber-100 p-2 text-amber-600">
-                              <CalendarDays size={16} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">Pending Bookings</p>
-                              <p className="mt-0.5 text-xs text-slate-500">
-                                You have {stats.pendingBookings} bookings awaiting approval.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                        {stats.pendingCancellations > 0 && (
-                          <div className="flex cursor-pointer items-start gap-3 rounded-xl border border-transparent p-3 transition-colors hover:border-slate-100 hover:bg-slate-50">
-                            <div className="rounded-lg bg-rose-100 p-2 text-rose-600">
-                              <AlertCircle size={16} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-bold text-slate-800">Cancellation Requests</p>
-                              <p className="mt-0.5 text-xs text-slate-500">
-                                {stats.pendingCancellations} guests requested to cancel.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </header>
 
@@ -591,7 +666,7 @@ const Dashboard = () => {
                   onClick={() => setIsCalendarOpen(true)}
                   className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-6 py-4 text-xs font-bold uppercase tracking-widest text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95"
                 >
-                  <span>Open Master Calendar</span>
+                  <span>View Calendar</span>
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors group-hover/btn:bg-white group-hover/btn:text-indigo-600">
                     <ArrowUpRight
                       size={16}

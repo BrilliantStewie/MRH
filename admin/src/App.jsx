@@ -39,17 +39,23 @@ const App = () => {
   // This makes the App.jsx much cleaner and prevents duplicate logic.
 
   return (
-    <div className="bg-slate-50 h-screen flex flex-col overflow-hidden font-sans antialiased">
-      <ToastContainer position="top-right" autoClose={3000} />
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
+      <div className="print:hidden">
+        <ToastContainer position="top-right" autoClose={3000} />
+      </div>
 
       {/* ================= ADMIN LAYOUT ================= */}
       {aToken ? (
         <>
-          <Navbar />
-          <div className="flex flex-1 overflow-hidden">
-            <Sidebar />
-            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8">
-              <div className="max-w-7xl mx-auto pb-20">
+          <div className="print:hidden">
+            <Navbar />
+          </div>
+          <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+            <div className="print:hidden">
+              <Sidebar />
+            </div>
+            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8 print:overflow-visible print:bg-white print:p-0">
+              <div className="mx-auto max-w-7xl pb-20 print:mx-0 print:max-w-none print:pb-0">
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
                   <Route path="/admin-dashboard" element={<Dashboard />} />
@@ -69,11 +75,15 @@ const App = () => {
       ) : sToken ? (
         /* ================= STAFF LAYOUT ================= */
         <>
-          <StaffNavbar />
-          <div className="flex flex-1 overflow-hidden">
-            <StaffSidebar />
-            <main className="flex-1 overflow-y-auto bg-slate-50 p-6">
-              <div className="max-w-7xl mx-auto">
+          <div className="print:hidden">
+            <StaffNavbar />
+          </div>
+          <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+            <div className="print:hidden">
+              <StaffSidebar />
+            </div>
+            <main className="flex-1 overflow-y-auto bg-slate-50 p-6 print:overflow-visible print:bg-white print:p-0">
+              <div className="mx-auto max-w-7xl print:mx-0 print:max-w-none">
                 <Routes>
                   <Route
                     path="/staff-dashboard"
