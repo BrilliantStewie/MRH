@@ -7,16 +7,26 @@ export const createCheckoutSession = async (req, res) => {
     const { bookingId } = req.body;
 
     // 1. Fetch the booking from the database to get the real price
-    const booking = await bookingModel.findById(bookingId);
+    const booking = await bookingModel
+      .findById(bookingId)
+      .populate("user_id", "firstName middleName lastName suffix email");
     if (!booking) {
       return res.json({ success: false, message: "Booking not found" });
     }
 
     const amount = booking.total_price; 
-    const description = `Booking Payment: ${bookingId}`;
+    const description = "Your receipt from Mercedarian Retreat House";
+    const user = booking.user_id;
+    const customerName = user
+      ? [user.firstName, user.middleName, user.lastName, user.suffix].filter(Boolean).join(" ")
+      : "Guest";
+    const customerEmail = user?.email || "guest@example.com";
 
-    const PAYMONGO_SECRET_KEY =
-      process.env.PAYMONGO_SECRET_KEY || "sk_test_uNGuemjd7GCh5RuC8XwWmFaJ";
+    const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
+    const FRONTEND_URL = process.env.FRONTEND_URL;
+    if (!PAYMONGO_SECRET_KEY || !FRONTEND_URL) {
+      return res.json({ success: false, message: "Payment configuration missing." });
+    }
 
     const options = {
       method: "POST",
@@ -30,24 +40,23 @@ export const createCheckoutSession = async (req, res) => {
         data: {
           attributes: {
             billing: {
-              name: "Guest User",
-              email: "guest@example.com",
+              name: customerName,
+              email: customerEmail,
             },
             line_items: [
               {
                 currency: "PHP",
                 amount: amount * 100, // Convert to Centavos
-                description: description,
-                name: "Room Booking",
+                description: `Booking reference: ${bookingId}`,
+                name: "Mercedarian Retreat House",
                 quantity: 1,
               },
             ],
             // Only GCash option
             payment_method_types: ["gcash"], 
             
-            // Note: You might want to make these URLs dynamic based on your frontend domain later
-            success_url: `http://localhost:5173/my-bookings?success=true&bookingId=${bookingId}`,
-            cancel_url: "http://localhost:5173/my-bookings?canceled=true",
+            success_url: `${FRONTEND_URL}/my-bookings?success=true&bookingId=${bookingId}`,
+            cancel_url: `${FRONTEND_URL}/my-bookings?canceled=true`,
             description: description,
           },
         },
@@ -61,7 +70,8 @@ export const createCheckoutSession = async (req, res) => {
       checkoutUrl: response.data.data.attributes.checkout_url,
     });
   } catch (error) {
+    const paymongoDetail = error.response?.data?.errors?.[0]?.detail;
     console.error("PayMongo Error:", error.response?.data || error.message);
-    res.json({ success: false, message: error.message });
+    res.json({ success: false, message: paymongoDetail || error.response?.data?.message || error.message });
   }
 };

@@ -44,3 +44,32 @@ export const markAsRead = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+/* ============================================================
+   3) MARK ALL NOTIFICATIONS AS READ
+============================================================ */
+export const markAllAsRead = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const result = await Notification.updateMany(
+      { recipient: userId, isRead: false },
+      { isRead: true }
+    );
+    res.json({ success: true, updated: result.modifiedCount || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* ============================================================
+   4) CLEAR ALL NOTIFICATIONS FOR USER
+============================================================ */
+export const clearUserNotifications = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const result = await Notification.deleteMany({ recipient: userId });
+    res.json({ success: true, deleted: result.deletedCount || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

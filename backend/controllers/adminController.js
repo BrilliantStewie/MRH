@@ -506,7 +506,7 @@ const approveBooking = async (req, res) => {
             recipient: booking.user_id._id,
             type: "booking_update",
             message: `Great news! Your booking has been approved by the administration.`,
-            link: "/my-bookings"
+            link: `/my-bookings?bookingId=${booking._id}`
         });
 
         await sendEmail(

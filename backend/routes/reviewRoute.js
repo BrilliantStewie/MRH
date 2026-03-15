@@ -12,6 +12,7 @@ import {
 
 import authUser from "../middlewares/authUser.js";
 import authAdmin from "../middlewares/authAdmin.js";
+import upload from "../middlewares/multer.js";
 
 const reviewRouter = express.Router();
 
@@ -33,10 +34,10 @@ reviewRouter.use(authUser);
 /* -------- MAIN REVIEW -------- */
 
 // Guest creates a review
-reviewRouter.post("/", createReview);
+reviewRouter.post("/", upload.array("images", 6), createReview);
 
 // Guest edits their review
-reviewRouter.put("/:reviewId", editReview);
+reviewRouter.put("/:reviewId", upload.array("images", 6), editReview);
 
 // Guest deletes their review
 reviewRouter.delete("/:reviewId", deleteReview);

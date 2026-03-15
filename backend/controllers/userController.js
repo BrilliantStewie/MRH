@@ -457,7 +457,8 @@ const getUserBookings = async (req, res) => {
         const userId = req.userId || req.body.userId;
         const bookings = await bookingModel.find({ user_id: userId })
             .populate("bookingItems.room_id")
-            .populate("package_id", "name")
+            .populate("bookingItems.package_id", "name")
+            .populate("extra_packages", "name")
             .sort({ createdAt: -1 });
         res.json({ success: true, bookings });
     } catch (error) {
@@ -498,11 +499,29 @@ const cancelBooking = async (req, res) => {
 
 const createCheckoutSession = async (req, res) => {
     try {
+        if (!process.env.PAYMONGO_SECRET_KEY || !process.env.FRONTEND_URL) {
+            return res.json({ success: false, message: "Payment configuration missing." });
+        }
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId).populate("bookingItems.room_id").populate("package_id");
+        const booking = await bookingModel
+            .findById(bookingId)
+            .populate("bookingItems.room_id")
+            .populate("bookingItems.package_id")
+            .populate("extra_packages")
+            .populate("user_id", "firstName middleName lastName suffix email");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        const itemName = booking.room_ids[0]?.name || booking.package_id?.name || 'Reservation';
+        const roomName = booking.bookingItems?.[0]?.room_id?.name;
+        const packageName =
+            booking.bookingItems?.[0]?.package_id?.name ||
+            booking.extra_packages?.[0]?.name;
+        const itemName = roomName || packageName || booking.bookingName || "Reservation";
+
+        const user = booking.user_id;
+        const customerName = user
+            ? [user.firstName, user.middleName, user.lastName, user.suffix].filter(Boolean).join(" ")
+            : "Guest";
+        const customerEmail = user?.email || "guest@example.com";
 
         const payload = {
             data: {
@@ -510,15 +529,19 @@ const createCheckoutSession = async (req, res) => {
                     send_email_receipt: true,
                     show_description: true,
                     show_line_items: true,
-                    description: `Booking for ${itemName}`,
+                    billing: {
+                        name: customerName,
+                        email: customerEmail
+                    },
+                    description: "Your receipt from Mercedarian Retreat House",
                     line_items: [{
                         currency: 'PHP',
                         amount: booking.total_price * 100,
-                        description: 'Reservation Fee',
-                        name: itemName,
+                        description: `Booking for ${itemName}`,
+                        name: "Mercedarian Retreat House",
                         quantity: 1
                     }],
-                    payment_method_types: ['gcash', 'card', 'paymaya', 'grab_pay'],
+                    payment_method_types: ['gcash'],
                     reference_number: booking._id.toString(),
                     success_url: `${process.env.FRONTEND_URL}/my-bookings?success=true&bookingId=${bookingId}`,
                     cancel_url: `${process.env.FRONTEND_URL}/my-bookings?canceled=true`
@@ -536,7 +559,12 @@ const createCheckoutSession = async (req, res) => {
 
         res.json({ success: true, checkoutUrl: response.data.data.attributes.checkout_url });
     } catch (error) {
-        res.json({ success: false, message: "Payment initialization failed" });
+        const paymongoDetail = error.response?.data?.errors?.[0]?.detail;
+        console.error("PayMongo checkout error:", error.response?.data || error.message);
+        res.json({
+            success: false,
+            message: paymongoDetail || error.response?.data?.message || error.message || "Payment initialization failed"
+        });
     }
 };
 
@@ -674,8 +702,9 @@ const getAllPublicReviews = async (req, res) => {
             rating: { $gt: 0 } 
         })
         .populate("user_id", "firstName lastName image")
-        .populate("room_ids", "name")
-        .populate("package_id", "name") 
+        .populate("bookingItems.room_id", "name")
+        .populate("bookingItems.package_id", "name")
+        .populate("extra_packages", "name")
         .sort({ createdAt: -1 });
 
         res.json({ success: true, reviews });

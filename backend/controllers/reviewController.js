@@ -1,7 +1,36 @@
 import Review from "../models/reviewModel.js";
 import Booking from "../models/bookingModel.js";
 import Notification from "../models/notificationModel.js";
+import cloudinary from "../config/cloudinary.js";
 import sendEmail from "../utils/sendEmail.js";
+
+const uploadReviewImage = (fileBuffer, folder = "mrh_reviews") =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: "image" },
+      (error, result) => {
+        if (error) return reject(error);
+        return resolve(result.secure_url);
+      }
+    );
+    stream.end(fileBuffer);
+  });
+
+const normalizeImageList = (value) => {
+  if (!value) return null;
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const sanitizeImageList = (list) =>
+  Array.isArray(list)
+    ? list.filter((img) => typeof img === "string" && img.trim())
+    : [];
 
 /* ============================================================
    1️⃣ GET ALL REVIEWS
@@ -16,7 +45,14 @@ export const getAllReviews = async (req, res) => {
         select: "firstName middleName lastName image",
         options: { strictPopulate: false }
       })
-      .populate("bookingId", "check_in check_out bookingName")
+      .populate({
+        path: "bookingId",
+        select: "check_in check_out bookingName bookingItems venueParticipants",
+        populate: {
+          path: "bookingItems.room_id",
+          select: "name room_type"
+        }
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -41,6 +77,7 @@ export const createReview = async (req, res) => {
 
   const { bookingId, rating, comment } = req.body;
   const userId = req.userId;
+  const imageFiles = Array.isArray(req.files) ? req.files : [];
 
   if (!userId) {
     return res.status(401).json({
@@ -67,13 +104,47 @@ export const createReview = async (req, res) => {
       });
     }
 
+    if (imageFiles.length > 6) {
+      return res.status(400).json({
+        success: false,
+        message: "You can upload up to 6 images per review."
+      });
+    }
+
+    const validImageFiles = imageFiles.filter(
+      (file) => file?.buffer && file.buffer.length > 0
+    );
+    const uploadedImages = await Promise.all(
+      validImageFiles.map((file) => uploadReviewImage(file.buffer))
+    );
+
     const existingReview = await Review.findOne({ bookingId });
 
     if (existingReview) {
 
+      const providedExistingImages = normalizeImageList(req.body.existingImages);
+      const baseImages = Array.isArray(providedExistingImages)
+        ? sanitizeImageList(providedExistingImages)
+        : sanitizeImageList(existingReview.images || []);
+      const finalImages = [...baseImages, ...uploadedImages];
+
+      if (finalImages.length > 6) {
+        return res.status(400).json({
+          success: false,
+          message: "You can upload up to 6 images per review."
+        });
+      }
+
+      const imagesChanged =
+        uploadedImages.length > 0 ||
+        (Array.isArray(providedExistingImages) &&
+          JSON.stringify(baseImages) !==
+            JSON.stringify(sanitizeImageList(existingReview.images || [])));
+
       const isChanged =
         existingReview.rating !== Number(rating) ||
-        existingReview.comment !== comment;
+        existingReview.comment !== comment ||
+        imagesChanged;
 
       if (isChanged) {
 
@@ -85,6 +156,9 @@ export const createReview = async (req, res) => {
 
         existingReview.rating = Number(rating);
         existingReview.comment = comment;
+        if (imagesChanged) {
+          existingReview.images = finalImages;
+        }
         existingReview.isEdited = true;
         existingReview.isHidden = false;
 
@@ -114,6 +188,7 @@ export const createReview = async (req, res) => {
       userId,
       rating: Number(rating),
       comment,
+      images: uploadedImages,
       isHidden: false
     });
 
@@ -164,6 +239,7 @@ export const editReview = async (req, res) => {
     const { reviewId } = req.params;
     const { comment, rating } = req.body;
     const userId = req.userId;
+    const imageFiles = Array.isArray(req.files) ? req.files : [];
 
     const review = await Review.findById(reviewId);
 
@@ -181,16 +257,53 @@ export const editReview = async (req, res) => {
       });
     }
 
+    if (imageFiles.length > 6) {
+      return res.status(400).json({
+        success: false,
+        message: "You can upload up to 6 images per review."
+      });
+    }
+
+    const validImageFiles = imageFiles.filter(
+      (file) => file?.buffer && file.buffer.length > 0
+    );
+    const uploadedImages = await Promise.all(
+      validImageFiles.map((file) => uploadReviewImage(file.buffer))
+    );
+
+    const providedExistingImages = normalizeImageList(req.body.existingImages);
+    const baseImages = Array.isArray(providedExistingImages)
+      ? sanitizeImageList(providedExistingImages)
+      : sanitizeImageList(review.images || []);
+    const finalImages = [...baseImages, ...uploadedImages];
+
+    if (finalImages.length > 6) {
+      return res.status(400).json({
+        success: false,
+        message: "You can upload up to 6 images per review."
+      });
+    }
+
+    const imagesChanged =
+      JSON.stringify(finalImages) !==
+      JSON.stringify(sanitizeImageList(review.images || []));
+
     review.editHistory.push({
       rating: review.rating,
       comment: review.comment,
       editedAt: new Date()
     });
 
-    review.comment = comment;
+    if (typeof comment !== "undefined") {
+      review.comment = comment;
+    }
 
     if (rating) {
       review.rating = Number(rating);
+    }
+
+    if (imagesChanged) {
+      review.images = finalImages;
     }
 
     review.isEdited = true;
@@ -315,17 +428,20 @@ if (req.userRole === "guest") {
       message: response,
       parentReplyId: parentReplyId || null
     });
+    const createdReply = review.reviewChat[review.reviewChat.length - 1];
 
     await review.save();
 
     if (role !== "guest") {
-
+      const reviewLink = createdReply?._id
+        ? `/reviews?reviewId=${reviewId}&replyId=${createdReply._id}`
+        : "/reviews";
       await Notification.create({
         recipient: review.userId._id,
         sender: userId,
         type: "new_reply",
         message: "Management replied to your review.",
-        link: "/my-bookings",
+        link: reviewLink,
         isRead: false
       });
 

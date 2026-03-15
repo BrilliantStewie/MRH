@@ -15,6 +15,7 @@ const reviewSchema = new mongoose.Schema({
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
   rating: { type: Number, required: true, min: 1, max: 5 },
   comment: { type: String, required: true, trim: true },
+  images: { type: [String], default: [] },
   isHidden: { type: Boolean, default: false },
   isEdited: { type: Boolean, default: false },
   reviewChat: [reviewChatSchema],

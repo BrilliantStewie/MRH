@@ -84,7 +84,6 @@ const Contact = () => {
                         <p className="font-bold text-slate-900 text-sm uppercase tracking-wide">Office Hours</p>
                         <div className="text-slate-500 mt-1 text-sm space-y-1">
                             <p>Mon – Sat: 8:00 AM – 5:00 PM</p>
-                            <p className="italic text-blue-400">Sunday: Closed for Prayer</p>
                         </div>
                     </div>
                 </div>

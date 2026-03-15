@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { AppContext } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import DatePicker from "react-datepicker";
+import DatePicker, { CalendarContainer } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -14,13 +14,24 @@ import {
 const RetreatBooking = () => {
     const { backendUrl, token, selectedRooms, addRoom, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
     const navigate = useNavigate();
-    const [venueParticipants, setVenueParticipants] = useState("");
+    const getStoredDate = (key) => {
+        const value = sessionStorage.getItem(key);
+        if (!value) return null;
+        const parsed = new Date(value);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const [venueParticipants, setVenueParticipants] = useState(() => (
+        sessionStorage.getItem("draftVenueParticipants") || ""
+    ));
 
 
     // --- 1. STATE VARIABLES ---
-    const [bookingName, setBookingName] = useState("");
-    const [startDate, setStartDate] = useState(null);
-    const [endDate, setEndDate] = useState(null);
+    const [bookingName, setBookingName] = useState(() => (
+        sessionStorage.getItem("draftBookingName") || ""
+    ));
+    const [startDate, setStartDate] = useState(() => getStoredDate("draftStartDate"));
+    const [endDate, setEndDate] = useState(() => getStoredDate("draftEndDate"));
 
     // Load participants and packages from sessionStorage
     const [roomParticipants, setRoomParticipants] = useState(() => {
@@ -38,10 +49,32 @@ const RetreatBooking = () => {
     const [dbPackages, setDbPackages] = useState([]);
     const [roomUnavailableDates, setRoomUnavailableDates] = useState([]);
     const [userBookedDates, setUserBookedDates] = useState([]);
+    const [guestReservedDates, setGuestReservedDates] = useState([]);
     const [capacityError, setCapacityError] = useState({});
-    const [selectedPackages, setSelectedPackages] = useState({});
+    const [selectedPackages, setSelectedPackages] = useState(() => {
+        const saved = sessionStorage.getItem("draftSelectedPackages");
+        return saved ? JSON.parse(saved) : {};
+    });
 
     // Save session state
+    useEffect(() => {
+        sessionStorage.setItem("draftVenueParticipants", venueParticipants);
+    }, [venueParticipants]);
+
+    useEffect(() => {
+        sessionStorage.setItem("draftBookingName", bookingName);
+    }, [bookingName]);
+
+    useEffect(() => {
+        if (startDate) sessionStorage.setItem("draftStartDate", startDate.toISOString());
+        else sessionStorage.removeItem("draftStartDate");
+    }, [startDate]);
+
+    useEffect(() => {
+        if (endDate) sessionStorage.setItem("draftEndDate", endDate.toISOString());
+        else sessionStorage.removeItem("draftEndDate");
+    }, [endDate]);
+
     useEffect(() => {
         sessionStorage.setItem("draftRoomParticipants", JSON.stringify(roomParticipants));
     }, [roomParticipants]);
@@ -49,6 +82,10 @@ const RetreatBooking = () => {
     useEffect(() => {
         sessionStorage.setItem("draftRoomPackages", JSON.stringify(roomPackages));
     }, [roomPackages]);
+
+    useEffect(() => {
+        sessionStorage.setItem("draftSelectedPackages", JSON.stringify(selectedPackages));
+    }, [selectedPackages]);
 
     const handleSelectPackage = (pkg) => {
 
@@ -173,11 +210,86 @@ const RetreatBooking = () => {
 
     const getPrice = (priceVal) => Number(priceVal?.$numberDecimal || priceVal || 0);
 
+    const hasVenuePackageSelected = () => {
+        return dbPackages.some((pkg) => {
+            const type = pkg.packageType?.toLowerCase();
+            if (type !== "venue package") return false;
+            const selected = selectedPackages[type];
+            return Array.isArray(selected) ? selected.includes(pkg._id) : selected === pkg._id;
+        });
+    };
+
+    useEffect(() => {
+        if (!dbPackages.length) return;
+
+        const venueType = "venue package";
+        const hasRooms = selectedRooms.length > 0;
+
+        setSelectedPackages(prev => {
+            if (hasRooms) {
+                if (!prev[venueType]) return prev;
+                const updated = { ...prev };
+                delete updated[venueType];
+                return updated;
+            }
+
+            if (prev[venueType]) return prev;
+
+            const venuePackages = dbPackages.filter(
+                pkg => pkg.packageType?.toLowerCase() === venueType
+            );
+
+            if (!venuePackages.length) return prev;
+
+            const preferred =
+                venuePackages.find(pkg => /regular.*venue.*only/i.test(pkg.name || "")) ||
+                venuePackages.find(pkg => /venue.*only/i.test(pkg.name || "")) ||
+                venuePackages[0];
+
+            return {
+                ...prev,
+                [venueType]: preferred._id
+            };
+        });
+    }, [dbPackages, selectedRooms.length]);
+
     // --- 5. AVAILABILITY CHECKS ---
     useEffect(() => {
         if (token) fetchUserBookedDates();
         fetchRoomUnavailableDates();
     }, [token, selectedRooms]);
+
+    useEffect(() => {
+        if (!backendUrl) return;
+        const fetchGuestReservedDates = async () => {
+            try {
+                const { data } = await axios.get(backendUrl + "/api/booking/calendar-availability");
+                if (data.success) {
+                    const counts = new Map();
+                    (data.bookings || []).forEach((b) => {
+                        const start = toDateObj(b.check_in || b.date || b.createdAt);
+                        const end = toDateObj(b.check_out || b.check_in || b.date || b.createdAt);
+                        const guestCountRaw = Number(b.guestCount);
+                        const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
+
+                        let current = new Date(start);
+                        while (current <= end) {
+                            const key = current.getTime();
+                            counts.set(key, (counts.get(key) || 0) + guestCount);
+                            current.setDate(current.getDate() + 1);
+                        }
+                    });
+                    const reserved = Array.from(counts.entries())
+                        .filter(([, count]) => count >= 2)
+                        .map(([time]) => new Date(time));
+                    setGuestReservedDates(reserved);
+                }
+            } catch (error) {
+                console.error("Failed to load guest availability:", error);
+            }
+        };
+        fetchGuestReservedDates();
+    }, [backendUrl]);
 
     const fetchRoomUnavailableDates = async () => {
 
@@ -211,6 +323,23 @@ const RetreatBooking = () => {
         } catch (error) { console.error(error); }
     };
 
+    const isSameDayBooking = startDate && endDate && toDateObj(startDate).getTime() === toDateObj(endDate).getTime();
+
+    useEffect(() => {
+        if (startDate && endDate && endDate < startDate) {
+            setEndDate(null);
+        }
+    }, [startDate, endDate]);
+
+    useEffect(() => {
+        if (isSameDayBooking && selectedRooms.length > 0) {
+            if (clearRooms) clearRooms();
+            setRoomParticipants({});
+            setRoomPackages({});
+            toast.info("Rooms removed for same-day events.");
+        }
+    }, [isSameDayBooking, selectedRooms.length]);
+
     const handleRemoveRoom = (roomId) => {
         if (removeRoom) {
             removeRoom(roomId);
@@ -220,15 +349,25 @@ const RetreatBooking = () => {
         }
     };
 
-    const allBlockedDates = [...roomUnavailableDates, ...userBookedDates];
+    const allBlockedDates = [...roomUnavailableDates, ...userBookedDates, ...guestReservedDates];
 
     const getDayClass = (date) => {
 
-    const time = date.getTime();
+    const time = toDateObj(date).getTime();
+    const todayTime = toDateObj(new Date()).getTime();
+
+    if (time < todayTime) {
+        return "past-date";
+    }
 
     // 🟢 Your own booking
     if (userBookedDates.some(d => d.getTime() === time)) {
         return "my-booking-date";
+    }
+
+    // 🟨 Reserved (2+ guests already booked)
+    if (guestReservedDates.some(d => d.getTime() === time)) {
+        return "guest-reserved-date";
     }
 
     // 🟡 Other users booking (only if a room is selected)
@@ -240,6 +379,26 @@ const RetreatBooking = () => {
     return "available-date";
 };
 
+    const CalendarLegendContainer = ({ className, children }) => {
+        return (
+            <div className="retreat-calendar-wrap">
+                <CalendarContainer className={className}>
+                    {children}
+                    <div className="retreat-calendar-legend">
+                        <div className="legend-item">
+                            <span className="legend-dot legend-available" />
+                            <span className="legend-label">Available</span>
+                        </div>
+                        <div className="legend-item">
+                            <span className="legend-dot legend-reserved" />
+                            <span className="legend-label">Reserved</span>
+                        </div>
+                    </div>
+                </CalendarContainer>
+            </div>
+        );
+    };
+
     const getDuration = () => {
         if (!startDate || !endDate) return 0;
         const start = new Date(startDate);
@@ -249,8 +408,6 @@ const RetreatBooking = () => {
         if (start.getTime() === end.getTime()) return 1;
         return Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
     };
-
-    const isSameDayBooking = startDate && endDate && toDateObj(startDate).getTime() === toDateObj(endDate).getTime();
 
     // --- 6. CALCULATION LOGIC ---
     // ✅ FIXED: Calculates total dynamically based on EACH room's assigned package
@@ -301,8 +458,13 @@ const RetreatBooking = () => {
         if (!startDate || !endDate) return toast.error("Please select dates.");
         if (!token) { toast.error("Please login first."); navigate("/login"); return; }
         if (!bookingName.trim()) return toast.error("Please enter an Event Name.");
-        if (selectedRooms.length === 0 && Number(venueParticipants) <= 0) {
-            return toast.error("Please enter venue participants.");
+        if (selectedRooms.length === 0) {
+            if (Number(venueParticipants) <= 0) {
+                return toast.error("Please enter venue participants.");
+            }
+            if (!hasVenuePackageSelected()) {
+                return toast.error("Please select a venue retreat package.");
+            }
         }
 
         for (const room of selectedRooms) {
@@ -325,6 +487,7 @@ const RetreatBooking = () => {
                 room_ids: selectedRooms.map(r => r._id),
                 check_in: startDate,
                 check_out: endDate,
+                venueParticipants: Number(venueParticipants) || 0,
 
                 bookingItems: selectedRooms.map(room => ({
                     room_id: room._id,
@@ -339,9 +502,20 @@ const RetreatBooking = () => {
 
             if (data.success) {
                 toast.success("Booking request sent!");
-                setStartDate(null); setEndDate(null); setRoomParticipants({}); setRoomPackages({}); setBookingName("");
+                setStartDate(null);
+                setEndDate(null);
+                setRoomParticipants({});
+                setRoomPackages({});
+                setBookingName("");
+                setVenueParticipants("");
+                setSelectedPackages({});
                 sessionStorage.removeItem("draftRoomParticipants");
                 sessionStorage.removeItem("draftRoomPackages");
+                sessionStorage.removeItem("draftBookingName");
+                sessionStorage.removeItem("draftVenueParticipants");
+                sessionStorage.removeItem("draftStartDate");
+                sessionStorage.removeItem("draftEndDate");
+                sessionStorage.removeItem("draftSelectedPackages");
                 if (clearRooms) clearRooms();
                 navigate("/my-bookings");
             } else {
@@ -404,7 +578,7 @@ const RetreatBooking = () => {
         !bookingName.trim() ||
         !startDate ||
         !endDate ||
-        (selectedRooms.length === 0 && venueParticipants <= 0) ||
+        (selectedRooms.length === 0 && (venueParticipants <= 0 || !hasVenuePackageSelected())) ||
         (isSameDayBooking && selectedRooms.length > 0) ||
         selectedRooms.some(room => !roomPackages[room._id]);
 
@@ -446,22 +620,15 @@ const RetreatBooking = () => {
             pkg => pkg.packageType?.toLowerCase() !== "venue package"
         );
 
-    } else if (isSameDay) {
+    } else {
 
-        // Same day + no rooms → show venue + other packages
+        // No rooms → always show venue packages (and other non-room packages)
         displayPackages = [
             ...venuePackages,
             ...otherPackages.filter(
                 pkg => pkg.packageType?.toLowerCase() !== "venue package"
             )
         ];
-
-    } else {
-
-        // Default case
-        displayPackages = otherPackages.filter(
-            pkg => pkg.packageType?.toLowerCase() !== "venue package"
-        );
 
     }
 
@@ -471,16 +638,65 @@ const RetreatBooking = () => {
                 .react-datepicker-wrapper { width: 100%; }
                 .react-datepicker { font-family: inherit; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: none; overflow: hidden; }
                 .react-datepicker__header { background-color: #fff; border-bottom: 1px solid #f1f5f9; padding-top: 15px; }
+                .retreat-calendar-wrap .react-datepicker {
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+                .retreat-calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid #f1f5f9;
+  background: #fff;
+  margin-top: auto;
+}
+                .retreat-calendar-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+                .retreat-calendar-legend .legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  display: inline-block;
+}
+                .retreat-calendar-legend .legend-available {
+  background: #ffffff;
+  border: 1px solid #cbd5f5;
+}
+                .retreat-calendar-legend .legend-reserved {
+  background: #f59e0b;
+  border: 1px solid #d97706;
+}
+                .retreat-calendar-legend .legend-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #64748b;
+}
                 .react-datepicker__day--disabled {
   opacity: 0.6;
-  background-color: #f1f5f9;
-  color: #94a3b8;
+  background-color: #f1f5f9 !important;
+  color: #94a3b8 !important;
   cursor: not-allowed;
   text-decoration: none;
 }
+                .past-date,
+                .react-datepicker__day--disabled.past-date {
+  opacity: 0.35;
+  filter: blur(0.6px);
+  background-color: #f8fafc !important;
+  color: #94a3b8 !important;
+  font-weight: 500;
+}
                 .my-booking-date {
-  background-color: #dcfce7 !important;
-  color: #15803d !important;
+  background-color: #fee2e2 !important;
+  color: #b91c1c !important;
   font-weight: bold;
   border-radius: 6px;
 }
@@ -492,7 +708,7 @@ const RetreatBooking = () => {
   transform: translateX(-50%);
   width: 4px;
   height: 4px;
-  background-color: #2563eb;
+  background-color: #dc2626;
   border-radius: 50%;
 }
 
@@ -501,6 +717,29 @@ const RetreatBooking = () => {
   color: #854d0e !important;
   font-weight: 600;
   border-radius: 6px;
+}
+.guest-reserved-date {
+  background-color: #fef9c3 !important;
+  color: #854d0e !important;
+  font-weight: 700;
+  border-radius: 6px;
+}
+                .react-datepicker__day--disabled.my-booking-date,
+                .react-datepicker__day--disabled.other-booking-date {
+  background-color: #f1f5f9 !important;
+  color: #94a3b8 !important;
+}
+.react-datepicker__day--disabled.guest-reserved-date {
+  background-color: #fef9c3 !important;
+  color: #854d0e !important;
+  opacity: 0.9;
+}
+                .react-datepicker__day--disabled.my-booking-date::after {
+  content: none;
+}
+                .react-datepicker__day--outside-month {
+  opacity: 0.55;
+  filter: blur(0.4px);
 }
                 .react-datepicker__day--selected, .react-datepicker__day--in-range { background-color: #0f172a !important; color: white !important; }
                 .custom-input { width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #334155; outline: none; transition: all 0.2s; background: white; }
@@ -537,7 +776,20 @@ const RetreatBooking = () => {
                                 <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Check-in Date</label>
                                 <div className="relative">
                                     <Calendar size={18} className="absolute left-3.5 top-3 text-slate-400 z-10" />
-                                    <DatePicker selected={startDate} onChange={(date) => setStartDate(date)} selectsStart startDate={startDate} endDate={endDate} minDate={new Date()} excludeDates={allBlockedDates} dayClassName={getDayClass} placeholderText="Select Date" className="custom-input" dateFormat="MM/dd/yyyy" />
+                                    <DatePicker
+                                        selected={startDate}
+                                        onChange={(date) => setStartDate(date)}
+                                        selectsStart
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        minDate={new Date()}
+                                        excludeDates={allBlockedDates}
+                                        dayClassName={getDayClass}
+                                        placeholderText="Select Date"
+                                        className="custom-input"
+                                        dateFormat="MM/dd/yyyy"
+                                        calendarContainer={CalendarLegendContainer}
+                                    />
                                 </div>
                             </div>
 
@@ -545,7 +797,26 @@ const RetreatBooking = () => {
                                 <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Check-out Date</label>
                                 <div className="relative">
                                     <Calendar size={18} className="absolute left-3.5 top-3 text-slate-400 z-10" />
-                                    <DatePicker selected={endDate} onChange={(date) => setEndDate(date)} selectsEnd startDate={startDate} endDate={endDate} minDate={startDate || new Date()} excludeDates={allBlockedDates} dayClassName={getDayClass} placeholderText="Select Date" className="custom-input" dateFormat="MM/dd/yyyy" />
+                                    <DatePicker
+                                        selected={endDate}
+                                        onChange={(date) => {
+                                            if (startDate && date && date < startDate) {
+                                                setEndDate(null);
+                                                return;
+                                            }
+                                            setEndDate(date);
+                                        }}
+                                        selectsEnd
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        minDate={startDate || new Date()}
+                                        excludeDates={allBlockedDates}
+                                        dayClassName={getDayClass}
+                                        placeholderText="Select Date"
+                                        className="custom-input"
+                                        dateFormat="MM/dd/yyyy"
+                                        calendarContainer={CalendarLegendContainer}
+                                    />
                                 </div>
                             </div>
 

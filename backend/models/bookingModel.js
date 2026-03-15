@@ -56,6 +56,19 @@ const bookingSchema = new mongoose.Schema({
     required: true
   },
 
+  extra_packages: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Package"
+    }
+  ],
+
+  venueParticipants: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
   check_in: {
     type: Date,
     required: true
@@ -148,13 +161,17 @@ const bookingSchema = new mongoose.Schema({
 bookingSchema.pre("save", function (next) {
 
   // Check date validity
-  if (this.check_out <= this.check_in) {
+  if (this.check_out < this.check_in) {
     return next(new Error("Check-out must be after check-in"));
   }
 
-  // Booking must contain at least one room
-  if (!this.bookingItems || this.bookingItems.length === 0) {
-    return next(new Error("Booking must contain at least one room"));
+  if (this.check_out.getTime() === this.check_in.getTime() && this.bookingItems && this.bookingItems.length > 0) {
+    return next(new Error("Rooms are not available for same-day bookings"));
+  }
+
+  // Booking must contain rooms or venue participants
+  if ((!this.bookingItems || this.bookingItems.length === 0) && (!this.venueParticipants || this.venueParticipants <= 0)) {
+    return next(new Error("Booking must include rooms or venue participants"));
   }
 
   // Auto set payment flag

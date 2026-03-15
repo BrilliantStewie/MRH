@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from "react";
+import { useLocation } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import Navbar from "../components/Navbar";
 import {
@@ -6,7 +7,7 @@ import {
   Send,
   CornerDownRight,
   Calendar,
-  MessageCircle,
+  Camera,
   User,
   ChevronDown,
   ChevronUp,
@@ -15,7 +16,11 @@ import {
   Clock,
   AlertCircle,
   Pencil,
-  Trash2
+  Trash2,
+  BedDouble,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -23,9 +28,12 @@ import { toast } from "react-toastify";
 const AllReviews = () => {
   const { backendUrl, token, userData } = useContext(AppContext);
   const loggedInUserId = userData?._id; // Identifies the currently logged-in guest
+  const location = useLocation();
 
   const [reviews, setReviews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const REVIEW_PAGE_SIZE = 5;
+  const [visibleReviewCount, setVisibleReviewCount] = useState(REVIEW_PAGE_SIZE);
   
   // Replying State
   const [replyText, setReplyText] = useState({});
@@ -35,8 +43,11 @@ const AllReviews = () => {
   const [editingReviewId, setEditingReviewId] = useState(null);
   const [editReviewText, setEditReviewText] = useState("");
   const [editReviewRating, setEditReviewRating] = useState(5); // <-- Added for star editing
+  const [editReviewImages, setEditReviewImages] = useState([]);
+  const [editReviewNewImages, setEditReviewNewImages] = useState([]);
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editReplyText, setEditReplyText] = useState("");
+  const [flashTargetId, setFlashTargetId] = useState(null);
 
   // Deletion Modal State
   const [itemToDelete, setItemToDelete] = useState(null); 
@@ -46,6 +57,8 @@ const AllReviews = () => {
   const [visibleReviewHistoryId, setVisibleReviewHistoryId] = useState(null); 
   const [expandedReplies, setExpandedReplies] = useState({});
   const [expandedReviewThreads, setExpandedReviewThreads] = useState({});
+  const [expandedReplyMessages, setExpandedReplyMessages] = useState({});
+  const [lightbox, setLightbox] = useState({ images: [], index: 0 });
 
   const toggleReplies = (parentId) => {
     setExpandedReplies(prev => ({ ...prev, [parentId]: !prev[parentId] }));
@@ -92,6 +105,103 @@ const AllReviews = () => {
     fetchReviews(); 
   }, [backendUrl]);
 
+  useEffect(() => {
+    setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), reviews.length || REVIEW_PAGE_SIZE));
+  }, [reviews.length]);
+
+  useEffect(() => {
+    if (!reviews.length) return;
+    const params = new URLSearchParams(location.search);
+    const reviewIdParam = params.get("reviewId");
+    const replyIdParam = params.get("replyId");
+    const stateReviewId = location.state?.reviewId;
+    const stateReplyId = location.state?.replyId;
+    const stateHighlightType = location.state?.highlightType;
+
+    let resolvedReviewId = reviewIdParam || stateReviewId;
+    let resolvedReplyId = replyIdParam || stateReplyId;
+    let parentReplyId = null;
+
+    if (resolvedReplyId) {
+      const matchReview = reviews.find((review) =>
+        review.reviewChat?.some((chat) => String(chat._id) === String(resolvedReplyId))
+      );
+      if (matchReview) {
+        resolvedReviewId = resolvedReviewId || matchReview._id;
+        const replyMatch = matchReview.reviewChat.find(
+          (chat) => String(chat._id) === String(resolvedReplyId)
+        );
+        if (replyMatch?.parentReplyId) {
+          parentReplyId = String(replyMatch.parentReplyId);
+        }
+      }
+    }
+
+    if (!resolvedReplyId && !resolvedReviewId && stateHighlightType === "new_reply") {
+      const latestReply = reviews
+        .filter((review) => String(review.userId?._id || review.userId) === String(loggedInUserId))
+        .flatMap((review) =>
+          (review.reviewChat || [])
+            .filter((chat) => chat.senderRole === "admin" || chat.senderRole === "staff")
+            .map((chat) => ({
+              reviewId: review._id,
+              replyId: chat._id,
+              createdAt: chat.createdAt,
+              parentReplyId: chat.parentReplyId
+            }))
+        )
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+      if (latestReply) {
+        resolvedReviewId = latestReply.reviewId;
+        resolvedReplyId = latestReply.replyId;
+        if (latestReply.parentReplyId) {
+          parentReplyId = String(latestReply.parentReplyId);
+        }
+      }
+    }
+
+    if (resolvedReviewId) {
+      setExpandedReviewThreads((prev) => ({ ...prev, [resolvedReviewId]: true }));
+    }
+    if (parentReplyId) {
+      setExpandedReplies((prev) => ({ ...prev, [parentReplyId]: true }));
+    }
+
+    const targetId = resolvedReplyId
+      ? `reply-${resolvedReplyId}`
+      : resolvedReviewId
+        ? `review-${resolvedReviewId}`
+        : null;
+
+    if (!targetId) return;
+
+    let canceled = false;
+    const timeouts = [];
+
+    setFlashTargetId(null);
+    timeouts.push(setTimeout(() => setFlashTargetId(targetId), 80));
+    timeouts.push(setTimeout(() => setFlashTargetId(null), 3000));
+
+    const tryScroll = (attempt = 0) => {
+      if (canceled) return;
+      const element = document.getElementById(targetId);
+      if (!element && attempt < 8) {
+        timeouts.push(setTimeout(() => tryScroll(attempt + 1), 150));
+        return;
+      }
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+
+    timeouts.push(setTimeout(() => tryScroll(0), 120));
+
+    return () => {
+      canceled = true;
+      timeouts.forEach((id) => clearTimeout(id));
+    };
+  }, [reviews, location.search, location.state, loggedInUserId]);
+
   /* ==========================================
      API: ACTIONS (Reply, Edit, Delete)
   ========================================== */
@@ -124,22 +234,96 @@ const AllReviews = () => {
     }
   };
 
+  const MAX_REVIEW_IMAGES = 6;
+  const MAX_REVIEW_IMAGE_SIZE = 5 * 1024 * 1024;
+
+  const clearEditReviewNewImages = () => {
+    editReviewNewImages.forEach((img) => {
+      if (img?.preview) URL.revokeObjectURL(img.preview);
+    });
+    setEditReviewNewImages([]);
+  };
+
+  const handleEditReviewImageChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+
+    const usedSlots = editReviewImages.length + editReviewNewImages.length;
+    const availableSlots = MAX_REVIEW_IMAGES - usedSlots;
+    if (availableSlots <= 0) {
+      toast.warning("You can upload up to 6 images.", customToastOptions);
+      event.target.value = "";
+      return;
+    }
+
+    const nextImages = [];
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Only image files are allowed.", customToastOptions);
+        continue;
+      }
+      if (file.size > MAX_REVIEW_IMAGE_SIZE) {
+        toast.error(`${file.name} exceeds the 5MB limit.`, customToastOptions);
+        continue;
+      }
+      if (usedSlots + nextImages.length >= MAX_REVIEW_IMAGES) {
+        toast.warning("You can upload up to 6 images.", customToastOptions);
+        break;
+      }
+      nextImages.push({
+        id: `${file.name}-${file.lastModified}-${Math.random().toString(16).slice(2)}`,
+        file,
+        preview: URL.createObjectURL(file)
+      });
+    }
+
+    if (nextImages.length > 0) {
+      setEditReviewNewImages((prev) => [...prev, ...nextImages]);
+    }
+
+    event.target.value = "";
+  };
+
+  const handleRemoveEditReviewImage = (image) => {
+    setEditReviewImages((prev) => prev.filter((img) => img !== image));
+  };
+
+  const handleRemoveEditReviewNewImage = (id) => {
+    setEditReviewNewImages((prev) => {
+      const target = prev.find((img) => img.id === id);
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return prev.filter((img) => img.id !== id);
+    });
+  };
+
+  const handleCancelEditReview = () => {
+    clearEditReviewNewImages();
+    setEditReviewImages([]);
+    setEditingReviewId(null);
+  };
+
   const handleEditReview = async (reviewId) => {
     if (!editReviewText.trim()) return toast.warning("Review cannot be empty.", customToastOptions);
     try {
-      // Send both comment and rating to the backend
-      const { data } = await axios.put(`${backendUrl}/api/reviews/${reviewId}`, { 
-        comment: editReviewText, 
-        rating: editReviewRating 
-      }, {
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-});
+      const reviewForm = new FormData();
+      reviewForm.append("comment", editReviewText);
+      reviewForm.append("rating", editReviewRating);
+      reviewForm.append("existingImages", JSON.stringify(editReviewImages));
+      editReviewNewImages.forEach((image) => {
+        reviewForm.append("images", image.file);
+      });
+
+      const { data } = await axios.put(`${backendUrl}/api/reviews/${reviewId}`, reviewForm, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
 
       if (data.success) {
         toast.success("Review updated", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
         setEditingReviewId(null);
+        setEditReviewImages([]);
+        clearEditReviewNewImages();
         fetchReviews();
       }
     } catch (err) { 
@@ -200,20 +384,166 @@ const AllReviews = () => {
   const formatDateTime = (dateString) => {
     return dateString ? new Date(dateString).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "";
   };
+  const formatDateRange = (start, end) => {
+    if (!start || !end) return "Dates not available";
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const startLabel = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const endLabel = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `${startLabel} - ${endLabel}`;
+  };
+  const resolveReviewImage = (imagePath) => {
+    if (!imagePath || typeof imagePath !== "string") return "";
+    if (imagePath.startsWith("http")) return imagePath;
+    return `${backendUrl}/${imagePath.replace(/\\/g, "/")}`;
+  };
+
+  const openLightbox = (images, index = 0) => {
+    const resolvedImages = (images || [])
+      .map(resolveReviewImage)
+      .filter(Boolean);
+    if (!resolvedImages.length) return;
+    const safeIndex = Math.max(0, Math.min(index, resolvedImages.length - 1));
+    setLightbox({ images: resolvedImages, index: safeIndex });
+  };
+
+  const closeLightbox = () => {
+    setLightbox({ images: [], index: 0 });
+  };
+
+  const showNextImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return { ...prev, index: (prev.index + 1) % prev.images.length };
+    });
+  };
+
+  const showPrevImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return {
+        ...prev,
+        index: (prev.index - 1 + prev.images.length) % prev.images.length
+      };
+    });
+  };
+  const ratingBuckets = [5, 4, 3, 2, 1];
+  const ratingCounts = ratingBuckets.reduce((acc, rating) => {
+    acc[rating] = reviews.filter((review) => Number(review.rating || 0) === rating).length;
+    return acc;
+  }, {});
+  const maxRatingCount = Math.max(1, ...ratingBuckets.map((rating) => ratingCounts[rating]));
+  const totalReviews = reviews.length;
+  const averageRating = totalReviews
+    ? (reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / totalReviews).toFixed(1)
+    : "0.0";
+  const totalEditImages = editReviewImages.length + editReviewNewImages.length;
+  const remainingEditSlots = MAX_REVIEW_IMAGES - totalEditImages;
+
 
   return (
-    <div className="w-full min-h-screen bg-[#f8fafc] font-sans text-slate-800 relative">
+    <div className="reviews-page w-full min-h-screen text-slate-800 relative">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-slate-50 via-white to-transparent" />
+      </div>
       <Navbar />
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+        @keyframes flashPulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            background-color: rgba(59, 130, 246, 0.08);
+          }
+          50% {
+            box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.35);
+            background-color: rgba(59, 130, 246, 0.16);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            background-color: transparent;
+          }
+        }
+        .flash-highlight {
+          animation: flashPulse 0.9s ease-in-out 0s 3;
+        }
+        .reviews-page {
+          font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+          background-color: #f5f7fb;
+        }
+        .review-card {
+          position: relative;
+          overflow: hidden;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .review-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: #0f172a;
+          opacity: 0.12;
+        }
+        .review-card::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 2px;
+          background: linear-gradient(90deg, rgba(15,23,42,0.08), rgba(37,99,235,0.18), rgba(15,23,42,0.08));
+        }
+        .review-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 30px -24px rgba(15, 23, 42, 0.45);
+        }
+      `}</style>
       
-      <div className="max-w-4xl mx-auto px-6 pt-32 pb-20">
-        <div className="mb-10 flex flex-col md:flex-row items-end justify-between gap-6">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">Guest Experience</h1>
-            <p className="text-slate-500 mt-1">Read and join the conversation</p>
-          </div>
+      <div className="w-full max-w-none mx-auto px-6 lg:px-24 xl:px-32 2xl:px-40 pt-28 pb-20">
+        <div className="mb-10 w-full max-w-[1200px] mx-auto">
+          <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-slate-400">
+            All Reviews
+          </p>
+          <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Feedback</h1>
+          <p className="text-slate-500 mt-2 max-w-2xl">
+            Clear, organized feedback with booking context for quick responses.
+          </p>
         </div>
 
-        <div className="space-y-6">
+        <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-auto">
+          <aside className="sticky top-28 h-fit">
+            <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
+              <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Star size={12} className="text-amber-400" fill="currentColor" />
+                  <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
+                </div>
+                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+              </div>
+              <div className="space-y-2">
+                {ratingBuckets.map((rating) => (
+                  <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center gap-1 w-9">
+                      <span>{rating}</span>
+                      <Star size={12} className="text-amber-400" fill="currentColor" />
+                    </div>
+                    <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-400"
+                        style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          <div className="space-y-6 flex flex-col items-start w-full pl-8">
           {isLoading ? (
             <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading experiences...</div>
           ) : reviews.length === 0 ? (
@@ -221,42 +551,63 @@ const AllReviews = () => {
               <p className="text-slate-400 italic">No reviews found yet.</p>
             </div>
           ) : (
-            reviews.map((review) => {
+            reviews.slice(0, visibleReviewCount).map((review) => {
               const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];
               const isThreadExpanded = expandedReviewThreads[review._id];
+              const booking = review.bookingId;
+              const bookingName = booking?.bookingName;
+              const reviewMessage = review.comment || "";
+              const isReviewMessageExpanded = !!expandedReplyMessages[`review-${review._id}`];
+              const shouldTruncateReviewMessage = reviewMessage.length > 300;
+              const roomSummary = "";
               
               // Identify if the logged-in user owns this main review
-              const reviewOwnerId = review.userId?._id || review.userId;
-              const isMyReview = reviewOwnerId === loggedInUserId;
+              const reviewOwnerId = String(review.userId?._id || review.userId || "");
+              const isMyReview = Boolean(reviewOwnerId) && String(loggedInUserId || "") === reviewOwnerId;
               const canReply = isMyReview || userData?.role === "admin" || userData?.role === "staff";
 
               return (
-                <div key={review._id} className="group bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200 overflow-hidden relative">
-                  <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                  <div className="p-8 pl-10">
+                <div id={`review-${review._id}`} key={review._id} className={`group review-card bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}>
+                  <div className="p-4 pl-5">
                     
                     {/* --- MAIN REVIEW HEADER --- */}
-                    <div className="flex justify-between items-start mb-5">
-                      <div className="flex items-center gap-4">
-                        {/* DYNAMIC AVATAR */}
-                        <div className="h-12 w-12 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
-                          {review.userId?.image ? (
-                            <img src={review.userId.image.startsWith('http') ? review.userId.image : `${backendUrl}/${review.userId.image}`} alt="Profile" className="w-full h-full object-cover" />
-                          ) : (
-                            <User size={20} className="text-slate-400" />
-                          )}
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-[16px] leading-tight">{formatName(review.userId, "guest")}</h3>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-3">
+                      <div className="flex flex-col gap-2">
+                        <div className="mt-6 flex items-center gap-3">
+                          {/* DYNAMIC AVATAR */}
+                          <div className="h-14 w-14 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
+                            {review.userId?.image ? (
+                              <img src={review.userId.image.startsWith('http') ? review.userId.image : `${backendUrl}/${review.userId.image}`} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                              <User size={20} className="text-slate-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-slate-900 text-[17px] leading-tight">{formatName(review.userId, "guest")}</h3>
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold text-slate-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={11} /> {formatDateRange(booking?.check_in, booking?.check_out)}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="flex gap-1 text-amber-400 mb-1 justify-end">
-                          {[...Array(5)].map((_, i) => <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"} />)}
+                      <div className="text-right sm:ml-auto">
+                        <div className="inline-flex min-w-[120px] items-center justify-between gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
+                          <div className="flex gap-1 text-amber-400">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                size={12}
+                                fill={i < review.rating ? "currentColor" : "none"}
+                                className={i < review.rating ? "" : "text-amber-200"}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-bold text-amber-700">{review.rating}.0</span>
                         </div>
-                        <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1 mb-1">
+                        <p className="mt-2 text-[8px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1">
                           {formatDateTime(review.createdAt)} {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
                         </p>
                         
@@ -265,11 +616,32 @@ const AllReviews = () => {
                           <div className="flex justify-end mt-1">
                             <button 
                               onClick={() => setVisibleReviewHistoryId(visibleReviewHistoryId === review._id ? null : review._id)}
-                              className="mt-2 flex items-center justify-end w-full gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
+                              className="mt-2 inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 hover:text-slate-700 transition-colors"
                             >
                               <Clock size={10} />
                               {visibleReviewHistoryId === review._id ? "Hide Previous Versions" : "View Previous Versions"}
                             </button>
+                          </div>
+                        )}
+
+                        {/* OWNERSHIP ACTIONS FOR MAIN REVIEW */}
+                        {isMyReview && (
+                          <div className="mt-3 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md border border-slate-200 rounded-lg p-1 shadow-sm">
+                              <button onClick={() => { 
+                                clearEditReviewNewImages();
+                                setEditReviewImages(Array.isArray(review.images) ? review.images : []);
+                                setEditingReviewId(review._id); 
+                                setEditReviewText(review.comment);
+                                setEditReviewRating(review.rating);
+                              }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Review">
+                                <Pencil size={14} />
+                              </button>
+                              <div className="w-px h-4 bg-slate-200"></div>
+                              <button onClick={() => setItemToDelete({ type: 'review', id: review._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Review">
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -306,7 +678,7 @@ const AllReviews = () => {
                     )}
 
                     {/* --- MAIN REVIEW CONTENT (Hover to edit/delete) --- */}
-                    <div className="mb-8 relative rounded-xl transition-all group/review">
+                    <div className="mb-5 relative rounded-xl transition-all group/review">
                       {editingReviewId === review._id ? (
                         <div className="animate-in fade-in duration-200">
                           {/* INTERACTIVE STAR SELECTOR */}
@@ -330,34 +702,128 @@ const AllReviews = () => {
                             onChange={(e) => setEditReviewText(e.target.value)} 
                             autoFocus 
                           />
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-500">
+                              <span>Photos</span>
+                              <span>{Math.max(0, totalEditImages)}/{MAX_REVIEW_IMAGES}</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {editReviewImages.map((image) => {
+                                const resolvedImage = resolveReviewImage(image);
+                                if (!resolvedImage) return null;
+                                return (
+                                  <div key={image} className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+                                    <img
+                                      src={resolvedImage}
+                                      alt="Review"
+                                      className="h-full w-full object-cover"
+                                      loading="lazy"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveEditReviewImage(image)}
+                                      className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
+                                      title="Remove image"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                              {editReviewNewImages.map((image) => (
+                                <div key={image.id} className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
+                                  <img
+                                    src={image.preview}
+                                    alt="New upload"
+                                    className="h-full w-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveEditReviewNewImage(image.id)}
+                                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
+                                    title="Remove image"
+                                  >
+                                    <X size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                              {remainingEditSlots > 0 && (
+                                <label className="h-12 w-12 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] font-semibold text-slate-500 cursor-pointer hover:border-blue-300 hover:text-blue-600 transition-colors">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleEditReviewImageChange}
+                                  />
+                                  <Camera size={14} />
+                                </label>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[9px] text-slate-400">Up to 6 images, 5MB each.</p>
+                          </div>
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => setEditingReviewId(null)} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
+                            <button onClick={handleCancelEditReview} className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:text-slate-800">Cancel</button>
                             <button onClick={() => handleEditReview(review._id)} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700">Save Changes</button>
                           </div>
                         </div>
                       ) : (
-                        <div className="mb-8">
-                    <h2 className="text-2xl font-serif italic text-slate-800 mb-3 leading-snug">
-                      "{review.bookingId?.bookingName || (review.bookingId?.room_ids?.length > 0 ? review.bookingId.room_ids.map((r) => r.name).join(", ") : "Retreat Stay")}"
-                    </h2>
-                    <p className="text-slate-600 text-[14px] leading-relaxed font-light">{review.comment || "No written review provided."}</p>
-                          
-                          {/* OWNERSHIP ACTIONS FOR MAIN REVIEW */}
-                          {isMyReview && (
-                            <div className="absolute -top-3 right-0 opacity-0 group-hover/review:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-md border border-slate-200 rounded-lg p-1 shadow-sm z-10">
-                                <button onClick={() => { 
-                                  setEditingReviewId(review._id); 
-                                  setEditReviewText(review.comment);
-                                  setEditReviewRating(review.rating); // Populate current rating
-                                }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Review">
-                                  <Pencil size={14} />
+                        <div className="mb-5">
+                          <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                            {bookingName && (
+                              <p className="text-[20px] font-bold text-slate-900 mb-2">
+                                {bookingName}
+                              </p>
+                            )}
+                            <p className="text-slate-700 text-[13px] leading-relaxed text-justify">
+                              {shouldTruncateReviewMessage && !isReviewMessageExpanded
+                                ? `${reviewMessage.slice(0, 300)}...`
+                                : (reviewMessage || "No written review provided.")}
+                            </p>
+                            {shouldTruncateReviewMessage && (
+                              <button
+                                onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [`review-${review._id}`]: !prev[`review-${review._id}`] }))}
+                                className="mt-1 text-[10px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                              >
+                                {isReviewMessageExpanded ? "See less" : "See more"}
+                              </button>
+                            )}
+                          </div>
+                          {Array.isArray(review.images) && review.images.length > 0 && (
+                            <div className="mt-6 flex flex-wrap gap-2">
+                              {review.images.slice(0, 2).map((image, index) => {
+                                const resolvedImage = resolveReviewImage(image);
+                                if (!resolvedImage) return null;
+                                return (
+                                  <button
+                                    key={`${review._id}-image-${index}`}
+                                    type="button"
+                                    onClick={() => openLightbox(review.images, index)}
+                                    className="h-14 w-14 overflow-hidden rounded-lg border border-slate-100 bg-slate-50"
+                                    title="View image"
+                                  >
+                                    <img
+                                      src={resolvedImage}
+                                      alt={`Review ${index + 1}`}
+                                      className="h-full w-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  </button>
+                                );
+                              })}
+                              {review.images.length > 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => openLightbox(review.images, 2)}
+                                  className="h-14 w-14 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-500"
+                                  title="View more images"
+                                >
+                                  +{review.images.length - 2} more
                                 </button>
-                                <div className="w-px h-4 bg-slate-200"></div>
-                                <button onClick={() => setItemToDelete({ type: 'review', id: review._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Review">
-                                  <Trash2 size={14} />
-                                </button>
+                              )}
                             </div>
                           )}
+                          
                         </div>
                       )}
                     </div>
@@ -368,9 +834,12 @@ const AllReviews = () => {
                     {/* --- REPLIES THREAD --- */}
                     {parentChats.length > 0 && (
                       <div className="mb-2 space-y-4">
-                        {(isThreadExpanded ? parentChats : parentChats.slice(0, 1)).map((parentChat) => {
+                        {(isThreadExpanded ? parentChats : []).map((parentChat) => {
                           const childReplies = review.reviewChat.filter(child => child.parentReplyId === parentChat._id);
                           const isExpanded = expandedReplies[parentChat._id];
+                          const parentMessage = parentChat.message || "";
+                          const isParentMessageExpanded = !!expandedReplyMessages[parentChat._id];
+                          const shouldTruncateParentMessage = parentMessage.length > 300;
                           
                           const replyOwnerId = parentChat.senderId?._id || parentChat.senderId;
                           const isMyReply = replyOwnerId === loggedInUserId && parentChat.senderRole === "guest";
@@ -378,9 +847,9 @@ const AllReviews = () => {
                           return (
                             <div key={parentChat._id} className="space-y-3">
                               
-                              <div className={`relative group/reply rounded-lg p-5 text-sm transition ${parentChat.senderRole === "admin" || parentChat.senderRole === "staff" ? "bg-[#f8fafc] ml-8 border border-slate-100" : "bg-white border border-slate-100 shadow-sm"}`}>
+                              <div id={`reply-${parentChat._id}`} className={`relative group/reply rounded-lg p-3 text-[12px] transition ${parentChat.senderRole === "admin" || parentChat.senderRole === "staff" ? "bg-[#f8fafc] ml-8 border border-slate-100" : "bg-white border border-slate-100 shadow-sm"} ${flashTargetId === `reply-${parentChat._id}` ? "flash-highlight" : ""}`}>
                                 
-                                <div className="flex items-center gap-2.5 mb-2 pr-10">
+                                <div className="flex items-start gap-2.5 mb-0.5">
                                   {parentChat.senderRole !== "admin" && (
                                     <div className="h-7 w-7 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
                                       {parentChat.senderId?.image ? (
@@ -391,12 +860,12 @@ const AllReviews = () => {
                                     </div>
                                   )}
 
-                                  <span className="font-bold text-slate-900 text-sm">{formatName(parentChat.senderId, parentChat.senderRole)}</span>
+                                  <span className="font-bold text-slate-900 text-[13px]">{formatName(parentChat.senderId, parentChat.senderRole)}</span>
                                   {parentChat.senderRole !== "guest" && (
                                     <span className={`${parentChat.senderRole === 'admin' ? 'bg-slate-900' : 'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider`}>{parentChat.senderRole}</span>
                                   )}
                                   
-                                  <div className="text-[10px] text-slate-400 ml-auto flex flex-col items-end gap-1">
+                                  <div className="ml-auto text-[10px] text-slate-400 flex flex-col items-end gap-1">
                                     <div className="flex items-center justify-end w-full gap-1">
                                       {formatDateTime(parentChat.createdAt)} {parentChat.isEdited && "(Edited)"}
                                     </div>
@@ -411,21 +880,34 @@ const AllReviews = () => {
 
                                 {editingReplyId === parentChat._id ? (
                                   <div className="mt-2">
-                                    <textarea className="w-full bg-white border-2 border-blue-400 rounded-lg p-3 text-sm focus:outline-none resize-none shadow-sm" rows="2" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} autoFocus />
+                                    <textarea className="w-full bg-white border-2 border-blue-400 rounded-lg p-2.5 text-[12px] focus:outline-none resize-none shadow-sm" rows="2" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} autoFocus />
                                     <div className="flex justify-end gap-2 mt-2">
                                       <button onClick={() => setEditingReplyId(null)} className="text-xs font-bold text-slate-500">Cancel</button>
                                       <button onClick={() => handleEditReply(parentChat._id)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold shadow-sm">Save</button>
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="flex justify-between items-start gap-4">
-                                    <p className="text-slate-600 text-[13px] leading-relaxed flex-1">{parentChat.message}</p>
-                                    
+                                  <div>
+                                    <p className="text-slate-600 text-[13px] leading-relaxed">
+                                      {shouldTruncateParentMessage && !isParentMessageExpanded
+                                        ? `${parentMessage.slice(0, 300)}...`
+                                        : parentMessage}
+                                    </p>
+                                    {shouldTruncateParentMessage && (
+                                      <button
+                                        onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [parentChat._id]: !prev[parentChat._id] }))}
+                                        className="mt-1 text-[10px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                      >
+                                        {isParentMessageExpanded ? "See less" : "See more"}
+                                      </button>
+                                    )}
                                     {isMyReply && (
-                                      <div className="absolute top-2 right-2 opacity-0 group-hover/reply:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm z-10">
+                                      <div className="mt-1 flex justify-end">
+                                        <div className="opacity-0 group-hover/reply:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm pointer-events-none group-hover/reply:pointer-events-auto">
                                           <button onClick={() => { setEditingReplyId(parentChat._id); setEditReplyText(parentChat.message); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Reply"><Pencil size={12} /></button>
                                           <div className="w-px h-3 bg-slate-200"></div>
                                           <button onClick={() => setItemToDelete({ type: 'reply', id: parentChat._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Reply"><Trash2 size={12} /></button>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -448,7 +930,7 @@ const AllReviews = () => {
                                   </div>
                                 )}
 
-                                <div className="mt-3 flex justify-start items-center">
+                                <div className="mt-2 flex justify-start items-center">
                                   {canReply && (!activeReplyId || activeReplyId !== parentChat._id) && (
   <button
     onClick={() => {
@@ -474,11 +956,14 @@ const AllReviews = () => {
                                   {childReplies.map((childChat) => {
                                     const childOwnerId = childChat.senderId?._id || childChat.senderId;
                                     const isMyChildReply = childOwnerId === loggedInUserId && childChat.senderRole === "guest";
+                                    const childMessage = childChat.message || "";
+                                    const isChildMessageExpanded = !!expandedReplyMessages[childChat._id];
+                                    const shouldTruncateChildMessage = childMessage.length > 300;
 
                                     return (
-                                      <div key={childChat._id} className={`relative group/child rounded-lg p-4 text-sm transition ${childChat.senderRole === "admin" || childChat.senderRole === "staff" ? "bg-[#f8fafc] border border-slate-100" : "bg-white border border-slate-100 shadow-sm"}`}>
+                              <div id={`reply-${childChat._id}`} key={childChat._id} className={`relative group/child rounded-lg p-2.5 text-[12px] transition ${childChat.senderRole === "admin" || childChat.senderRole === "staff" ? "bg-[#f8fafc] border border-slate-100" : "bg-white border border-slate-100 shadow-sm"} ${flashTargetId === `reply-${childChat._id}` ? "flash-highlight" : ""}`}>
                                         
-                                        <div className="flex items-center gap-2.5 mb-2 pr-10">
+                                        <div className="flex items-start gap-2.5 mb-0.5">
                                           {childChat.senderRole !== "admin" && (
                                             <div className="h-6 w-6 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
                                               {childChat.senderId?.image ? (
@@ -489,12 +974,12 @@ const AllReviews = () => {
                                             </div>
                                           )}
 
-                                          <span className="font-bold text-slate-900 text-sm">{formatName(childChat.senderId, childChat.senderRole)}</span>
+                                          <span className="font-bold text-slate-900 text-[13px]">{formatName(childChat.senderId, childChat.senderRole)}</span>
                                           {childChat.senderRole !== "guest" && (
                                             <span className={`${childChat.senderRole === 'admin' ? 'bg-slate-900' : 'bg-blue-600'} text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider`}>{childChat.senderRole}</span>
                                           )}
                                           
-                                          <div className="text-[10px] text-slate-400 ml-auto flex flex-col items-end gap-1">
+                                          <div className="ml-auto text-[10px] text-slate-400 flex flex-col items-end gap-1">
                                             <div className="flex items-center justify-end w-full gap-1">
                                               {formatDateTime(childChat.createdAt)} {childChat.isEdited && "(Edited)"}
                                             </div>
@@ -509,21 +994,34 @@ const AllReviews = () => {
 
                                         {editingReplyId === childChat._id ? (
                                           <div className="mt-2">
-                                            <textarea className="w-full bg-white border-2 border-blue-400 rounded-lg p-3 text-sm focus:outline-none resize-none shadow-sm" rows="2" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} autoFocus />
+                                            <textarea className="w-full bg-white border-2 border-blue-400 rounded-lg p-2.5 text-[12px] focus:outline-none resize-none shadow-sm" rows="2" value={editReplyText} onChange={(e) => setEditReplyText(e.target.value)} autoFocus />
                                             <div className="flex justify-end gap-2 mt-2">
                                               <button onClick={() => setEditingReplyId(null)} className="text-xs font-bold text-slate-500">Cancel</button>
                                               <button onClick={() => handleEditReply(childChat._id)} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold shadow-sm">Save</button>
                                             </div>
                                           </div>
                                         ) : (
-                                          <div className="flex justify-between items-start gap-4">
-                                            <p className="text-slate-600 text-[13px] leading-relaxed flex-1">{childChat.message}</p>
-                                            
+                                          <div>
+                                            <p className="text-slate-600 text-[13px] leading-relaxed">
+                                              {shouldTruncateChildMessage && !isChildMessageExpanded
+                                                ? `${childMessage.slice(0, 300)}...`
+                                                : childMessage}
+                                            </p>
+                                            {shouldTruncateChildMessage && (
+                                              <button
+                                                onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [childChat._id]: !prev[childChat._id] }))}
+                                                className="mt-1 text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                              >
+                                                {isChildMessageExpanded ? "See less" : "See more"}
+                                              </button>
+                                            )}
                                             {isMyChildReply && (
-                                              <div className="absolute top-2 right-2 opacity-0 group-hover/child:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm z-10">
+                                              <div className="mt-1 flex justify-end">
+                                                <div className="opacity-0 group-hover/child:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm pointer-events-none group-hover/child:pointer-events-auto">
                                                   <button onClick={() => { setEditingReplyId(childChat._id); setEditReplyText(childChat.message); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Reply"><Pencil size={12} /></button>
                                                   <div className="w-px h-3 bg-slate-200"></div>
                                                   <button onClick={() => setItemToDelete({ type: 'reply', id: childChat._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Reply"><Trash2 size={12} /></button>
+                                                </div>
                                               </div>
                                             )}
                                           </div>
@@ -546,7 +1044,7 @@ const AllReviews = () => {
                                           </div>
                                         )}
 
-                                        <div className="mt-2 flex justify-start items-center">
+                                        <div className="mt-1 flex justify-start items-center">
                                           {canReply && (!activeReplyId || activeReplyId !== parentChat._id) && (
                                             <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-2 py-1 rounded-md -ml-2 transition-colors hover:bg-blue-50">
                                               <Reply size={14} /> Reply
@@ -573,10 +1071,14 @@ const AllReviews = () => {
                           );
                         })}
                         
-                        {parentChats.length > 1 && (
+                        {parentChats.length > 0 && (
                           <div className="flex justify-center mt-2">
                             <button onClick={() => toggleReviewThreads(review._id)} className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm">
-                              {isThreadExpanded ? <><ChevronUp size={14} /> Show less responses</> : <><ChevronDown size={14} /> View {parentChats.length - 1} more {parentChats.length - 1 === 1 ? "response" : "responses"}</>}
+                              {isThreadExpanded ? (
+                                <><ChevronUp size={14} /> Hide replies</>
+                              ) : (
+                                <><ChevronDown size={14} /> See {parentChats.length} {parentChats.length === 1 ? "reply" : "replies"}</>
+                              )}
                             </button>
                           </div>
                         )}
@@ -589,6 +1091,17 @@ const AllReviews = () => {
               );
             })
           )}
+          {!isLoading && reviews.length > visibleReviewCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, reviews.length))}
+                className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+              >
+                Show more reviews
+              </button>
+            </div>
+          )}
+          </div>
         </div>
       </div>
 
@@ -603,6 +1116,57 @@ const AllReviews = () => {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setItemToDelete(null)} className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">Cancel</button>
               <button onClick={executeDelete} className="px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider text-white bg-red-500 hover:bg-red-600 transition-colors shadow-sm">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lightbox.images.length > 0 && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={closeLightbox}
+        >
+          <div
+            className="relative w-full max-w-3xl mx-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="absolute -top-12 right-0 text-white/80 hover:text-white transition-colors"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
+              <img
+                src={lightbox.images[lightbox.index]}
+                alt={`Review image ${lightbox.index + 1}`}
+                className="w-full max-h-[80vh] object-contain bg-black"
+              />
+              {lightbox.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevImage}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    title="Previous"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextImage}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    title="Next"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white">
+                    {lightbox.index + 1} / {lightbox.images.length}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

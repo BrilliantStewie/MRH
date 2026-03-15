@@ -14,7 +14,10 @@ import {
   Reply,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -28,6 +31,8 @@ const StaffReviews = () => {
 
   const [reviews, setReviews] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const REVIEW_PAGE_SIZE = 5;
+  const [visibleReviewCount, setVisibleReviewCount] = useState(REVIEW_PAGE_SIZE);
   const [replyText, setReplyText] = useState({});
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [editingReplyId, setEditingReplyId] = useState(null);
@@ -39,6 +44,8 @@ const StaffReviews = () => {
   // State for child replies & main thread toggles
   const [expandedReplies, setExpandedReplies] = useState({});
   const [expandedReviewThreads, setExpandedReviewThreads] = useState({});
+  const [expandedReplyMessages, setExpandedReplyMessages] = useState({});
+  const [lightbox, setLightbox] = useState({ images: [], index: 0 });
 
   // 🌟 State for Custom Delete Modal
   const [itemToDelete, setItemToDelete] = useState(null);
@@ -121,6 +128,10 @@ const StaffReviews = () => {
   useEffect(() => {
     fetchReviews();
   }, [backendUrl, sToken]);
+
+  useEffect(() => {
+    setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), reviews.length || REVIEW_PAGE_SIZE));
+  }, [reviews.length]);
 
   /* ==========================================
      SEND REPLY
@@ -242,6 +253,42 @@ const StaffReviews = () => {
     });
   };
 
+  const resolveReviewImage = (imagePath) => {
+    if (!imagePath || typeof imagePath !== "string") return "";
+    if (imagePath.startsWith("http")) return imagePath;
+    return `${backendUrl}/${imagePath.replace(/\\/g, "/")}`;
+  };
+
+  const openLightbox = (images, index = 0) => {
+    const resolvedImages = (images || [])
+      .map(resolveReviewImage)
+      .filter(Boolean);
+    if (!resolvedImages.length) return;
+    const safeIndex = Math.max(0, Math.min(index, resolvedImages.length - 1));
+    setLightbox({ images: resolvedImages, index: safeIndex });
+  };
+
+  const closeLightbox = () => {
+    setLightbox({ images: [], index: 0 });
+  };
+
+  const showNextImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return { ...prev, index: (prev.index + 1) % prev.images.length };
+    });
+  };
+
+  const showPrevImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return {
+        ...prev,
+        index: (prev.index - 1 + prev.images.length) % prev.images.length
+      };
+    });
+  };
+
   const formatStayDate = (start, end) => {
     if (!start) return "";
     const s = new Date(start);
@@ -255,39 +302,103 @@ const StaffReviews = () => {
     return formatDate(start);
   };
 
-  const averageRating = reviews.length > 0
-    ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / reviews.length).toFixed(1)
+  const ratingBuckets = [5, 4, 3, 2, 1];
+  const ratingCounts = ratingBuckets.reduce((acc, rating) => {
+    acc[rating] = reviews.filter((review) => Number(review.rating || 0) === rating).length;
+    return acc;
+  }, {});
+  const maxRatingCount = Math.max(1, ...ratingBuckets.map((rating) => ratingCounts[rating]));
+  const totalReviews = reviews.length;
+  const averageRating = totalReviews
+    ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / totalReviews).toFixed(1)
     : "0.0";
 
   return (
-    <div className="w-full min-h-screen bg-[#f8fafc] p-6 md:p-12 font-sans text-slate-800 relative overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]">
-      
-      {/* PAGE HEADER */}
-      <div className="max-w-4xl mx-auto mb-10 flex flex-col md:flex-row items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Staff Feedback</h1>
-          <p className="text-slate-500 mt-1">Manage guest reviews and responses</p>
-        </div>
+    <div className="reviews-page w-full min-h-screen text-slate-800 relative">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-slate-50 via-white to-transparent" />
+      </div>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+        .reviews-page {
+          font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
+          background-color: #f5f7fb;
+        }
+        .review-card {
+          position: relative;
+          overflow: hidden;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .review-card::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: #0f172a;
+          opacity: 0.12;
+        }
+        .review-card::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 2px;
+          background: linear-gradient(90deg, rgba(15,23,42,0.08), rgba(37,99,235,0.18), rgba(15,23,42,0.08));
+        }
+        .review-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 30px -24px rgba(15, 23, 42, 0.45);
+        }
+      `}</style>
 
-        {/* STATS BADGE */}
-        <div className="flex items-center gap-5 bg-white px-6 py-3 rounded-xl border border-slate-200 shadow-sm">
-          <div className="text-right">
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Avg Rating</p>
-            <div className="flex items-center justify-end gap-1.5">
-              <span className="text-xl font-bold text-slate-900">{averageRating}</span>
-              <div className="flex text-amber-400 mb-1"><Star size={16} fill="currentColor" /></div>
-            </div>
-          </div>
-          <div className="h-10 w-px bg-slate-100"></div>
-          <div>
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">Total</p>
-            <p className="text-xl font-bold text-slate-900 text-center">{reviews.length}</p>
-          </div>
-        </div>
+      <div className="w-full max-w-none mx-auto px-4 lg:px-12 xl:px-16 2xl:px-20 pt-20 pb-20">
+      
+      <div className="mb-10 w-full max-w-[1200px] mx-auto">
+        <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-slate-400">
+          Staff
+        </p>
+        <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
+        <p className="text-slate-500 mt-2 max-w-2xl">
+          Manage guest reviews and responses.
+        </p>
       </div>
 
-      {/* REVIEWS LIST */}
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-auto">
+        <aside className="sticky top-28 h-fit">
+          <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
+            <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
+              <div className="mt-1 flex items-center gap-2">
+                <Star size={12} className="text-amber-400" fill="currentColor" />
+                <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
+              </div>
+              <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+            </div>
+            <div className="space-y-2">
+              {ratingBuckets.map((rating) => (
+                <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                  <div className="flex items-center gap-1 w-9">
+                    <span>{rating}</span>
+                    <Star size={12} className="text-amber-400" fill="currentColor" />
+                  </div>
+                  <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-amber-400"
+                      style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <div className="space-y-6 flex flex-col items-start w-full pl-8">
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : reviews.length === 0 ? (
@@ -295,55 +406,62 @@ const StaffReviews = () => {
             <p className="text-slate-400 italic">No reviews found yet.</p>
           </div>
         ) : (
-          reviews.map((review) => {
+          reviews.slice(0, visibleReviewCount).map((review) => {
             const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];
             const isThreadExpanded = expandedReviewThreads[review._id];
+            const booking = review.bookingId;
+            const bookingName = booking?.bookingName;
+            const reviewMessage = review.comment || "";
+            const isReviewMessageExpanded = !!expandedReplyMessages[`review-${review._id}`];
+            const shouldTruncateReviewMessage = reviewMessage.length > 300;
 
             return (
-              <div key={review._id} className="group bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200 overflow-hidden relative">
-                <div className="absolute left-0 top-0 bottom-0 w-[5px] bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                <div className="p-8 pl-10">
+              <div key={review._id} className="group review-card bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[180px] max-w-[700px] w-full">
+                <div className="p-4 pl-5">
                   
-                  {/* HEADER: User & Rating */}
-                  <div className="flex justify-between items-start mb-5">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
-                        {review.userId?.image ? (
-                          <img src={review.userId.image.startsWith('http') ? review.userId.image : `${backendUrl}/${review.userId.image}`} alt="User" className="w-full h-full object-cover" />
-                        ) : (
-                          <User size={20} className="text-slate-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-[16px] leading-tight">{formatName(review.userId, "guest")}</h3>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1 font-medium">
-                          <Calendar size={12} />
-                          <span>{formatStayDate(review.check_in, review.check_out)}</span>
+                  {/* --- MAIN REVIEW HEADER --- */}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="mt-6 flex items-center gap-3">
+                        <div className="h-14 w-14 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
+                          {review.userId?.image ? (
+                            <img src={review.userId.image.startsWith('http') ? review.userId.image : `${backendUrl}/${review.userId.image}`} alt="User" className="w-full h-full object-cover" />
+                          ) : (
+                            <User size={20} className="text-slate-400" />
+                          )}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-[17px] leading-tight">{formatName(review.userId, "guest")}</h3>
+                          <div className="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Calendar size={11} /> {formatStayDate(booking?.check_in, booking?.check_out)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="flex gap-1 text-amber-400 mb-1 justify-end">
-                        {[...Array(5)].map((_, i) => (
-                          <Star key={i} size={14} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-slate-200"} />
-                        ))}
+                    <div className="text-right sm:ml-auto">
+                      <div className="inline-flex min-w-[120px] items-center justify-between gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1">
+                        <div className="flex gap-1 text-amber-400">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} className={i < review.rating ? "" : "text-amber-200"} />
+                          ))}
+                        </div>
+                        <span className="text-[10px] font-bold text-amber-700">{Number(review.rating || 0)}.0</span>
                       </div>
-                      <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1 mb-1">
-                        {formatDateTime(review.createdAt)}
-                        {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
+                      <p className="mt-2 text-[8px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1">
+                        {formatDateTime(review.createdAt)} {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
                       </p>
 
-                      {/* GUEST EDIT HISTORY TOGGLE */}
                       {review.isEdited && review.editHistory && review.editHistory.length > 0 && (
                         <div className="flex justify-end mt-1">
                           <button 
                             onClick={() => setVisibleReviewHistoryId(visibleReviewHistoryId === review._id ? null : review._id)}
-                            className="mt-5 flex items-center justify-end w-full gap-1 text-[9px] font-bold text-indigo-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
+                            className="mt-2 inline-flex items-center gap-1 text-[8px] font-semibold text-slate-500 hover:text-slate-700 transition-colors"
                           >
                             <Clock size={10} />
-                            {visibleReviewHistoryId === review._id ? "Hide History" : "View History"}
+                            {visibleReviewHistoryId === review._id ? "Hide Previous Versions" : "View Previous Versions"}
                           </button>
                         </div>
                       )}
@@ -384,11 +502,61 @@ const StaffReviews = () => {
                   )}
 
                   {/* MAIN REVIEW CONTENT */}
-                  <div className="mb-8">
-                    <h2 className="text-2xl font-serif italic text-slate-800 mb-3 leading-snug">
-                      "{review.bookingId?.bookingName || (review.bookingId?.room_ids?.length > 0 ? review.bookingId.room_ids.map((r) => r.name).join(", ") : "Retreat Stay")}"
-                    </h2>
-                    <p className="text-slate-600 text-[14px] leading-relaxed font-light">{review.comment || "No written review provided."}</p>
+                  <div className="mb-5">
+                    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+                      {bookingName && (
+                        <p className="text-[20px] font-bold text-slate-900 mb-2">
+                          {bookingName}
+                        </p>
+                      )}
+                      <p className="text-slate-700 text-[13px] leading-relaxed text-justify">
+                        {shouldTruncateReviewMessage && !isReviewMessageExpanded
+                          ? `${reviewMessage.slice(0, 300)}...`
+                          : (reviewMessage || "No written review provided.")}
+                      </p>
+                      {shouldTruncateReviewMessage && (
+                        <button
+                          onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [`review-${review._id}`]: !prev[`review-${review._id}`] }))}
+                          className="mt-1 text-[10px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                        >
+                          {isReviewMessageExpanded ? "See less" : "See more"}
+                        </button>
+                      )}
+                    </div>
+                    {Array.isArray(review.images) && review.images.length > 0 && (
+                      <div className="mt-6 flex flex-wrap gap-2">
+                        {review.images.slice(0, 2).map((image, index) => {
+                          const resolvedImage = resolveReviewImage(image);
+                          if (!resolvedImage) return null;
+                          return (
+                            <button
+                              key={`${review._id}-image-${index}`}
+                              type="button"
+                              onClick={() => openLightbox(review.images, index)}
+                              className="h-14 w-14 overflow-hidden rounded-lg border border-slate-100 bg-slate-50"
+                              title="View image"
+                            >
+                              <img
+                                src={resolvedImage}
+                                alt={`Review ${index + 1}`}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </button>
+                          );
+                        })}
+                        {review.images.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => openLightbox(review.images, 2)}
+                            className="h-14 w-14 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-[10px] font-bold text-slate-500"
+                            title="View more images"
+                          >
+                            +{review.images.length - 2} more
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* REPLIES (THREADED VIEW) */}
@@ -401,6 +569,11 @@ const StaffReviews = () => {
                         // Check if there are any child replies to this parent reply
                         const childReplies = review.reviewChat.filter(child => child.parentReplyId === parentChat._id);
                         const isExpanded = expandedReplies[parentChat._id];
+                        const parentMessage = parentChat.message || "";
+                        const isParentMessageExpanded = !!expandedReplyMessages[parentChat._id];
+                        const shouldTruncateParentMessage = parentMessage.length > 300;
+                        const parentReplyOwnerId = parentChat.senderId?._id || parentChat.senderId;
+                        const isMyReply = String(parentReplyOwnerId || "") === String(loggedInUserId || "") && parentChat.senderRole === "staff";
 
                         return (
                           <div key={parentChat._id} className="space-y-3">
@@ -459,7 +632,19 @@ const StaffReviews = () => {
                                 </>
                               ) : (
                                 <>
-                                  <p className="text-slate-600 text-[13px] leading-relaxed pr-16">{parentChat.message}</p>
+                                  <p className="text-slate-600 text-[13px] leading-relaxed pr-16">
+                                    {shouldTruncateParentMessage && !isParentMessageExpanded
+                                      ? `${parentMessage.slice(0, 300)}...`
+                                      : parentMessage}
+                                  </p>
+                                  {shouldTruncateParentMessage && (
+                                    <button
+                                      onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [parentChat._id]: !prev[parentChat._id] }))}
+                                      className="mt-1 text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                    >
+                                      {isParentMessageExpanded ? "See less" : "See more"}
+                                    </button>
+                                  )}
                                   
                                   {/* PARENT HISTORY CONTENT */}
                                   {visibleHistoryId === parentChat._id && (
@@ -484,8 +669,8 @@ const StaffReviews = () => {
                                     </div>
                                   )}
 
-                                  {/* ADMIN ONLY: FLOATING ACTION MENU */}
-                                  {parentChat.senderRole === "admin" && (
+                                  {/* STAFF ONLY: FLOATING ACTION MENU */}
+                                  {isMyReply && (
                                     <div className="absolute top-10 right-4 opacity-0 group-hover/thread:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white border border-slate-200 shadow-sm rounded-md p-0.5 z-10">
                                       <button onClick={() => { setEditingReplyId(parentChat._id); setEditText(parentChat.message); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"><Pencil size={13} /></button>
                                       <div className="w-px h-3 bg-slate-200"></div>
@@ -506,7 +691,14 @@ const StaffReviews = () => {
                             {/* CHILD REPLIES */}
                             {isExpanded && childReplies.length > 0 && (
                               <div className="ml-12 space-y-3 border-l-2 border-slate-100 pl-4 mt-2">
-                                {childReplies.map((childChat) => (
+                                {childReplies.map((childChat) => {
+                                  const childMessage = childChat.message || "";
+                                  const isChildMessageExpanded = !!expandedReplyMessages[childChat._id];
+                                  const shouldTruncateChildMessage = childMessage.length > 300;
+                                  const childReplyOwnerId = childChat.senderId?._id || childChat.senderId;
+                                  const isMyChildReply = String(childReplyOwnerId || "") === String(loggedInUserId || "") && childChat.senderRole === "staff";
+
+                                  return (
                                   <div key={childChat._id} className={`relative group/thread rounded-lg p-4 text-sm transition ${childChat.senderRole === "admin" || childChat.senderRole === "staff" ? "bg-[#f8fafc] border border-slate-100" : "bg-white border border-slate-100"}`}>
                                     <div className="flex items-center gap-2.5 mb-2 pr-10">
                                       {childChat.senderRole !== "admin" && (
@@ -556,7 +748,19 @@ const StaffReviews = () => {
                                       </>
                                     ) : (
                                       <>
-                                        <p className="text-slate-600 text-[13px] leading-relaxed pr-10">{childChat.message}</p>
+                                        <p className="text-slate-600 text-[13px] leading-relaxed pr-10">
+                                          {shouldTruncateChildMessage && !isChildMessageExpanded
+                                            ? `${childMessage.slice(0, 300)}...`
+                                            : childMessage}
+                                        </p>
+                                        {shouldTruncateChildMessage && (
+                                          <button
+                                            onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [childChat._id]: !prev[childChat._id] }))}
+                                            className="mt-1 text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                          >
+                                            {isChildMessageExpanded ? "See less" : "See more"}
+                                          </button>
+                                        )}
                                         
                                         <div className="mt-2 flex justify-start items-center">
                                           {(!activeReplyId || activeReplyId !== parentChat._id) && (
@@ -590,7 +794,7 @@ const StaffReviews = () => {
                                         )}
 
                                         {/* ADMIN ONLY: FLOATING ACTION MENU */}
-                                        {childChat.senderRole === "admin" && (
+                                        {isMyChildReply && (
                                           <div className="absolute top-10 right-4 opacity-0 group-hover/thread:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white border border-slate-200 shadow-sm rounded-md p-0.5 z-10">
                                             <button onClick={() => { setEditingReplyId(childChat._id); setEditText(childChat.message); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"><Pencil size={13} /></button>
                                             <div className="w-px h-3 bg-slate-200"></div>
@@ -600,7 +804,8 @@ const StaffReviews = () => {
                                       </>
                                     )}
                                   </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             )}
 
@@ -629,10 +834,10 @@ const StaffReviews = () => {
                       })}
 
                       {/* "VIEW X MORE RESPONSES" TOGGLE */}
-                      {parentChats.length > 1 && (
-                        <div className="flex justify-center mt-2">
+                      {parentChats.length > 0 && (
+                        <div className="flex justify-end mt-2">
                           <button onClick={() => toggleReviewThreads(review._id)} className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm">
-                            {isThreadExpanded ? <><ChevronUp size={14} /> Show less responses</> : <><ChevronDown size={14} /> View {parentChats.length - 1} more {parentChats.length - 1 === 1 ? "response" : "responses"}</>}
+                            {isThreadExpanded ? <><ChevronUp size={14} /> Hide {parentChats.length === 1 ? "reply" : "replies"}</> : <><ChevronDown size={14} /> See {parentChats.length} {parentChats.length === 1 ? "reply" : "replies"}</>}
                           </button>
                         </div>
                       )}
@@ -663,7 +868,19 @@ const StaffReviews = () => {
             );
           })
         )}
+        {!isLoading && reviews.length > visibleReviewCount && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, reviews.length))}
+              className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+            >
+              Show more reviews
+            </button>
+          </div>
+        )}
       </div>
+    </div>
+  </div>
 
       {/* DELETION CONFIRMATION MODAL */}
       {itemToDelete && (
@@ -689,6 +906,57 @@ const StaffReviews = () => {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {lightbox.images.length > 0 && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={closeLightbox}
+        >
+          <div
+            className="relative w-full max-w-3xl mx-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="absolute -top-12 right-0 text-white/80 hover:text-white transition-colors"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+            <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black">
+              <img
+                src={lightbox.images[lightbox.index]}
+                alt={`Review image ${lightbox.index + 1}`}
+                className="w-full max-h-[80vh] object-contain bg-black"
+              />
+              {lightbox.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevImage}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    title="Previous"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextImage}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white hover:bg-black/70 transition-colors"
+                    title="Next"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white">
+                    {lightbox.index + 1} / {lightbox.images.length}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

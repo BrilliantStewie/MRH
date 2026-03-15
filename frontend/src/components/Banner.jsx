@@ -1,15 +1,33 @@
-import React, { useState } from 'react'; // Added useState
+import React, { useContext, useEffect, useState } from 'react'; // Added useState
 import { assets } from '../assets/assets';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Star, Calendar } from 'lucide-react';
 import AvailabilityCalendar from './AvailabilityCalendar'; // Import your calendar component
+import axios from "axios";
+import { AppContext } from "../context/AppContext";
 
 const Banner = () => {
   const navigate = useNavigate();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const { backendUrl } = useContext(AppContext);
 
   // You would typically fetch these from your API or pass them as props
   const [bookings, setBookings] = useState([]); 
+
+  useEffect(() => {
+    if (!backendUrl) return;
+    const fetchAvailability = async () => {
+      try {
+        const { data } = await axios.get(`${backendUrl}/api/booking/calendar-availability`);
+        if (data.success) {
+          setBookings(data.bookings || []);
+        }
+      } catch (error) {
+        console.error("Failed to load availability:", error);
+      }
+    };
+    fetchAvailability();
+  }, [backendUrl]);
 
   return (
     <div className="max-w-7xl mx-auto px-8 mt-16 mb-24">

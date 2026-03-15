@@ -92,7 +92,7 @@ const App = () => {
           <Route path="/reviews" element={<AllReviews />} />
 
           <Route path="/*" element={
-            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="mx-auto max-w-[1750px] px-3 sm:px-4 lg:px-6 xl:px-[100px]">
               <Routes>
                 <Route path="/rooms" element={<Rooms />} />
                 <Route path="/login" element={<Login />} />

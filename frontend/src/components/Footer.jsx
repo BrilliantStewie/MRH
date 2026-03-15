@@ -6,7 +6,7 @@ import { MapPin, Phone, Mail, Facebook, Instagram, Youtube, ArrowRight, Cross } 
 const Footer = () => {
   return (
     <footer className="bg-white border-t border-slate-100 pt-10 font-sans text-slate-900">
-      <div className="max-w-7xl mx-auto px-8">
+      <div className="mx-auto max-w-[1750px] px-4 lg:px-6 xl:px-[100px]">
         
         {/* --- MAIN LAYOUT GRID --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-16 mb-24">

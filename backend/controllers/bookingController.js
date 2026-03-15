@@ -12,6 +12,14 @@ d.setHours(0,0,0,0);
 return d;
 };
 
+const addDays = (date, days) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+};
+
+const rangesOverlap = (startA, endA, startB, endB) => startA <= endB && endA >= startB;
+
 /* ======================================================
    CREATE BOOKING
 ====================================================== */
@@ -21,15 +29,39 @@ try{
 
 const userId = req.userId;
 
-const {
-bookingName,
-bookingItems=[],
-check_in,
-check_out
-} = req.body;
+ const {
+  bookingName,
+  bookingItems=[],
+  check_in,
+  check_out,
+  venueParticipants=0,
+  extra_packages=[]
+ } = req.body;
 
-if(!bookingItems.length)
-return res.json({success:false,message:"No rooms selected"});
+ if(!bookingItems.length && Number(venueParticipants) <= 0)
+ return res.json({success:false,message:"Please add room selection or venue participants"});
+ 
+ const extraPackages = Array.isArray(extra_packages) ? extra_packages : [];
+ let extraPackageDocs = [];
+ 
+ if (extraPackages.length) {
+   extraPackageDocs = await packageModel.find({ _id: { $in: extraPackages } });
+   if (extraPackageDocs.length !== extraPackages.length) {
+     return res.json({ success: false, message: "Invalid package selected" });
+   }
+ }
+ 
+ if (!bookingItems.length) {
+   if (!extraPackages.length) {
+     return res.json({ success: false, message: "Please select a venue retreat package" });
+   }
+   const hasVenuePackage = extraPackageDocs.some(
+     (pkg) => pkg.packageType?.toLowerCase() === "venue package"
+   );
+   if (!hasVenuePackage) {
+     return res.json({ success: false, message: "Please select a venue retreat package" });
+   }
+ }
 
 /* ---------- NORMALIZE DATES ---------- */
 
@@ -40,50 +72,70 @@ const today=normalizeDate(new Date());
 if(start < today)
 return res.json({success:false,message:"Past dates not allowed"});
 
-if(end <= start)
-return res.json({success:false,message:"Invalid date range"});
+ if(end < start)
+ return res.json({success:false,message:"Invalid date range"});
 
-/* ---------- GET ROOM IDS ---------- */
+ if (end.getTime() === start.getTime() && bookingItems.length) {
+  return res.json({ success: false, message: "Rooms are not available for same-day bookings" });
+ }
 
-const roomIds = bookingItems.map(item=>item.room_id);
-/* ---------- CHECK ROOM CONFLICT ---------- */
+ /* ---------- CHECK ROOM CONFLICT (WITH CLEANING DAY) ---------- */
+ if (bookingItems.length) {
+   const uniqueRooms = bookingItems.map(item => item.room_id);
 
-const uniqueRooms = bookingItems.map(item => item.room_id);
+   const bookings = await bookingModel.find(
+     {
+       "bookingItems.room_id": { $in: uniqueRooms },
+       status: { $in: ["pending", "approved"] }
+     },
+     "check_in check_out bookingItems"
+   );
 
-const conflict = await bookingModel.findOne({
-  "bookingItems.room_id": { $in: uniqueRooms },
-  status: { $in: ["pending", "approved"] },
-  check_in: { $lt: end },
-  check_out: { $gt: start }
-});
+   const conflict = bookings.some((booking) => {
+     const existingStart = normalizeDate(booking.check_in);
+     const existingEnd = normalizeDate(booking.check_out);
+     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
+     return rangesOverlap(existingStart, cleaningEnd, start, end);
+   });
 
-if (conflict) {
-  return res.json({
-    success: false,
-    message: "One or more selected rooms are already booked for those dates"
-  });
-}
+   if (conflict) {
+     return res.json({
+       success: false,
+       message: "One or more selected rooms are already booked (includes cleaning day)"
+     });
+   }
+ }
 
 /* ---------- CALCULATE PRICE ---------- */
 
 const days = Math.ceil((end-start)/(1000*60*60*24)) || 1;
 
-let total_price = 0;
+ let total_price = 0;
 
-for (const item of bookingItems){
+ for (const item of bookingItems){
 
-const pkg = await packageModel.findById(item.package_id);
+ const pkg = await packageModel.findById(item.package_id);
 
-if(!pkg)
-return res.json({success:false,message:"Invalid package selected"});
+ if(!pkg)
+ return res.json({success:false,message:"Invalid package selected"});
 
-const subtotal = pkg.price * item.participants * days;
+ const subtotal = pkg.price * item.participants * days;
 
-item.subtotal = subtotal;
+ item.subtotal = subtotal;
 
-total_price += subtotal;
+ total_price += subtotal;
 
-}
+ }
+
+ if (extraPackageDocs.length) {
+   const participantsForExtras = bookingItems.length
+     ? bookingItems.reduce((sum, item) => sum + Number(item.participants || 0), 0)
+     : Number(venueParticipants) || 0;
+ 
+   for (const pkg of extraPackageDocs) {
+     total_price += pkg.price * participantsForExtras * days;
+   }
+ }
 
 /* ---------- CREATE BOOKING ---------- */
 
@@ -92,7 +144,9 @@ const booking = await bookingModel.create({
 user_id:userId,
 bookingName,
 
-bookingItems,
+ bookingItems,
+ extra_packages: extraPackages,
+ venueParticipants: Number(venueParticipants) || 0,
 
 check_in:start,
 check_out:end,
@@ -330,18 +384,32 @@ try{
 
 const {roomIds=[],checkIn,checkOut}=req.body;
 
+if (!roomIds.length || !checkIn || !checkOut) {
+  return res.json({ success: true });
+}
+
 const start=normalizeDate(checkIn);
 const end=normalizeDate(checkOut);
 
-const conflict = await bookingModel.findOne({
-  "bookingItems.room_id": { $in: uniqueRooms },
-  status: { $in: ["pending", "approved"] }, // important
-  check_in: { $lt: end },
-  check_out: { $gt: start }
+const uniqueRooms = roomIds;
+
+const bookings = await bookingModel.find(
+  {
+    "bookingItems.room_id": { $in: uniqueRooms },
+    status: { $in: ["pending", "approved"] }
+  },
+  "check_in check_out bookingItems"
+);
+
+const conflict = bookings.some((booking) => {
+  const existingStart = normalizeDate(booking.check_in);
+  const existingEnd = normalizeDate(booking.check_out);
+  const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
+  return rangesOverlap(existingStart, cleaningEnd, start, end);
 });
 
 if(conflict)
-return res.json({success:false,message:"Rooms unavailable"});
+return res.json({success:false,message:"Rooms unavailable (includes cleaning day)"});
 
 res.json({success:true});
 
@@ -388,6 +456,110 @@ res.json({success:true,blockedDates});
 
 }catch(error){
 res.json({success:false,message:error.message});
+}
+};
+
+/* ======================================================
+   GET BOOKED ROOMS FOR DATE RANGE
+====================================================== */
+
+export const getBookedRoomsForRange = async (req, res) => {
+try {
+  const { roomIds = [], checkIn, checkOut } = req.body;
+
+  if (!checkIn || !checkOut || !roomIds.length) {
+    return res.json({ success: true, bookedRoomIds: [] });
+  }
+
+  const start = normalizeDate(checkIn);
+  const end = normalizeDate(checkOut);
+
+  if (end < start) {
+    return res.json({ success: true, bookedRoomIds: [] });
+  }
+
+  const allowedIds = new Set(roomIds.map((id) => String(id)));
+
+  const bookings = await bookingModel.find(
+    {
+      "bookingItems.room_id": { $in: roomIds },
+      status: { $in: ["pending", "approved"] }
+    },
+    "check_in check_out bookingItems"
+  );
+
+  const bookedSet = new Set();
+  const bookedReasons = new Map();
+  bookings.forEach((booking) => {
+    const existingStart = normalizeDate(booking.check_in);
+    const existingEnd = normalizeDate(booking.check_out);
+    const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
+
+    const isBookingOverlap = rangesOverlap(existingStart, existingEnd, start, end);
+    const isCleaningOverlap = rangesOverlap(cleaningEnd, cleaningEnd, start, end);
+    if (!isBookingOverlap && !isCleaningOverlap) return;
+
+    (booking.bookingItems || []).forEach((item) => {
+      const id = String(item.room_id);
+      if (!allowedIds.has(id)) return;
+
+      bookedSet.add(id);
+
+      if (isBookingOverlap) {
+        bookedReasons.set(id, "booked");
+        return;
+      }
+
+      if (!bookedReasons.has(id)) {
+        bookedReasons.set(id, "cleaning");
+      }
+    });
+  });
+
+  const bookedRooms = Array.from(bookedSet).map((roomId) => ({
+    roomId,
+    reason: bookedReasons.get(roomId) || "booked"
+  }));
+
+  res.json({
+    success: true,
+    bookedRoomIds: Array.from(bookedSet),
+    bookedRooms
+  });
+} catch (error) {
+  res.json({ success: false, message: error.message });
+}
+};
+
+/* ======================================================
+   GET CALENDAR AVAILABILITY (GUEST COUNTS)
+====================================================== */
+
+export const getCalendarAvailability = async (req, res) => {
+try {
+  const bookings = await bookingModel.find(
+    { status: { $in: ["pending", "approved"] } },
+    "check_in check_out bookingItems venueParticipants status paymentStatus"
+  );
+
+  const availability = bookings.map((b) => {
+    const roomGuests = (b.bookingItems || []).reduce(
+      (sum, item) => sum + Number(item.participants || 0),
+      0
+    );
+    const venueGuests = Number(b.venueParticipants || 0);
+    return {
+      check_in: b.check_in,
+      check_out: b.check_out,
+      status: b.status,
+      paymentStatus: b.paymentStatus,
+      guestCount: roomGuests + venueGuests
+    };
+  });
+
+  res.json({ success: true, bookings: availability });
+} catch (error) {
+  res.json({ success: false, message: error.message });
 }
 };
 
@@ -454,26 +626,34 @@ res.json({success:false,message:error.message});
 export const getUserBookedDates = async (req,res)=>{
 try{
 
-const bookings = await bookingModel.find({
-user_id:req.userId,
-status:{$in:["pending","approved"]}
-});
+ const bookings = await bookingModel.find({
+ user_id:req.userId,
+ status:{$in:["pending","approved"]}
+ });
 
 const userBusyDates=[];
 
-bookings.forEach(b=>{
+ bookings.forEach(b=>{
 
-let current=new Date(b.check_in);
+ const start = normalizeDate(b.check_in);
+ const end = normalizeDate(b.check_out);
 
-while(current<b.check_out){
+ if (start.getTime() === end.getTime()) {
+   userBusyDates.push(new Date(start));
+   return;
+ }
 
-userBusyDates.push(new Date(current));
+ let current = new Date(start);
 
-current.setDate(current.getDate()+1);
+ while(current < end){
 
-}
+ userBusyDates.push(new Date(current));
 
-});
+ current.setDate(current.getDate()+1);
+
+ }
+
+ });
 
 res.json({success:true,userBusyDates});
 
