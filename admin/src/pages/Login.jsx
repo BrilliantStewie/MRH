@@ -184,7 +184,7 @@ const Login = () => {
   const isStaffResetView = !isAdmin && staffView === "Reset Password";
   const activeColor = isAdmin ? 'text-indigo-600' : 'text-gray-800';
   const ringColor = isAdmin ? 'focus:ring-indigo-100' : 'focus:ring-gray-200';
-  const inputLabel = isAdmin ? "Email Address" : "Email or Phone Number";
+  const inputLabel = isAdmin ? "Email address" : "Email or phone number";
   const inputType = isAdmin ? "email" : "text"; 
   const inputPlaceholder = isAdmin ? "Email" : "Email or Phone Number";
 
@@ -265,7 +265,7 @@ const Login = () => {
                 </div>
                 {!isStaffResetView && (
                   <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">{inputLabel}</label>
+                      <label className="text-sm font-semibold text-gray-500 ml-1">{inputLabel}</label>
                       <input 
                           type={inputType}
                           value={identifier}
@@ -292,7 +292,7 @@ const Login = () => {
                 {!isStaffResetView && (!showForgotEmailField || isAdmin) && (
                   <div className="space-y-1">
                     <div className="flex justify-between items-center">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide ml-1">Password</label>
+                      <label className="text-sm font-semibold text-gray-500 ml-1">Password</label>
                       {!isAdmin && (
                         <button
                           type="button"
@@ -425,8 +425,6 @@ const Login = () => {
 };
 
 export default Login;
-
-
 
 
 

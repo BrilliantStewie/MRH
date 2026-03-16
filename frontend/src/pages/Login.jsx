@@ -471,7 +471,7 @@ const Login = () => {
                   )}
 
                   <div className='space-y-1.5'>
-                    <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>{state === 'Sign Up' ? "Email" : "Email or Phone"}</label>
+                    <label className='text-sm font-semibold text-gray-500'>{state === 'Sign Up' ? "Email" : "Email or phone"}</label>
                     <div className='relative'>
                       <input 
                         className={`w-full bg-gray-50 border rounded-xl p-3.5 text-sm transition-all outline-none ${isAccountTaken && state === 'Sign Up' ? 'border-red-400 bg-red-50' : 'border-gray-100 focus:border-blue-500'}`}
@@ -517,7 +517,7 @@ const Login = () => {
                   {!showForgotEmailField && (
                     <div className='space-y-1.5'>
                       <div className='flex justify-between items-center'>
-                        <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>Password</label>
+                        <label className='text-sm font-semibold text-gray-500'>Password</label>
                         {state === 'Login' && <button type="button" onClick={() => setShowForgotEmailField(true)} className='text-[11px] text-blue-600 font-bold hover:underline'>Forgot Password?</button>}
                       </div>
                       <div className='relative'>
@@ -529,7 +529,7 @@ const Login = () => {
 
                   {state === 'Sign Up' && (
                     <div className='space-y-1.5'>
-                      <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>Confirm Password</label>
+                      <label className='text-sm font-semibold text-gray-500'>Confirm password</label>
                       <div className='relative'>
                         <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3.5 text-sm focus:border-blue-500 outline-none' type={showConfirmPassword ? "text" : "password"} onChange={(e) => setConfirmPassword(e.target.value)} value={confirmPassword} placeholder="Re-type password" required />
                         <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>{showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
