@@ -38,6 +38,7 @@ const Navbar = () => {
   const [showAllNotifications, setShowAllNotifications] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   /* ==========================================
      NAVBAR UI LOGIC
@@ -46,6 +47,13 @@ const Navbar = () => {
     setToken(false);
     localStorage.removeItem("token");
     navigate("/login");
+  };
+
+  const openLogoutConfirm = () => {
+    setShowLogoutConfirm(true);
+    setShowProfileMenu(false);
+    setShowNotifications(false);
+    setShowMobileMenu(false);
   };
 
   /* ==========================================
@@ -216,6 +224,14 @@ const Navbar = () => {
     }
   };
 
+  const appendFlashNonce = (link, nonce) => {
+    if (!link) return link;
+    const [path, query = ""] = link.split("?");
+    const params = new URLSearchParams(query);
+    params.set("flash", String(nonce));
+    return `${path}?${params.toString()}`;
+  };
+
   const userProfileImage = userData?.image;
   const firstName = userData?.firstName 
     ? userData.firstName 
@@ -234,6 +250,7 @@ const Navbar = () => {
     setShowAllNotifications(false);
     setShowClearConfirm(false);
     setShowNotificationMenu(false);
+    setShowLogoutConfirm(false);
   }, [location.pathname]);
 
   const navLinks = [
@@ -409,16 +426,18 @@ const Navbar = () => {
                                     ? n.link
                                     : meta.link || n.link;
                                   if (targetLink) {
-                                    const linkQuery = targetLink.includes("?") ? targetLink.split("?")[1] : "";
+                                    const flashNonce = Date.now();
+                                    const linkWithFlash = appendFlashNonce(targetLink, flashNonce);
+                                    const linkQuery = linkWithFlash.includes("?") ? linkWithFlash.split("?")[1] : "";
                                     const bookingIdFromLink = linkQuery
                                       ? new URLSearchParams(linkQuery).get("bookingId")
                                       : null;
-                                    navigate(targetLink, {
+                                    navigate(linkWithFlash, {
                                       state: {
                                         highlightType: n.type,
                                         bookingId: bookingIdFromLink,
                                         notificationMessage: n.message,
-                                        flashNonce: Date.now()
+                                        flashNonce
                                       }
                                     });
                                   }
@@ -494,9 +513,14 @@ const Navbar = () => {
               </div>
             )}
 
-            <button onClick={() => navigate("/retreat-booking")} className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all shadow-lg active:scale-95">
-              Book Retreat <ArrowRight size={14} className="opacity-70"/>
-            </button>
+            {token && (
+              <button
+                onClick={() => navigate("/retreat-booking")}
+                className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all shadow-lg active:scale-95"
+              >
+                Book Retreat <ArrowRight size={14} className="opacity-70" />
+              </button>
+            )}
 
             {token ? (
               <div className="relative">
@@ -523,15 +547,15 @@ const Navbar = () => {
                     <button onClick={() => navigate("/my-bookings")} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
                       <Calendar size={14}/> My Bookings
                     </button>
-                    <button onClick={logout} className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2">
-                      <LogOut size={14}/> Sign Out
+                    <button onClick={openLogoutConfirm} className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2">
+                      <LogOut size={14}/> Log Out
                     </button>
                   </div>
                 )}
               </div>
             ) : (
               <button onClick={() => navigate("/login")} className="px-6 py-2.5 bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-50 transition-all">
-                Login
+                Login / Sign Up
               </button>
             )}
 
@@ -557,7 +581,7 @@ const Navbar = () => {
                <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
                  <button onClick={() => { setShowMobileMenu(false); navigate('/my-profile'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Profile</button>
                  <button onClick={() => { setShowMobileMenu(false); navigate('/my-bookings'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Bookings</button>
-                 <button onClick={() => { setShowMobileMenu(false); logout(); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50">Sign Out</button>
+                 <button onClick={() => { setShowMobileMenu(false); openLogoutConfirm(); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50">Log Out</button>
                </div>
              ) : (
                 <button onClick={() => { setShowMobileMenu(false); navigate('/login'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 mt-2 border-t border-slate-100 pt-4">Login</button>
@@ -565,6 +589,43 @@ const Navbar = () => {
           </div>
         )}
       </nav>
+
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-slate-900">Log out?</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  You will need to sign in again to access your account.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  logout();
+                }}
+                className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

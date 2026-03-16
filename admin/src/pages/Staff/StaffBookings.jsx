@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { StaffContext } from "../../context/StaffContext";
 import {
@@ -252,9 +253,12 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 // --- MAIN PAGE ---
 const StaffBookings = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
+  const location = useLocation();
 
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
+  const [flashBookingId, setFlashBookingId] = useState(null);
+  const handledFlashRef = useRef(null);
   
   // Modal State
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -293,6 +297,59 @@ const StaffBookings = () => {
   useEffect(() => {
     if (sToken) fetchBookings();
   }, [sToken, backendUrl]);
+
+  const triggerBookingFlash = (bookingId) => {
+    if (!bookingId) return;
+    setFlashBookingId(null);
+    setTimeout(() => setFlashBookingId(`booking-${bookingId}`), 0);
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const flashParam = params.get("flash");
+    const bookingIdParam = params.get("bookingId");
+    const stateBookingId = location.state?.bookingId;
+    const hasFlash = Boolean(flashParam || location.state?.flashNonce);
+    const resolvedBookingId = bookingIdParam || stateBookingId;
+
+    if (!resolvedBookingId || !hasFlash) return;
+    const flashKey = flashParam || location.state?.flashNonce;
+    if (handledFlashRef.current === flashKey) return;
+    handledFlashRef.current = flashKey;
+
+    setSearchTerm("");
+    setBuildingFilter("All Buildings");
+    setTypeFilter("All Room Types");
+    setStatusFilter("All Status");
+    setSortOrder("Newest First");
+    setStartDate("");
+    setEndDate("");
+    triggerBookingFlash(resolvedBookingId);
+
+    if (flashParam) {
+      params.delete("flash");
+      const cleanedSearch = params.toString();
+      const cleanedUrl = `${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ""}`;
+      window.history.replaceState(window.history.state, "", cleanedUrl);
+    }
+  }, [location.search, location.state]);
+
+  useEffect(() => {
+    if (!flashBookingId) return;
+    let attempts = 0;
+    const maxAttempts = 12;
+    const interval = setInterval(() => {
+      const element = document.getElementById(flashBookingId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        clearInterval(interval);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+      attempts += 1;
+    }, 250);
+    return () => clearInterval(interval);
+  }, [flashBookingId, filteredBookings]);
 
   /* =======================================
      FILTERING & SORTING LOGIC
@@ -396,6 +453,15 @@ const StaffBookings = () => {
 
   return (
     <div className="w-full min-h-screen bg-[#f8fafc] p-4 md:p-8 font-sans overflow-y-auto">
+      <style>{`
+        @keyframes bookingFlashRow {
+          0%, 100% { background-color: transparent; }
+          50% { background-color: rgba(59, 130, 246, 0.12); }
+        }
+        .booking-flash td {
+          animation: bookingFlashRow 0.9s ease-in-out 0s 3;
+        }
+      `}</style>
       
       {/* HEADER SECTION */}
       <div className="max-w-7xl mx-auto mb-8">
@@ -518,7 +584,11 @@ const StaffBookings = () => {
               {filteredBookings.length > 0 ? (
                 filteredBookings.map((b) => {
                   return (
-                    <tr key={b._id} className="hover:bg-slate-50/50 transition-colors group">
+                    <tr
+                      id={`booking-${b._id}`}
+                      key={b._id}
+                      className={`hover:bg-slate-50/50 transition-colors group ${flashBookingId === `booking-${b._id}` ? "booking-flash" : ""}`}
+                    >
                       
                       {/* GUEST PROFILE */}
                       <td className="px-6 py-5 align-top">

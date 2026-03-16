@@ -144,7 +144,7 @@ const Analytics = () => {
   if (!allBookings) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-400">
-        <Loader2 size={40} className="animate-spin mb-4 text-indigo-500" />
+        <Loader2 size={40} className="animate-spin mb-4 text-blue-500" />
         <p className="font-bold text-sm tracking-wide uppercase">Loading Analytics...</p>
       </div>
     );
@@ -161,7 +161,7 @@ const Analytics = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className={`relative p-8 rounded-3xl overflow-hidden shadow-sm transition-all hover:shadow-md ${stats.isPositive ? 'bg-indigo-600 text-white' : 'bg-rose-500 text-white'}`}>
+        <div className={`relative p-8 rounded-3xl overflow-hidden shadow-sm transition-all hover:shadow-md ${stats.isPositive ? 'bg-blue-600 text-white' : 'bg-rose-500 text-white'}`}>
           <div className="relative z-10">
             <div className="flex items-center gap-2 opacity-90 mb-2">
                 <Zap size={16} fill="currentColor" />
@@ -197,7 +197,7 @@ const Analytics = () => {
         <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-               <TrendingUp size={20} className="text-indigo-600" /> Intake Trends
+               <TrendingUp size={20} className="text-blue-600" /> Intake Trends
              </h3>
           </div>
           
@@ -206,15 +206,15 @@ const Analytics = () => {
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11, fontWeight: 700}} dy={10} />
                 <YAxis hide />
                 <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
-                <Area type="monotone" dataKey="bookings" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorReal)" animationDuration={1000} />
+                <Area type="monotone" dataKey="bookings" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReal)" animationDuration={1000} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -236,7 +236,7 @@ const Analytics = () => {
                 <Tooltip cursor={{fill: '#f1f5f9', radius: 8}} contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
                 <Bar dataKey="demand" radius={[6, 6, 6, 6]} barSize={24} animationDuration={1000}>
                   {seasonalData.map((entry, index) => (
-                    <Cell key={index} fill={index === new Date().getMonth() ? '#6366f1' : '#cbd5e1'} />
+                    <Cell key={index} fill={index === new Date().getMonth() ? '#3b82f6' : '#cbd5e1'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -244,8 +244,8 @@ const Analytics = () => {
           </div>
           
           <div className="mt-4 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-3 rounded-xl">
-             <Info size={14} className="text-indigo-500" />
-             <span>The <strong className="text-indigo-600">Indigo</strong> bar represents current month activity.</span>
+             <Info size={14} className="text-blue-500" />
+             <span>The <strong className="text-blue-600">Blue</strong> bar represents current month activity.</span>
           </div>
         </div>
 
@@ -269,7 +269,7 @@ const Analytics = () => {
           {/* Next Month Projection */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+              <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                 <Activity size={20} />
               </div>
               <div>
@@ -305,7 +305,7 @@ const Analytics = () => {
         <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
-               <TrendingUp size={20} className="text-purple-600" /> Future Demand Forecast
+               <TrendingUp size={20} className="text-blue-600" /> Future Demand Forecast
              </h3>
           </div>
 
@@ -336,11 +336,11 @@ const Analytics = () => {
                 <Line 
                   type="monotone" 
                   dataKey="Predicted" 
-                  stroke="#a855f7" 
+                  stroke="#3b82f6" 
                   strokeWidth={3} 
                   strokeDasharray="5 5"
-                  dot={{ r: 4, fill: '#a855f7' }} 
-                  activeDot={{ r: 6, fill: '#a855f7', stroke: '#fff', strokeWidth: 2 }} 
+                  dot={{ r: 4, fill: '#3b82f6' }} 
+                  activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} 
                   animationDuration={1000}
                 />
               </LineChart>
@@ -348,8 +348,8 @@ const Analytics = () => {
           </div>
 
           <div className="mt-4 flex items-center gap-2 text-[10px] text-slate-400 bg-slate-50 p-3 rounded-xl">
-             <Info size={14} className="text-purple-500 flex-shrink-0" />
-             <span>The <strong className="text-purple-600">Dashed Purple</strong> line plots your AI-estimated trajectory for the upcoming quarter based on your recent growth velocity.</span>
+             <Info size={14} className="text-blue-500 flex-shrink-0" />
+             <span>The <strong className="text-blue-600">Dashed Blue</strong> line plots your AI-estimated trajectory for the upcoming quarter based on your recent growth velocity.</span>
           </div>
         </div>
 

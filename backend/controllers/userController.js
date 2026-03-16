@@ -4,17 +4,64 @@ import validator from "validator";
 import axios from "axios"; 
 import userModel from "../models/userModel.js";
 import bookingModel from "../models/bookingModel.js";
+import Notification from "../models/notificationModel.js";
 import cloudinary from "../config/cloudinary.js"; 
+import { admin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
 import sendEmail from "../utils/sendEmail.js";
 import sendSMS from "../utils/sendSMS.js";
 
 // --- HELPERS ---
+const parseGoogleDisplayName = (value, fallbackFirst = "") => {
+    const cleaned = String(value || "").trim().replace(/\s+/g, " ");
+    if (!cleaned) {
+        return { firstName: fallbackFirst || "Google", middleName: "", lastName: "" };
+    }
+    const parts = cleaned.split(" ");
+    if (parts.length === 1) {
+        return { firstName: cleaned, middleName: "", lastName: "" };
+    }
+    return {
+        firstName: parts.slice(0, -1).join(" "),
+        middleName: "",
+        lastName: parts[parts.length - 1]
+    };
+};
+
 const createToken = (id, name, role) => {
     return jwt.sign(
         { id, name, role },
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
     );
+};
+
+const normalizePHPhone = (value) => {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.startsWith("63") && digits.length === 12) {
+        return `0${digits.slice(2)}`;
+    }
+    if (digits.length === 10 && digits.startsWith("9")) {
+        return `0${digits}`;
+    }
+    return digits;
+};
+
+const isValidPHPhone = (value) => /^09\d{9}$/.test(value);
+
+const buildPhoneCandidates = (value) => {
+    const rawDigits = String(value || "").replace(/\D/g, "");
+    const normalized = normalizePHPhone(value);
+    const candidates = new Set();
+
+    if (rawDigits) candidates.add(rawDigits);
+    if (normalized) candidates.add(normalized);
+
+    if (normalized && normalized.startsWith("0") && normalized.length === 11) {
+        candidates.add(normalized.slice(1));
+        candidates.add(`63${normalized.slice(1)}`);
+    }
+
+    return Array.from(candidates);
 };
 
 const streamUpload = (fileBuffer) => {
@@ -35,7 +82,7 @@ const streamUpload = (fileBuffer) => {
 // ✅ Send OTP for Email Verification or Password Reset
 const sendOTP = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, isResetMode } = req.body;
 
         if (!validator.isEmail(email)) {
             return res.json({ success: false, message: "Invalid email" });
@@ -43,8 +90,8 @@ const sendOTP = async (req, res) => {
 
         let user = await userModel.findOne({ email: email.toLowerCase().trim() });
 
-        // ✅ PREVENT SENDING OTP IF EMAIL IS ALREADY TAKEN BY A VERIFIED USER
-        if (user && user.isVerified && user.firstName !== "Pending") {
+        // ✅ PREVENT SENDING OTP IF EMAIL IS ALREADY TAKEN BY A VERIFIED USER (except for reset)
+        if (!isResetMode && user && user.isVerified && user.firstName !== "Pending") {
             return res.json({ success: false, message: "Email already taken" });
         }
 
@@ -74,13 +121,14 @@ const sendOTP = async (req, res) => {
 
         await sendEmail(
             email,
-            "Security Verification Code",
+            "Your verification code",
             `
-                <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-                    <h2 style="color: #1A2B32;">Security Verification</h2>
-                    <p>Use the following code to verify your identity. This code is valid for 10 minutes.</p>
-                    <h1 style="color:#2563EB; letter-spacing: 5px; background: #f3f4f6; padding: 10px; text-align: center;">${otp}</h1>
-                    <p style="color: #666; font-size: 12px;">If you did not request this code, please ignore this email.</p>
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                    <p>Use this code to continue:</p>
+                    <p style="font-size: 20px; font-weight: 700; letter-spacing: 2px;">${otp}</p>
+                    <p>This code expires in 10 minutes.</p>
+                    <p>If you did not request this, you can ignore this email.</p>
+                    <p>Mercedarian Retreat House</p>
                 </div>
             `
         );
@@ -95,16 +143,17 @@ const sendOTP = async (req, res) => {
 // ✅ Send OTP via Phone (Registration/Login)
 const sendPhoneOTP = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { phone, isResetMode } = req.body;
 
-        if (!phone || phone.length < 11) {
+        const normalizedPhone = normalizePHPhone(phone);
+        if (!normalizedPhone || normalizedPhone.length < 11 || !isValidPHPhone(normalizedPhone)) {
             return res.json({ success: false, message: "Invalid phone number" });
         }
 
-        let user = await userModel.findOne({ phone: phone.trim() });
+        let user = await userModel.findOne({ phone: normalizedPhone.trim() });
 
-        // ✅ PREVENT SENDING OTP IF PHONE IS ALREADY TAKEN BY A VERIFIED USER
-        if (user && user.isVerified && user.firstName !== "Pending") {
+        // ✅ PREVENT SENDING OTP IF PHONE IS ALREADY TAKEN BY A VERIFIED USER (except for reset)
+        if (!isResetMode && user && user.isVerified && user.firstName !== "Pending") {
             return res.json({ success: false, message: "Phone number already taken" });
         }
 
@@ -120,7 +169,7 @@ const sendPhoneOTP = async (req, res) => {
             const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
 
             user = new userModel({
-                phone,
+                phone: normalizedPhone,
                 email: `phone_${Date.now()}_${phone}@mrh.local`,
                 otp,
                 otpExpires,
@@ -135,7 +184,7 @@ const sendPhoneOTP = async (req, res) => {
 
         // ✅ ACTUAL SMS SENDING
         await sendSMS(
-            phone,
+            normalizedPhone,
             `Your MRH verification code is: ${otp}. Valid for 10 minutes.`
         );
 
@@ -158,6 +207,7 @@ const requestPasswordReset = async (req, res) => {
             return res.json({ success: false, message: "No account found with this email" });
         }
 
+        req.body.isResetMode = true;
         return sendOTP(req, res);
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -168,13 +218,137 @@ const requestPasswordReset = async (req, res) => {
 const requestPhoneReset = async (req, res) => {
     try {
         const { phone } = req.body;
-        const user = await userModel.findOne({ phone });
+        const normalizedPhone = normalizePHPhone(phone);
+        const user = await userModel.findOne({ phone: normalizedPhone });
 
         if (!user) {
             return res.json({ success: false, message: "No account found with this phone number" });
         }
 
+        req.body.phone = normalizedPhone;
+        req.body.isResetMode = true;
         return sendPhoneOTP(req, res);
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const sendPhoneOTPUpdate = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { phone } = req.body;
+        const normalizedPhone = normalizePHPhone(phone);
+
+        if (!normalizedPhone || !isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        const conflictUser = await userModel.findOne({
+            phone: normalizedPhone,
+            _id: { $ne: userId }
+        });
+        if (conflictUser && conflictUser.isVerified) {
+            return res.json({ success: false, message: "Phone number already taken" });
+        }
+
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
+
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        user.pendingPhone = normalizedPhone;
+        await user.save();
+
+        await sendSMS(
+            normalizedPhone,
+            `Your MRH verification code is: ${otp}. Valid for 10 minutes.`
+        );
+
+        res.json({ success: true, message: "OTP sent to your phone" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const verifyPhoneFirebase = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { idToken } = req.body;
+
+        if (!idToken) {
+            return res.json({ success: false, message: "Missing Firebase token" });
+        }
+
+        initFirebaseAdmin();
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const phoneNumber = decoded.phone_number;
+
+        if (!phoneNumber) {
+            return res.json({ success: false, message: "Phone number not found in token" });
+        }
+
+        const normalizedPhone = normalizePHPhone(phoneNumber);
+        if (!isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid Philippine phone number" });
+        }
+
+        const conflictUser = await userModel.findOne({
+            phone: normalizedPhone,
+            _id: { $ne: userId }
+        });
+        if (conflictUser && conflictUser.isVerified) {
+            return res.json({ success: false, message: "Phone number already taken" });
+        }
+
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        user.phone = normalizedPhone;
+        user.phoneVerified = true;
+        user.pendingPhone = "";
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+
+        res.json({ success: true, message: "Phone verified successfully", phone: normalizedPhone });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const verifyPhoneOTPUpdate = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { otp } = req.body;
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        const storedOtp = user.otp ? String(user.otp).trim() : null;
+        const providedOtp = otp ? String(otp).trim() : null;
+
+        if (!storedOtp || storedOtp !== providedOtp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (new Date() > new Date(user.otpExpires)) {
+            return res.json({ success: false, message: "OTP expired" });
+        }
+
+        if (!user.pendingPhone) {
+            return res.json({ success: false, message: "No pending phone to verify" });
+        }
+
+        user.phone = user.pendingPhone;
+        user.pendingPhone = "";
+        user.phoneVerified = true;
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+
+        res.json({ success: true, message: "Phone verified successfully" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -209,8 +383,15 @@ const resetPassword = async (req, res) => {
 
         await sendEmail(
             user.email,
-            "Password Reset Successful",
-            `<p>Hello ${user.firstName},</p><p>Your password has been successfully updated. If you did not perform this action, please contact us immediately.</p>`
+            "Password updated - Mercedarian Retreat House",
+            `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                    <p>Hello ${user.firstName},</p>
+                    <p>Your password was updated.</p>
+                    <p>If you did not make this change, please contact us.</p>
+                    <p>Mercedarian Retreat House</p>
+                </div>
+            `
         );
 
         res.json({ success: true, message: "Password updated successfully" });
@@ -221,18 +402,87 @@ const resetPassword = async (req, res) => {
 
 const googleAuth = async (req, res) => {
     try {
-        const { email, displayName, photoURL } = req.body;
+        const { idToken, intent } = req.body;
+        if (!idToken) {
+            return res.json({ success: false, message: "Missing Google token." });
+        }
+        const normalizedIntent = intent === "signup" ? "signup" : "login";
+
+        initFirebaseAdmin();
+        const decoded = await admin.auth().verifyIdToken(idToken);
+
+        const email = (decoded.email || "").toLowerCase().trim();
+        if (!email) {
+            return res.json({ success: false, message: "Google account has no email." });
+        }
+
+        const displayName = decoded.name || "";
+        const givenName = decoded.given_name || "";
+        const familyName = decoded.family_name || "";
+        const photoURL = decoded.picture || "";
+        const emailVerified = decoded.email_verified === true;
+        const fullName = (displayName || [givenName, familyName].filter(Boolean).join(" ") || email.split("@")[0]).trim();
+
         let user = await userModel.findOne({ email });
 
         if (user) {
             if (user.disabled) {
                 return res.json({ success: false, message: "Account disabled. Contact admin." });
             }
+            if (normalizedIntent === "signup") {
+                if (user.authProvider === "google") {
+                    return res.json({ success: false, message: "Account already exists. Please log in with Google." });
+                }
+                return res.json({ success: false, message: "Email already registered. Please log in with your password." });
+            }
+            if (normalizedIntent === "login" && user.authProvider === "local") {
+                return res.json({ success: false, message: "This account uses email and password. Please log in with your password." });
+            }
+            let updated = false;
+            const shouldRefreshName = Boolean(fullName);
+            const isLegacyGoogleUser = user.lastName === "User";
+
+            if (user.authProvider === "google" || isLegacyGoogleUser) {
+                if (user.authProvider !== "google") {
+                    user.authProvider = "google";
+                    updated = true;
+                }
+
+                if (shouldRefreshName) {
+                    const parsedName = parseGoogleDisplayName(fullName, user.firstName);
+                    if (parsedName.firstName && user.firstName !== parsedName.firstName) {
+                        user.firstName = parsedName.firstName;
+                        updated = true;
+                    }
+
+                    if (user.middleName !== parsedName.middleName) {
+                        user.middleName = parsedName.middleName;
+                        updated = true;
+                    }
+
+                    if (user.lastName !== parsedName.lastName) {
+                        user.lastName = parsedName.lastName;
+                        updated = true;
+                    }
+                }
+            }
+            if (photoURL && !user.image) {
+                user.image = photoURL;
+                updated = true;
+            }
+            if (emailVerified && !user.isVerified) {
+                user.isVerified = true;
+                updated = true;
+            }
+            if (updated) await user.save();
         } else {
-            const parts = displayName.split(" ");
-            const firstName = parts[0];
-            const lastName = parts.length > 1 ? parts[parts.length - 1] : "User";
-            const middleName = parts.length > 2 ? parts.slice(1, -1).join(" ") : "";
+            if (normalizedIntent === "login") {
+                return res.json({ success: false, message: "No account found. Please sign up with Google." });
+            }
+            const parsedName = parseGoogleDisplayName(fullName, "Google");
+            const firstName = parsedName.firstName || "Google";
+            const middleName = parsedName.middleName;
+            const lastName = parsedName.lastName;
 
             const salt = await bcrypt.genSalt(10);
             const hashedPassword = await bcrypt.hash(Math.random().toString(36), salt);
@@ -245,14 +495,21 @@ const googleAuth = async (req, res) => {
                 image: photoURL,
                 password: hashedPassword,
                 phone: "0000000000",
-                isVerified: true 
+                isVerified: true,
+                authProvider: "google"
             });
             await user.save();
 
             await sendEmail(
                 email,
                 "Welcome to Mercedarian Retreat House",
-                `<h3>Welcome, ${firstName}!</h3><p>Your account has been created via Google. We are happy to have you!</p>`
+                `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                        <p>Hello ${firstName},</p>
+                        <p>Your account is ready. You can sign in and book your stay.</p>
+                        <p>Mercedarian Retreat House</p>
+                    </div>
+                `
             );
         }
 
@@ -304,8 +561,14 @@ const registerUser = async (req, res) => {
 
         await sendEmail(
             email,
-            "Account Created Successfully",
-            `<h3>Welcome to Mercedarian Retreat House, ${firstName}!</h3><p>Your account is now active. You can start booking your stay with us.</p>`
+            "Welcome to Mercedarian Retreat House",
+            `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                    <p>Hello ${firstName},</p>
+                    <p>Your account is active. You can now book your stay.</p>
+                    <p>Mercedarian Retreat House</p>
+                </div>
+            `
         );
 
         res.json({ success: true, message: "Account created successfully" });
@@ -317,11 +580,23 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
-        const user = await userModel.findOne({
-    email: email.toLowerCase().trim()
-});
-        
+        const { email, identifier, phone, password } = req.body;
+        const rawIdentifier = String(email || identifier || phone || "").trim();
+        const normalizedPhone = normalizePHPhone(rawIdentifier);
+        const isEmail = validator.isEmail(rawIdentifier);
+        const isPhone = isValidPHPhone(normalizedPhone);
+
+        if (!isEmail && !isPhone) {
+            return res.json({ success: false, message: "Enter a valid email or 11-digit phone number" });
+        }
+
+        const phoneCandidates = buildPhoneCandidates(rawIdentifier);
+        const query = isEmail
+            ? { email: rawIdentifier.toLowerCase() }
+            : { phone: { $in: phoneCandidates } };
+
+        const user = await userModel.findOne(query);
+
         if (!user) return res.json({ success: false, message: "User does not exist" });
         if (user.disabled) return res.json({ success: false, message: "Account disabled. Contact admin." });
         if (!user.isVerified) return res.json({ success: false, message: "Please verify your email first." });
@@ -387,7 +662,7 @@ const updateUserProfile = async (req, res) => {
 
         if (firstName) user.firstName = firstName;
         if (lastName) user.lastName = lastName;
-        if (suffix) user.suffix = suffix;
+        if (typeof suffix !== "undefined") user.suffix = suffix;
         if (typeof middleName !== 'undefined') user.middleName = middleName;
         if (phone) user.phone = phone;
 
@@ -428,8 +703,7 @@ const createBooking = async (req, res) => {
             participants,
             total_price: totalPrice,
             payment: false,
-            paymentStatus: 'unpaid',
-            paymentMethod: 'n/a'
+            paymentStatus: 'unpaid'
         };
 
         const newBooking = new bookingModel(bookingData);
@@ -439,10 +713,17 @@ const createBooking = async (req, res) => {
         if (user) {
             await sendEmail(
                 user.email,
-                "Booking Request Submitted",
-                `<p>Peace be with you, ${user.firstName},</p>
-                 <p>Your booking request for ${new Date(checkIn).toLocaleDateString()} has been received and is currently <b>pending approval</b>.</p>
-                 <p>Total Price: <b>PHP ${totalPrice}</b></p>`
+                "Booking request received - Mercedarian Retreat House",
+                `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                        <p>Hello ${user.firstName},</p>
+                        <p>Your booking request was received.</p>
+                        <p>Check-in: ${new Date(checkIn).toLocaleDateString()}</p>
+                        <p>Total: PHP ${totalPrice}</p>
+                        <p>Status: Pending approval</p>
+                        <p>Mercedarian Retreat House</p>
+                    </div>
+                `
             );
         }
 
@@ -478,14 +759,27 @@ const cancelBooking = async (req, res) => {
 
         if (isApproved || isPaid) {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancellation_pending" });
+            await notifyAdminsAndStaff({
+                type: "booking_update",
+                message: `Cancellation request received: ${booking.bookingName || "Booking"}`,
+                link: `/admin/bookings?bookingId=${booking._id}`,
+                sender: booking.user_id?._id || booking.user_id
+            });
             res.json({ success: true, message: "Cancellation request sent for approval" });
         } else {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
             
             await sendEmail(
                 booking.user_id.email,
-                "Booking Cancelled",
-                `<p>Hello,</p><p>Your booking for ${new Date(booking.check_in).toLocaleDateString()} has been successfully cancelled.</p>`
+                "Booking cancelled - Mercedarian Retreat House",
+                `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                        <p>Hello ${booking.user_id.firstName || "Guest"},</p>
+                        <p>Your booking was cancelled.</p>
+                        <p>Check-in: ${new Date(booking.check_in).toLocaleDateString()}</p>
+                        <p>Mercedarian Retreat House</p>
+                    </div>
+                `
             );
 
             res.json({ success: true, message: "Booking Cancelled" });
@@ -557,6 +851,15 @@ const createCheckoutSession = async (req, res) => {
             }
         });
 
+        try {
+            await bookingModel.findByIdAndUpdate(bookingId, {
+                paymentMethod: 'gcash',
+                paymentStatus: 'pending'
+            });
+        } catch (updateError) {
+            console.error("Failed to update booking payment method:", updateError.message);
+        }
+
         res.json({ success: true, checkoutUrl: response.data.data.attributes.checkout_url });
     } catch (error) {
         const paymongoDetail = error.response?.data?.errors?.[0]?.detail;
@@ -568,21 +871,81 @@ const createCheckoutSession = async (req, res) => {
     }
 };
 
+const notifyAdminsAndStaff = async ({ type, message, link, sender }) => {
+    try {
+        const recipients = await userModel
+            .find({ role: { $in: ["admin", "staff"] } })
+            .select("_id");
+
+        if (!recipients.length) return;
+
+        const notifications = recipients.map((recipient) => ({
+            recipient: recipient._id,
+            sender,
+            type,
+            message,
+            link,
+            isRead: false
+        }));
+
+        await Notification.insertMany(notifications);
+    } catch (error) {
+        console.error("Notification create error:", error.message);
+    }
+};
+
+const notifyUser = async ({ recipient, type, message, link, sender }) => {
+    if (!recipient) return;
+    try {
+        await Notification.create({
+            recipient,
+            sender,
+            type,
+            message,
+            link,
+            isRead: false
+        });
+    } catch (error) {
+        console.error("User notification create error:", error.message);
+    }
+};
+
 const verifyPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
         const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
             payment: true, 
             paymentStatus: 'paid', 
-            paymentMethod: 'online' 
+            paymentMethod: 'gcash' 
         }, { new: true }).populate("user_id");
 
         if (booking) {
             await sendEmail(
                 booking.user_id.email,
-                "Payment Received",
-                `<p>Hello ${booking.user_id.firstName},</p><p>Your payment for booking ID ${booking._id} has been verified. Thank you!</p>`
+                "Payment received - Mercedarian Retreat House",
+                `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                        <p>Hello ${booking.user_id.firstName},</p>
+                        <p>Your payment was received and verified.</p>
+                        <p>Booking: ${booking.bookingName || "Reservation"}</p>
+                        <p>Mercedarian Retreat House</p>
+                    </div>
+                `
             );
+
+            await notifyAdminsAndStaff({
+                type: "payment_update",
+                message: `Payment received: ${booking.bookingName || "Booking"}`,
+                link: `/admin/bookings?bookingId=${booking._id}`,
+                sender: booking.user_id?._id || booking.user_id
+            });
+
+            await notifyUser({
+                recipient: booking.user_id?._id || booking.user_id,
+                type: "payment_update",
+                message: "Payment sent successfully. Your booking is now marked as paid.",
+                link: `/my-bookings?bookingId=${booking._id}`
+            });
         }
 
         res.json({ success: true, message: "Payment Verified" });
@@ -594,7 +957,27 @@ const verifyPayment = async (req, res) => {
 const markCashPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        await bookingModel.findByIdAndUpdate(bookingId, { paymentMethod: 'cash' });
+        await bookingModel.findByIdAndUpdate(bookingId, { 
+            paymentMethod: 'cash',
+            paymentStatus: 'pending'
+        });
+
+        const booking = await bookingModel.findById(bookingId).populate("user_id");
+        if (booking) {
+            await notifyAdminsAndStaff({
+                type: "payment_update",
+                message: `Cash payment selected: ${booking.bookingName || "Booking"}`,
+                link: `/admin/bookings?bookingId=${booking._id}`,
+                sender: booking.user_id?._id || booking.user_id
+            });
+
+            await notifyUser({
+                recipient: booking.user_id?._id || booking.user_id,
+                type: "payment_update",
+                message: "Cash payment selected. Please pay at the counter.",
+                link: `/my-bookings?bookingId=${booking._id}`
+            });
+        }
         res.json({ success: true, message: "Marked as Pay Now (Cash)" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -612,9 +995,23 @@ const confirmCashPayment = async (req, res) => {
         if (booking) {
             await sendEmail(
                 booking.user_id.email,
-                "Payment Confirmed",
-                `<p>Hello ${booking.user_id.firstName},</p><p>Your cash payment has been confirmed by the administration. Your booking is now fully secured.</p>`
+                "Payment confirmed - Mercedarian Retreat House",
+                `
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                        <p>Hello ${booking.user_id.firstName},</p>
+                        <p>Your cash payment was confirmed.</p>
+                        <p>Your booking is now secured.</p>
+                        <p>Mercedarian Retreat House</p>
+                    </div>
+                `
             );
+
+            await notifyUser({
+                recipient: booking.user_id?._id || booking.user_id,
+                type: "payment_update",
+                message: "Cash payment confirmed. Your reservation is secured.",
+                link: `/my-bookings?bookingId=${booking._id}`
+            });
         }
 
         res.json({ success: true, message: "Payment Confirmed by Admin" });
@@ -761,10 +1158,13 @@ export {
     loginUser, 
     sendOTP,
     sendPhoneOTP,
+    sendPhoneOTPUpdate,
+    verifyPhoneFirebase,
     requestPasswordReset,
     requestPhoneReset,
     resetPassword,
     verifyOTP,
+    verifyPhoneOTPUpdate,
     checkEmailExists,
     checkPhoneExists, 
     googleAuth, 

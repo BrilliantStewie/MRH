@@ -6,6 +6,7 @@ import {
   getStaffProfile,
   updateStaffProfile,
   getStaffBookings,
+  verifyStaffPhoneFirebase,
 } from "../controllers/staffController.js";
 
 // ✅ Import Admin controllers to reuse the logic for staff
@@ -13,6 +14,7 @@ import { getAllRooms, getAllUsers } from "../controllers/adminController.js";
 
 // ✅ Import the chat controller
 import { addReviewChat } from "../controllers/bookingController.js"; 
+import { getAllPackages } from "../controllers/packageController.js";
 
 const router = express.Router();
 
@@ -36,6 +38,8 @@ router.post(
   updateStaffProfile
 );
 
+router.post("/verify-phone-firebase", authStaff, verifyStaffPhoneFirebase);
+
 /* =========================
    STAFF VIEW ALL GUEST BOOKINGS
 ========================= */
@@ -47,6 +51,7 @@ router.get("/bookings", authStaff, getStaffBookings);
 ========================= */
 router.get("/rooms", authStaff, getAllRooms);
 router.get("/users", authStaff, getAllUsers);
+router.get("/packages", authStaff, getAllPackages);
 
 /* =========================
    💬 STAFF REVIEW CHAT (Reply to Guest)

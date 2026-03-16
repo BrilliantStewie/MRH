@@ -55,10 +55,6 @@ const Sidebar = () => {
 
   return (
     <aside className="w-64 bg-white border-r min-h-screen p-4 flex flex-col gap-1">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-2 mb-2">
-        Overview
-      </p>
-
       <NavLink to="/admin-dashboard" className={linkClass}>
         <div className="flex items-center gap-3">
           <LayoutDashboard size={18} />
@@ -81,10 +77,6 @@ const Sidebar = () => {
         {/* ✅ Shows an animated dot if there are pending bookings */}
         <NotificationIndicator count={hasNewBookings} variant="dot" />
       </NavLink>
-
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
-        Management
-      </p>
 
       <NavLink to="/rooms-list" className={linkClass}>
         <div className="flex items-center gap-3">
@@ -109,10 +101,6 @@ const Sidebar = () => {
         <NotificationIndicator count={pendingReviewsCount} variant="number" />
       </NavLink>
 
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mt-6 mb-2">
-        People
-      </p>
-
       <NavLink to="/admin-staff-list" className={linkClass}>
         <div className="flex items-center gap-3">
           <Users size={18} />
@@ -123,7 +111,7 @@ const Sidebar = () => {
       <NavLink to="/admin-users" className={linkClass}>
         <div className="flex items-center gap-3">
           <User size={18} />
-          User Accounts
+          Users
         </div>
       </NavLink>
     </aside>

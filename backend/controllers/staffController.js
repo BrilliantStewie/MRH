@@ -3,27 +3,68 @@ import bookingModel from "../models/bookingModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary";
+import { admin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
+import validator from "validator";
+
+const normalizePHPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("63") && digits.length === 12) {
+    return `0${digits.slice(2)}`;
+  }
+  return digits;
+};
+
+const isValidPHPhone = (value) => /^09\d{9}$/.test(value);
+
+const buildPhoneCandidates = (value) => {
+  const rawDigits = String(value || "").replace(/\D/g, "");
+  const normalized = normalizePHPhone(value);
+  const candidates = new Set();
+
+  if (rawDigits) candidates.add(rawDigits);
+  if (normalized) candidates.add(normalized);
+
+  if (normalized && normalized.startsWith("0") && normalized.length === 11) {
+    candidates.add(normalized.slice(1));
+    candidates.add(`63${normalized.slice(1)}`);
+  }
+
+  return Array.from(candidates);
+};
 
 /* =====================================================
    STAFF LOGIN (EMAIL OR PHONE)
 ===================================================== */
 export const staffLogin = async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, email, phone, password } = req.body;
+    const rawIdentifier = String(identifier || email || phone || "").trim();
+    const normalizedPhone = normalizePHPhone(rawIdentifier);
+    const isEmail = validator.isEmail(rawIdentifier);
+    const isPhone = isValidPHPhone(normalizedPhone);
 
-    if (!identifier || !password) {
+    if (!rawIdentifier || !password) {
       return res.status(400).json({
         success: false,
         message: "Please enter credentials",
       });
     }
 
+    if (!isEmail && !isPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid email or 11-digit phone number",
+      });
+    }
+
     // 1. Find the user by email or phone
+    const phoneCandidates = buildPhoneCandidates(rawIdentifier);
+    const query = isEmail
+      ? { email: rawIdentifier.toLowerCase() }
+      : { phone: { $in: phoneCandidates } };
+
     const user = await userModel.findOne({
-      $or: [
-        { email: identifier.trim() },
-        { phone: identifier.trim() }
-      ],
+      ...query,
       role: "staff"
     });
 
@@ -215,6 +256,61 @@ export const updateStaffProfile = async (req, res) => {
       success: false,
       message: error.message || "Server error",
     });
+  }
+};
+
+/* =====================================================
+   VERIFY STAFF PHONE (FIREBASE OTP)
+===================================================== */
+export const verifyStaffPhoneFirebase = async (req, res) => {
+  try {
+    const staffId = req.userId || req.user?.id;
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.json({ success: false, message: "Missing Firebase token" });
+    }
+
+    initFirebaseAdmin();
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const phoneNumber = decoded.phone_number;
+
+    if (!phoneNumber) {
+      return res.json({ success: false, message: "Phone number not found in token" });
+    }
+
+    const normalizedPhone = normalizePHPhone(phoneNumber);
+    if (!isValidPHPhone(normalizedPhone)) {
+      return res.json({ success: false, message: "Invalid Philippine phone number" });
+    }
+
+    const conflictUser = await userModel.findOne({
+      phone: normalizedPhone,
+      _id: { $ne: staffId }
+    });
+    if (conflictUser && conflictUser.isVerified) {
+      return res.json({ success: false, message: "Phone number already taken" });
+    }
+
+    const staff = await userModel.findById(staffId);
+    if (!staff || staff.role !== "staff") {
+      return res.json({ success: false, message: "Staff not found" });
+    }
+
+    staff.phone = normalizedPhone;
+    staff.phoneVerified = true;
+    staff.pendingPhone = "";
+    staff.otp = null;
+    staff.otpExpires = null;
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Phone verified successfully",
+      phone: normalizedPhone
+    });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
   }
 };
 

@@ -199,14 +199,14 @@ export const createReview = async (req, res) => {
       review: comment
     });
 
-    const admins = await Booking.db.model("User").find({ role: "admin" });
+    const recipients = await Booking.db.model("User").find({ role: { $in: ["admin", "staff"] } });
 
-    const adminNotifications = admins.map((admin) => ({
-      recipient: admin._id,
+    const adminNotifications = recipients.map((user) => ({
+      recipient: user._id,
       sender: userId,
       type: "new_review",
-      message: `A guest left a ${rating}-star review.`,
-      link: "/admin/reviews",
+      message: `New ${rating}-star review received.`,
+      link: `/admin/reviews?reviewId=${newReview._id}`,
       isRead: false
     }));
 
@@ -440,38 +440,43 @@ if (req.userRole === "guest") {
         recipient: review.userId._id,
         sender: userId,
         type: "new_reply",
-        message: "Management replied to your review.",
+        message: "Reply added to your review.",
         link: reviewLink,
         isRead: false
       });
 
       await sendEmail(
         review.userId.email,
-        "Response to Your Review – Mercedarian Retreat House",
+        "Review reply - Mercedarian Retreat House",
         `
-        <p>Dear ${review.userId.firstName},</p>
-        <p>Our management team has responded to your review.</p>
-
-        <blockquote style="border-left:3px solid #ccc;padding-left:10px;color:#555;">
-        ${response}
-        </blockquote>
-
-        <p>You may login to continue the conversation.</p>
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+          <p>Hello ${review.userId.firstName},</p>
+          <p>We added a reply to your review.</p>
+          <div style="margin: 12px 0; padding: 10px 12px; border-left: 3px solid #e2e8f0; color: #334155;">
+            ${response}
+          </div>
+          <p>Sign in to view or respond.</p>
+          <p>Mercedarian Retreat House</p>
+        </div>
         `
       );
 
     } else {
 
-      const admins = await Booking.db.model("User")
-        .find({ role: "admin" })
+      const recipients = await Booking.db.model("User")
+        .find({ role: { $in: ["admin", "staff"] } })
         .select("email firstName");
 
-      const adminNotifications = admins.map((admin) => ({
-        recipient: admin._id,
+      const adminReviewLink = createdReply?._id
+        ? `/admin/reviews?reviewId=${reviewId}&replyId=${createdReply._id}`
+        : `/admin/reviews?reviewId=${reviewId}`;
+
+      const adminNotifications = recipients.map((user) => ({
+        recipient: user._id,
         sender: userId,
         type: "new_reply",
-        message: "A guest replied to a review thread.",
-        link: "/admin/reviews",
+        message: "Guest replied to a review.",
+        link: adminReviewLink,
         isRead: false
       }));
 
@@ -617,7 +622,7 @@ export const toggleReviewVisibility = async (req, res) => {
       await Notification.create({
         recipient: review.userId,
         type: "review_hidden",
-        message: "Your review has been hidden by moderation.",
+        message: "Review hidden by moderation.",
         link: "/my-bookings",
         isRead: false
       });

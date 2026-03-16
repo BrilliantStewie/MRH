@@ -41,6 +41,12 @@ const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 
 const formatCurrency = (value) => `\u20B1${Number(value || 0).toLocaleString()}`;
 const formatLongDate = (date) => LONG_DATE_FORMATTER.format(date);
+const normalizeDate = (value) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 const Dashboard = () => {
   const {
@@ -74,6 +80,7 @@ const Dashboard = () => {
     const bookings = allBookings || [];
     const rooms = allRooms || [];
     const currentDate = new Date();
+    const today = normalizeDate(currentDate);
 
     const yearlyRevenue = bookings
       .filter((booking) => {
@@ -94,9 +101,26 @@ const Dashboard = () => {
       })
       .reduce((sum, booking) => sum + (Number(booking.total_price || booking.amount) || 0), 0);
 
-    const occupiedCount = rooms.filter((room) => room.available === false).length;
-    const totalRooms = rooms.length || 1;
-    const occupancyRate = Math.round((occupiedCount / totalRooms) * 100);
+    const occupiedRoomIds = new Set();
+
+    bookings.forEach((booking) => {
+      if ((booking.status || "").toLowerCase() !== "approved") return;
+
+      const checkIn = normalizeDate(booking.check_in || booking.checkIn || booking.date);
+      const checkOut = normalizeDate(booking.check_out || booking.checkOut);
+      if (!today || !checkIn || !checkOut) return;
+
+      if (today >= checkIn && today < checkOut) {
+        (booking.bookingItems || []).forEach((item) => {
+          const roomId = item?.room_id?._id ?? item?.room_id;
+          if (roomId) occupiedRoomIds.add(String(roomId));
+        });
+      }
+    });
+
+    const occupiedCount = occupiedRoomIds.size;
+    const totalRooms = rooms.length || 0;
+    const occupancyRate = totalRooms ? Math.round((occupiedCount / totalRooms) * 100) : 0;
 
     const pendingBookings = bookings.filter((booking) => booking.status === "pending");
     const pendingCancellations = bookings.filter((booking) => booking.status === "cancellation_pending");

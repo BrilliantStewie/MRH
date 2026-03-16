@@ -8,19 +8,15 @@
   * {
     font-family: 'Outfit', sans-serif;
   }
-  /* Default scrollbar for the main page */
+  /* Hide scrollbars globally in admin */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: rgb(125 125 125) #f3f4f6;
+    scrollbar-width: none;
   }
   *::-webkit-scrollbar {
-    @apply w-2 h-2 bg-transparent;
-  }
-  *::-webkit-scrollbar-track {
-    @apply bg-gray-100 rounded-full;
-  }
-  *::-webkit-scrollbar-thumb {
-    @apply bg-gray-400 rounded-full hover:bg-gray-500;
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
   }
 }
 

@@ -35,6 +35,7 @@ const Rooms = () => {
     clearRooms,
     getRoomsData,
     backendUrl,
+    token,
   } = useContext(AppContext);
 
   const navigate = useNavigate();
@@ -62,6 +63,7 @@ const Rooms = () => {
   };
   const [rangeStart] = useState(() => getStoredDate("draftStartDate"));
   const [rangeEnd] = useState(() => getStoredDate("draftEndDate"));
+  const isLoggedIn = Boolean(token);
 
   useEffect(() => {
     getRoomsData();
@@ -183,6 +185,7 @@ const Rooms = () => {
   const isSelected = (id) => selectedRooms.some((room) => String(room._id) === String(id));
 
   useEffect(() => {
+    const statusFilter = isLoggedIn ? filterStatus : "all";
     let data = [...(rooms || [])];
 
     if (roomType !== "all") {
@@ -193,7 +196,7 @@ const Rooms = () => {
       data = data.filter((room) => normalize(room.building) === normalize(building));
     }
 
-    if (filterStatus === "available") {
+    if (statusFilter === "available") {
       data = data.filter((room) => {
         const isBooked = occupiedRooms.some((id) => String(id) === String(room._id));
         const isBookedForRange =
@@ -201,7 +204,7 @@ const Rooms = () => {
           Boolean(rangeBookedReasons[String(room._id)]);
         return !isBooked && !isBookedForRange && room.available !== false;
       });
-    } else if (filterStatus === "occupied") {
+    } else if (statusFilter === "occupied") {
       data = data.filter((room) =>
         occupiedRooms.some((id) => String(id) === String(room._id))
       );
@@ -244,11 +247,27 @@ const Rooms = () => {
     });
 
     setFilteredRooms(data);
-  }, [rooms, roomType, building, search, filterStatus, occupiedRooms, rangeBookedRooms, rangeBookedReasons]);
+  }, [
+    rooms,
+    roomType,
+    building,
+    search,
+    filterStatus,
+    occupiedRooms,
+    rangeBookedRooms,
+    rangeBookedReasons,
+    isLoggedIn,
+  ]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [roomType, building, search, filterStatus]);
+
+  useEffect(() => {
+    if (!isLoggedIn && filterStatus !== "all") {
+      setFilterStatus("all");
+    }
+  }, [isLoggedIn, filterStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRooms.length / ROOMS_PER_PAGE));
   const currentPageSafe = Math.min(currentPage, totalPages);
@@ -328,15 +347,22 @@ const Rooms = () => {
     }
 
     const isRoomSelected = isSelected(room._id);
-    const isRoomUnderMaintenance = room.status === "maintenance";
-    const isRoomCleaningDay = cleaningRooms.some((id) => String(id) === String(room._id));
-    const isRoomBookedToday = occupiedRooms.some((id) => String(id) === String(room._id));
+    const isRoomUnderMaintenance = isLoggedIn && room.status === "maintenance";
+    const isRoomCleaningDay =
+      isLoggedIn && cleaningRooms.some((id) => String(id) === String(room._id));
+    const isRoomBookedToday =
+      isLoggedIn && occupiedRooms.some((id) => String(id) === String(room._id));
     const roomRangeReason =
-      rangeBookedReasons[String(room._id)] ||
-      (rangeBookedRooms.some((id) => String(id) === String(room._id)) ? "booked" : "");
+      isLoggedIn
+        ? rangeBookedReasons[String(room._id)] ||
+          (rangeBookedRooms.some((id) => String(id) === String(room._id))
+            ? "booked"
+            : "")
+        : "";
     const isRoomBookedForRange = Boolean(roomRangeReason);
     const isRoomUnavailable =
-      isRoomUnderMaintenance || isRoomCleaningDay || isRoomBookedToday || isRoomBookedForRange;
+      isLoggedIn &&
+      (isRoomUnderMaintenance || isRoomCleaningDay || isRoomBookedToday || isRoomBookedForRange);
 
     return (
       <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm duration-200">
@@ -431,48 +457,50 @@ const Rooms = () => {
               )}
             </div>
 
-            <div className="mt-auto border-t border-slate-100 pt-4">
-              <button
-                disabled={isRoomUnavailable}
-                onClick={() => {
-                  if (isRoomUnavailable) return;
-                  if (isRoomSelected) removeRoom(room._id);
-                  else addRoom(room);
-                  onClose();
-                }}
-                className={`flex w-full items-center justify-center gap-2 rounded-xl py-4 font-bold uppercase tracking-wide transition-all ${
-                  isRoomUnavailable
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                    : isRoomSelected
-                      ? "bg-red-50 text-red-600 hover:bg-red-100"
-                      : "bg-slate-900 text-white shadow-xl hover:bg-slate-800"
-                }`}
-              >
-                {isRoomUnavailable ? (
-                  <>
-                    {isRoomUnderMaintenance
-                      ? "Maintenance"
-                      : isRoomCleaningDay
-                        ? "Cleaning"
-                        : isRoomBookedToday
-                          ? "Occupied"
-                          : isRoomBookedForRange
-                            ? roomRangeReason === "cleaning"
-                              ? "Cleaning Day"
-                              : "Booked"
-                            : "Unavailable"}
-                  </>
-                ) : isRoomSelected ? (
-                  <>
-                    Remove from Booking <X size={18} />
-                  </>
-                ) : (
-                  <>
-                    Add to Booking <Plus size={18} />
-                  </>
-                )}
-              </button>
-            </div>
+            {isLoggedIn && (
+              <div className="mt-auto border-t border-slate-100 pt-4">
+                <button
+                  disabled={isRoomUnavailable}
+                  onClick={() => {
+                    if (isRoomUnavailable) return;
+                    if (isRoomSelected) removeRoom(room._id);
+                    else addRoom(room);
+                    onClose();
+                  }}
+                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-4 font-bold uppercase tracking-wide transition-all ${
+                    isRoomUnavailable
+                      ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                      : isRoomSelected
+                        ? "bg-red-50 text-red-600 hover:bg-red-100"
+                        : "bg-slate-900 text-white shadow-xl hover:bg-slate-800"
+                  }`}
+                >
+                  {isRoomUnavailable ? (
+                    <>
+                      {isRoomUnderMaintenance
+                        ? "Maintenance"
+                        : isRoomCleaningDay
+                          ? "Cleaning"
+                          : isRoomBookedToday
+                            ? "Occupied"
+                            : isRoomBookedForRange
+                              ? roomRangeReason === "cleaning"
+                                ? "Cleaning Day"
+                                : "Booked"
+                              : "Unavailable"}
+                    </>
+                  ) : isRoomSelected ? (
+                    <>
+                      Remove from Booking <X size={18} />
+                    </>
+                  ) : (
+                    <>
+                      Add to Booking <Plus size={18} />
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -562,90 +590,95 @@ const Rooms = () => {
                 )}
               </div>
 
-              <div className="mb-3 border-t border-slate-100 pt-3">
-                <p className="mb-1.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest leading-[1.25] text-slate-400">
-                  <CheckCircle size={8} /> Availability
-                </p>
-                {[
-                  { val: "all", label: "Show All", icon: Layers },
-                  { val: "available", label: "Available", icon: CircleDashed },
-                  { val: "occupied", label: "Occupied", icon: CalendarX },
-                ].map((status) => (
-                  <button
-                    key={status.val}
-                    onClick={() => setFilterStatus(status.val)}
-                    className={getFilterButtonClass(filterStatus === status.val)}
-                  >
-                    <status.icon
-                      size={10}
-                      className={
-                        filterStatus === status.val
-                          ? "text-blue-400"
-                          : "text-slate-400 group-hover:text-slate-600"
-                      }
-                    />
-                    {status.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-[8px]">
-              {selectedRooms.length > 0 ? (
-                <div className="overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-900/5">
-                  <div className="relative h-28 bg-slate-900">
-                    <img
-                      src={getImageUrl(getRoomImage(selectedRooms[0]))}
-                      alt="Selected Room"
-                      className="h-full w-full object-cover opacity-60"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
-                    <div className="absolute bottom-3 left-3 pr-3 text-white">
-                      <p className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-blue-200">
-                        Current Selection
-                      </p>
-                      <div className="text-[12px] font-bold leading-tight text-white">
-                        {selectedRooms[0].name}
-                        {extraCount > 0 && (
-                          <span className="ml-1.5 inline-flex items-center rounded bg-blue-600 px-1 py-0.5 text-[8px] font-bold text-white shadow-sm">
-                            +{extraCount} others
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <button
-                      onClick={() => navigate("/retreat-booking")}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 py-2.5 text-[10px] font-bold uppercase text-white shadow-lg shadow-slate-200 hover:bg-slate-800"
-                    >
-                      Review & Book <ArrowRight size={12} />
-                    </button>
-                    <button
-                      onClick={clearRooms}
-                      className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[9px] font-bold uppercase text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                    >
-                      Clear Selection <Trash2 size={10} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-3 shadow-sm">
-                  <h2 className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-blue-900">
-                    <Sun size={10} className="text-orange-500" /> No rooms selected
-                  </h2>
-                  <p className="mb-2.5 text-[9px] leading-relaxed text-slate-500">
-                    Choose a room to add it to your booking, or continue with a venue-only reservation.
+              {isLoggedIn && (
+                <div className="mb-3 border-t border-slate-100 pt-3">
+                  <p className="mb-1.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest leading-[1.25] text-slate-400">
+                    <CheckCircle size={8} /> Availability
                   </p>
-                  <button
-                    onClick={() => navigate("/retreat-booking")}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white py-2 text-[9px] font-bold uppercase text-blue-700 hover:bg-blue-50"
-                  >
-                    Book Venue Only <ArrowRight size={11} />
-                  </button>
+                  {[
+                    { val: "all", label: "Show All", icon: Layers },
+                    { val: "available", label: "Available", icon: CircleDashed },
+                    { val: "occupied", label: "Occupied", icon: CalendarX },
+                  ].map((status) => (
+                    <button
+                      key={status.val}
+                      onClick={() => setFilterStatus(status.val)}
+                      className={getFilterButtonClass(filterStatus === status.val)}
+                    >
+                      <status.icon
+                        size={10}
+                        className={
+                          filterStatus === status.val
+                            ? "text-blue-400"
+                            : "text-slate-400 group-hover:text-slate-600"
+                        }
+                      />
+                      {status.label}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
+
+            {isLoggedIn && (
+              <div className="mt-[8px]">
+                {selectedRooms.length > 0 ? (
+                  <div className="overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-slate-900/5">
+                    <div className="relative h-28 bg-slate-900">
+                      <img
+                        src={getImageUrl(getRoomImage(selectedRooms[0]))}
+                        alt="Selected Room"
+                        className="h-full w-full object-cover opacity-60"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent" />
+                      <div className="absolute bottom-3 left-3 pr-3 text-white">
+                        <p className="mb-0.5 text-[8px] font-bold uppercase tracking-wider text-blue-200">
+                          Current Selection
+                        </p>
+                        <div className="text-[12px] font-bold leading-tight text-white">
+                          {selectedRooms[0].name}
+                          {extraCount > 0 && (
+                            <span className="ml-1.5 inline-flex items-center rounded bg-blue-600 px-1 py-0.5 text-[8px] font-bold text-white shadow-sm">
+                              +{extraCount} others
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <button
+                        onClick={() => navigate("/retreat-booking")}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 py-2.5 text-[10px] font-bold uppercase text-white shadow-lg shadow-slate-200 hover:bg-slate-800"
+                      >
+                        Review & Book <ArrowRight size={12} />
+                      </button>
+                      <button
+                        onClick={clearRooms}
+                        className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[9px] font-bold uppercase text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                      >
+                        Clear Selection <Trash2 size={10} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-3 shadow-sm">
+                    <h2 className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-blue-900">
+                      <Sun size={10} className="text-orange-500" /> No rooms selected
+                    </h2>
+                    <p className="mb-2.5 text-[9px] leading-relaxed text-slate-500">
+                      Choose a room to add it to your booking, or continue with a venue-only
+                      reservation.
+                    </p>
+                    <button
+                      onClick={() => navigate("/retreat-booking")}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white py-2 text-[9px] font-bold uppercase text-blue-700 hover:bg-blue-50"
+                    >
+                      Book Venue Only <ArrowRight size={11} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </aside>
 
@@ -659,27 +692,39 @@ const Rooms = () => {
             <div className="space-y-[20px]">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {paginatedRooms.map((room) => {
-                  const isUnderMaintenance = room.status === "maintenance";
-                  const isCleaningDay = cleaningRooms.some((id) => String(id) === String(room._id));
-                  const isBookedToday = occupiedRooms.some((id) => String(id) === String(room._id));
-                  const rangeReason =
-                    rangeBookedReasons[String(room._id)] ||
-                    (rangeBookedRooms.some((id) => String(id) === String(room._id)) ? "booked" : "");
+                  const isUnderMaintenance = isLoggedIn && room.status === "maintenance";
+                  const isCleaningDay =
+                    isLoggedIn && cleaningRooms.some((id) => String(id) === String(room._id));
+                  const isBookedToday =
+                    isLoggedIn && occupiedRooms.some((id) => String(id) === String(room._id));
+                  const rangeReason = isLoggedIn
+                    ? rangeBookedReasons[String(room._id)] ||
+                      (rangeBookedRooms.some((id) => String(id) === String(room._id))
+                        ? "booked"
+                        : "")
+                    : "";
                   const isBookedForRange = Boolean(rangeReason);
                   const isUnavailable =
-                    isUnderMaintenance || isCleaningDay || isBookedToday || isBookedForRange;
-                  const selected = isSelected(room._id);
+                    isLoggedIn &&
+                    (isUnderMaintenance || isCleaningDay || isBookedToday || isBookedForRange);
+                  const selected = isLoggedIn && isSelected(room._id);
+                  const canSelectRoom = isLoggedIn && !isUnavailable;
 
                   return (
                     <div
                       key={room._id}
-                      onClick={() => !isUnavailable && (selected ? removeRoom(room._id) : addRoom(room))}
+                      onClick={() => {
+                        if (!canSelectRoom) return;
+                        selected ? removeRoom(room._id) : addRoom(room);
+                      }}
                       className={`relative overflow-hidden rounded-xl border-2 bg-white transition-all duration-300 ${
-                        isUnavailable
+                        !isLoggedIn
                           ? "border-slate-100 shadow-none"
-                          : selected
-                            ? "cursor-pointer border-slate-900 shadow-xl ring-4 ring-blue-600/10"
-                            : "cursor-pointer border-transparent hover:border-slate-200 hover:shadow-lg"
+                          : isUnavailable
+                            ? "border-slate-100 shadow-none"
+                            : selected
+                              ? "cursor-pointer border-slate-900 shadow-xl ring-4 ring-blue-600/10"
+                              : "cursor-pointer border-transparent hover:border-slate-200 hover:shadow-lg"
                       }`}
                     >
                       <div
@@ -770,34 +815,38 @@ const Rooms = () => {
                           </span>
                         </div>
 
-                        <button
-                          disabled={isUnavailable}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (!isUnavailable) {
-                              selected ? removeRoom(room._id) : addRoom(room);
-                            }
-                          }}
-                          className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[10px] font-bold uppercase transition-all ${
-                            isUnavailable
-                              ? "cursor-not-allowed border border-slate-100 bg-slate-50 text-slate-300"
-                              : selected
-                                ? "border border-red-50 bg-red-50 text-red-600 hover:bg-red-100"
-                                : "bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 hover:shadow-xl"
-                          }`}
-                        >
-                        {isUnderMaintenance
-                          ? "Maintenance"
-                          : isCleaningDay
-                            ? "Cleaning"
-                            : isBookedToday
-                              ? "Occupied"
-                              : isBookedForRange
-                                  ? rangeReason === "cleaning" ? "Cleaning Day" : "Booked"
-                                  : selected
-                                    ? "Remove"
-                                    : "Select"}
-                        </button>
+                        {isLoggedIn && (
+                          <button
+                            disabled={isUnavailable}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (!isUnavailable) {
+                                selected ? removeRoom(room._id) : addRoom(room);
+                              }
+                            }}
+                            className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[10px] font-bold uppercase transition-all ${
+                              isUnavailable
+                                ? "cursor-not-allowed border border-slate-100 bg-slate-50 text-slate-300"
+                                : selected
+                                  ? "border border-red-50 bg-red-50 text-red-600 hover:bg-red-100"
+                                  : "bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 hover:shadow-xl"
+                            }`}
+                          >
+                            {isUnderMaintenance
+                              ? "Maintenance"
+                              : isCleaningDay
+                                ? "Cleaning"
+                                : isBookedToday
+                                  ? "Occupied"
+                                  : isBookedForRange
+                                    ? rangeReason === "cleaning"
+                                      ? "Cleaning Day"
+                                      : "Booked"
+                                    : selected
+                                      ? "Remove"
+                                      : "Select"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

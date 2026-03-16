@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import Navbar from "../components/Navbar";
@@ -48,6 +48,7 @@ const AllReviews = () => {
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editReplyText, setEditReplyText] = useState("");
   const [flashTargetId, setFlashTargetId] = useState(null);
+  const handledFlashRef = useRef(null);
 
   // Deletion Modal State
   const [itemToDelete, setItemToDelete] = useState(null); 
@@ -112,6 +113,12 @@ const AllReviews = () => {
   useEffect(() => {
     if (!reviews.length) return;
     const params = new URLSearchParams(location.search);
+    const flashParam = params.get("flash");
+    const hasFlash = Boolean(flashParam || location.state?.flashNonce);
+    if (!hasFlash) return;
+    const flashKey = flashParam || location.state?.flashNonce;
+    if (handledFlashRef.current === flashKey) return;
+    handledFlashRef.current = flashKey;
     const reviewIdParam = params.get("reviewId");
     const replyIdParam = params.get("replyId");
     const stateReviewId = location.state?.reviewId;
@@ -195,6 +202,13 @@ const AllReviews = () => {
     };
 
     timeouts.push(setTimeout(() => tryScroll(0), 120));
+
+    if (flashParam) {
+      params.delete("flash");
+      const cleanedSearch = params.toString();
+      const cleanedUrl = `${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ""}`;
+      window.history.replaceState(window.history.state, "", cleanedUrl);
+    }
 
     return () => {
       canceled = true;
@@ -473,26 +487,8 @@ const AllReviews = () => {
         .review-card {
           position: relative;
           overflow: hidden;
+          box-shadow: none;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .review-card::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 2px;
-          background: #0f172a;
-          opacity: 0.12;
-        }
-        .review-card::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 2px;
-          background: linear-gradient(90deg, rgba(15,23,42,0.08), rgba(37,99,235,0.18), rgba(15,23,42,0.08));
         }
         .review-card:hover {
           transform: translateY(-2px);
@@ -554,6 +550,10 @@ const AllReviews = () => {
             reviews.slice(0, visibleReviewCount).map((review) => {
               const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];
               const isThreadExpanded = expandedReviewThreads[review._id];
+              const RepliesToggleIcon = isThreadExpanded ? ChevronUp : ChevronDown;
+              const repliesToggleText = isThreadExpanded
+                ? "Hide replies"
+                : `See ${parentChats.length} ${parentChats.length === 1 ? "reply" : "replies"}`;
               const booking = review.bookingId;
               const bookingName = booking?.bookingName;
               const reviewMessage = review.comment || "";
@@ -567,7 +567,7 @@ const AllReviews = () => {
               const canReply = isMyReview || userData?.role === "admin" || userData?.role === "staff";
 
               return (
-                <div id={`review-${review._id}`} key={review._id} className={`group review-card bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}>
+              <div id={`review-${review._id}`} key={review._id} className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}>
                   <div className="p-4 pl-5">
                     
                     {/* --- MAIN REVIEW HEADER --- */}
@@ -1070,22 +1070,20 @@ const AllReviews = () => {
                             </div>
                           );
                         })}
-                        
+
                         {parentChats.length > 0 && (
                           <div className="flex justify-center mt-2">
-                            <button onClick={() => toggleReviewThreads(review._id)} className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm">
-                              {isThreadExpanded ? (
-                                <><ChevronUp size={14} /> Hide replies</>
-                              ) : (
-                                <><ChevronDown size={14} /> See {parentChats.length} {parentChats.length === 1 ? "reply" : "replies"}</>
-                              )}
+                            <button
+                              onClick={() => toggleReviewThreads(review._id)}
+                              className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                            >
+                              <RepliesToggleIcon size={14} />
+                              {repliesToggleText}
                             </button>
                           </div>
                         )}
-
                       </div>
                     )}
-
                   </div>
                 </div>
               );

@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { User, Camera, Eye, EyeOff, Loader2, Info, Mail, ShieldCheck, Lock, Phone, UserCircle, ChevronRight, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { auth, googleProvider } from "../config/firebase";
 // ✅ IMPORT THE COMPONENT
 import VerifyOtp from './VerifyOtp'; 
 
@@ -17,6 +19,7 @@ const Login = () => {
 
   const [state, setState] = useState('Login');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -51,9 +54,51 @@ const Login = () => {
   const [isAccountTaken, setIsAccountTaken] = useState(false);
   const [isPhoneFieldTaken, setIsPhoneFieldTaken] = useState(false); // New state for registration phone field
 
+  const resolveGoogleAuthError = (err) => {
+    const code = err?.code;
+    if (code === "auth/popup-closed-by-user") return "Sign-in popup closed.";
+    if (code === "auth/cancelled-popup-request") return "Another sign-in is in progress.";
+    if (code === "auth/popup-blocked") return "Popup blocked. We will redirect you to sign in.";
+    if (code === "auth/operation-not-allowed") return "Google sign-in is not enabled in Firebase.";
+    if (code === "auth/unauthorized-domain") return "This domain is not authorized for Google sign-in.";
+    if (code === "auth/invalid-api-key") return "Invalid Firebase API key.";
+    return err?.response?.data?.message || err?.message || "Google sign-in failed.";
+  };
+
   useEffect(() => {
     if (token) navigate('/');
   }, [token, navigate]);
+
+  useEffect(() => {
+    let active = true;
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!result?.user || !active) return;
+
+        setGoogleLoading(true);
+        const intent = localStorage.getItem("googleAuthIntent") || "login";
+        localStorage.removeItem("googleAuthIntent");
+        const idToken = await result.user.getIdToken();
+        const { data } = await axios.post(backendUrl + '/api/user/google-auth', { idToken, intent });
+        if (data.success) {
+          localStorage.setItem('token', data.token);
+          setToken(data.token);
+        } else {
+          setError(data.message || "Google sign-in failed.");
+        }
+      } catch (err) {
+        if (!active) return;
+        const message = resolveGoogleAuthError(err);
+        setError(message);
+      } finally {
+        if (active) setGoogleLoading(false);
+      }
+    };
+
+    handleRedirectResult();
+    return () => { active = false; };
+  }, [backendUrl, setToken]);
 
   useEffect(() => {
     setIsDisabled(false);
@@ -155,16 +200,6 @@ const Login = () => {
   const formatPhone = (val) => val.replace(/\D/g, '');
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true);
-      window.location.href = `${backendUrl}/api/user/google-auth`; 
-    } catch (err) {
-      setError("Google Sign-In failed.");
-      setLoading(false);
-    }
-  };
-
   const handleVerifyClick = async (type = 'default') => {
     const targetValue = (type === 'phone') ? phone : email;
     const isEmail = validateEmail(targetValue);
@@ -261,6 +296,35 @@ const Login = () => {
       setError("Failed to reset password.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async (intent = "login") => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const idToken = await result.user.getIdToken();
+
+      const { data } = await axios.post(backendUrl + '/api/user/google-auth', { idToken, intent });
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+      } else {
+        setError(data.message || "Google sign-in failed.");
+      }
+    } catch (err) {
+      const code = err?.code;
+      if (code === "auth/popup-blocked") {
+        setError("Popup blocked. Redirecting to Google sign-in...");
+        localStorage.setItem("googleAuthIntent", intent);
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      const message = resolveGoogleAuthError(err);
+      setError(message);
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -412,9 +476,18 @@ const Login = () => {
                       <input 
                         className={`w-full bg-gray-50 border rounded-xl p-3.5 text-sm transition-all outline-none ${isAccountTaken && state === 'Sign Up' ? 'border-red-400 bg-red-50' : 'border-gray-100 focus:border-blue-500'}`}
                         type="text" 
-                        onChange={(e) => setEmail(e.target.value.startsWith('0') ? e.target.value.replace(/\D/g, '').slice(0, 11) : e.target.value)} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const looksLikeEmail = value.includes("@") || /[a-zA-Z]/.test(value);
+                          if (looksLikeEmail) {
+                            setEmail(value);
+                            return;
+                          }
+                          const digits = value.replace(/\D/g, "").slice(0, 11);
+                          setEmail(digits);
+                        }} 
                         value={email} 
-                        placeholder={state === 'Sign Up' ? "Enter email" : "09XXXXXXXXX or Email"} 
+                        placeholder={state === 'Sign Up' ? "name@example.com" : "Email or Phone Number"} 
                         required 
                       />
                       
@@ -468,8 +541,14 @@ const Login = () => {
 
               {state === 'Reset Password' && (
                 <div className='space-y-4'>
-                   <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3.5 text-sm' type="password" placeholder="New Password" onChange={(e) => setPassword(e.target.value)} value={password} required />
-                   <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3.5 text-sm' type="password" placeholder="Confirm New Password" onChange={(e) => setConfirmPassword(e.target.value)} value={confirmPassword} required />
+                   <div className='relative'>
+                     <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3.5 text-sm' type={showPassword ? "text" : "password"} placeholder="New Password" onChange={(e) => setPassword(e.target.value)} value={password} required />
+                     <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                   </div>
+                   <div className='relative'>
+                     <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3.5 text-sm' type={showConfirmPassword ? "text" : "password"} placeholder="Confirm New Password" onChange={(e) => setConfirmPassword(e.target.value)} value={confirmPassword} required />
+                     <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>{showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                   </div>
                 </div>
               )}
 
@@ -483,26 +562,43 @@ const Login = () => {
                   type='submit' 
                   className='w-full bg-[#1A2B32] text-white py-4 rounded-xl font-bold text-sm mt-6 hover:bg-black hover:shadow-lg transition-all active:scale-[0.99] disabled:bg-gray-200 disabled:cursor-not-allowed'
                 >
-                  {loading ? <Loader2 className='animate-spin mx-auto' size={20} /> : (state === 'Reset Password' ? "Update Password" : (state === 'Sign Up' ? "Sign up" : "Sign in"))}
+                  {loading ? <Loader2 className='animate-spin mx-auto' size={20} /> : (state === 'Reset Password' ? "Update Password" : (state === 'Sign Up' ? "Sign up" : "Log in"))}
                 </button>
               )}
 
-              {state !== 'Reset Password' && !showForgotEmailField && (
+              {(state === 'Login' || state === 'Sign Up') && !showForgotEmailField && (
                 <>
-                  <div className='relative py-4 flex items-center'>
-                    <div className='flex-grow border-t border-gray-100'></div>
-                    <span className='px-4 text-[10px] text-gray-300 font-bold uppercase tracking-widest'>Or</span>
-                    <div className='flex-grow border-t border-gray-100'></div>
+                  <div className='flex items-center gap-3 mt-6'>
+                    <div className='h-px flex-1 bg-gray-100'></div>
+                    <span className='text-[10px] font-bold text-gray-300 uppercase tracking-widest'>or</span>
+                    <div className='h-px flex-1 bg-gray-100'></div>
                   </div>
-                  <button type="button" onClick={handleGoogleSignIn} className='w-full border border-gray-200 py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-3 hover:bg-gray-50 transition-all shadow-sm active:scale-[0.98]'>
-                    <img src="https://www.gstatic.com/images/branding/product/2x/googleg_48dp.png" className='w-5 h-5' alt="Google" />
-                    <span className="text-gray-700">Sign in with Google</span>
+                  <button
+                    type="button"
+                    onClick={() => handleGoogleSignIn(state === 'Sign Up' ? "signup" : "login")}
+                    disabled={googleLoading}
+                    className='w-full mt-3 border border-gray-200 bg-white text-gray-700 py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed'
+                  >
+                    {googleLoading ? (
+                      <Loader2 className='animate-spin' size={18} />
+                    ) : (
+                      <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.73 1.22 9.23 3.61l6.86-6.86C35.94 2.46 30.47 0 24 0 14.64 0 6.27 5.38 2.1 13.22l8.02 6.23C12.21 13.3 17.68 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.5 24.5c0-1.6-.14-3.14-.4-4.5H24v9h12.7c-.58 3.12-2.34 5.77-4.98 7.55l7.62 5.9c4.45-4.11 7.16-10.17 7.16-17.95z"/>
+                        <path fill="#FBBC05" d="M10.12 28.45c-.48-1.42-.75-2.94-.75-4.45s.27-3.03.75-4.45l-8.02-6.23C.74 16.23 0 20.05 0 24s.74 7.77 2.1 10.68l8.02-6.23z"/>
+                        <path fill="#34A853" d="M24 48c6.47 0 11.94-2.13 15.92-5.78l-7.62-5.9c-2.11 1.42-4.8 2.25-8.3 2.25-6.32 0-11.79-3.8-13.88-9.45l-8.02 6.23C6.27 42.62 14.64 48 24 48z"/>
+                      </svg>
+                    )}
+                    <span>{state === 'Sign Up' ? "Sign up with Google" : "Continue with Google"}</span>
                   </button>
-                  <p className='text-center mt-8 text-sm text-gray-400 font-medium'>
-                    {state === 'Sign Up' ? "Already have an account?" : "Don't you have an account?"}
-                    <button type="button" onClick={() => setState(state === 'Sign Up' ? 'Login' : 'Sign Up')} className='text-blue-600 ml-1 font-bold hover:underline'>{state === 'Sign Up' ? "Sign in" : "Sign up"}</button>
-                  </p>
                 </>
+              )}
+
+              {state !== 'Reset Password' && !showForgotEmailField && (
+                <p className='text-center mt-8 text-sm text-gray-400 font-medium'>
+                  {state === 'Sign Up' ? "Already have an account?" : "Don't you have an account?"}
+                  <button type="button" onClick={() => setState(state === 'Sign Up' ? 'Login' : 'Sign Up')} className='text-blue-600 ml-1 font-bold hover:underline'>{state === 'Sign Up' ? "Log in" : "Sign up"}</button>
+                </p>
               )}
             </form>
           </div>
@@ -519,3 +615,6 @@ const Login = () => {
 };
 
 export default Login;
+
+
+

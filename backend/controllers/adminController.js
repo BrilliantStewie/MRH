@@ -292,12 +292,13 @@ const changeUserStatus = async (req, res) => {
     await user.save();
 
     const statusText = user.disabled ? "disabled" : "re-enabled";
+    const accountStatusMessage = user.disabled ? "Account disabled." : "Account reactivated.";
 
     // 🔔 In-app notification
     await Notification.create({
       recipient: user._id,
       type: "account_status",
-      message: `Your account has been ${statusText} by the administration.`,
+      message: accountStatusMessage,
       link: "/login",
       isRead: false
     });
@@ -305,16 +306,18 @@ const changeUserStatus = async (req, res) => {
     // 📧 Email
     await sendEmail(
       user.email,
-      `Account ${user.disabled ? "Suspension" : "Reactivation"} – Mercedarian Retreat House`,
+      "Account status update - Mercedarian Retreat House",
       `
-      <p>Dear ${user.firstName || "User"},</p>
-      ${
-        user.disabled
-          ? `<p>Your account has been <strong>disabled</strong>. Please contact administration.</p>`
-          : `<p>Your account has been <strong>re-activated</strong>. You may now log in.</p>`
-      }
-      <br/>
-      <p>Administration Office<br/>Mercedarian Retreat House</p>
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+        <p>Hello ${user.firstName || "User"},</p>
+        <p>Your account is now ${user.disabled ? "disabled" : "active"}.</p>
+        ${
+          user.disabled
+            ? "<p>If you believe this is a mistake, please contact us.</p>"
+            : "<p>You can sign in anytime.</p>"
+        }
+        <p>Mercedarian Retreat House</p>
+      </div>
       `
     );
 
@@ -505,24 +508,21 @@ const approveBooking = async (req, res) => {
         await Notification.create({
             recipient: booking.user_id._id,
             type: "booking_update",
-            message: `Great news! Your booking has been approved by the administration.`,
+            message: "Booking approved.",
             link: `/my-bookings?bookingId=${booking._id}`
         });
 
         await sendEmail(
             booking.user_id.email,
-            "Booking Confirmation – Mercedarian Retreat House",
+            "Booking approved - Mercedarian Retreat House",
             `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <p>Dear ${booking.user_id.firstName},</p>
-                <p>Good day.</p>
-                <p>We are pleased to inform you that your booking request has been <strong>approved by the Administration</strong>.</p>
-                <p>Your reservation for ${new Date(booking.check_in).toLocaleDateString()} is now confirmed. Please check your dashboard for further details.</p>
-                <p>Should you have any inquiries or special requests, please feel free to contact us.</p>
-                <br/>
-                <p>Thank you for choosing Mercedarian Retreat House.</p>
-                <br/>
-                <p>Respectfully,<br/>Administration Office<br/>Mercedarian Retreat House</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Your booking has been approved.</p>
+                <p>Booking: ${booking.bookingName || "Reservation"}</p>
+                <p>Check-in: ${new Date(booking.check_in).toLocaleDateString()}</p>
+                <p>You can view details in your account.</p>
+                <p>Mercedarian Retreat House</p>
             </div>
             `
         );
@@ -542,17 +542,13 @@ const declineBooking = async (req, res) => {
 
         await sendEmail(
             booking.user_id.email,
-            "Booking Request Update – Mercedarian Retreat House",
+            "Booking update - Mercedarian Retreat House",
             `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <p>Dear ${booking.user_id.firstName},</p>
-                <p>We regret to inform you that your booking request has been <strong>declined by the Administration</strong>.</p>
-                <p>If you would like to reschedule or submit a new booking request, you may do so through your account.</p>
-                <p>For further clarification, please feel free to contact us.</p>
-                <br/>
-                <p>Thank you for your understanding.</p>
-                <br/>
-                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Your booking request was declined.</p>
+                <p>You can submit a new request or contact us if you need help.</p>
+                <p>Mercedarian Retreat House</p>
             </div>
             `
         );
@@ -572,19 +568,25 @@ const paymentConfirmed = async (req, res) => {
 
         await sendEmail(
             booking.user_id.email,
-            "Payment Confirmation – Mercedarian Retreat House",
+            "Payment confirmed - Mercedarian Retreat House",
             `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <p>Dear ${booking.user_id.firstName},</p>
-                <p>Good day.</p>
-                <p>This is to formally confirm that your payment for <strong>${booking.bookingName || booking.room_ids[0]?.name}</strong> has been successfully verified and confirmed by the <strong>Administration</strong>.</p>
-                <p>Your reservation is now fully secured. Kindly keep this email for your records.</p>
-                <p>We look forward to welcoming you to Mercedarian Retreat House.</p>
-                <br/>
-                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Your payment is confirmed.</p>
+                <p>Booking: ${booking.bookingName || booking.room_ids[0]?.name || "Reservation"}</p>
+                <p>Your reservation is secured.</p>
+                <p>Mercedarian Retreat House</p>
             </div>
             `
         );
+
+        await Notification.create({
+            recipient: booking.user_id._id,
+            type: "payment_update",
+            message: `Payment confirmed for ${booking.bookingName || "your reservation"}.`,
+            link: `/my-bookings?bookingId=${booking._id}`,
+            isRead: false
+        });
 
         res.json({ success: true, message: "Payment Confirmed" });
     } catch (error) {
@@ -605,15 +607,13 @@ const approveCancellationRequest = async (req, res) => {
 
         await sendEmail(
             booking.user_id.email,
-            "Cancellation Approved – Mercedarian Retreat House",
+            "Cancellation approved - Mercedarian Retreat House",
             `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <p>Dear ${booking.user_id.firstName},</p>
-                <p>This is to inform you that your cancellation request has been <strong>approved by the Administration</strong>.</p>
-                <p>Your booking has now been officially cancelled in our system.</p>
-                <p>If you wish to make a new reservation in the future, we will be happy to assist you.</p>
-                <br/>
-                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Your cancellation request was approved.</p>
+                <p>Your booking is now cancelled.</p>
+                <p>Mercedarian Retreat House</p>
             </div>
             `
         );
@@ -635,15 +635,13 @@ const resolveCancellation = async (req, res) => {
 
         await sendEmail(
             booking.user_id.email,
-            "Cancellation Request Update – Mercedarian Retreat House",
+            "Cancellation update - Mercedarian Retreat House",
             `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <p>Dear ${booking.user_id.firstName},</p>
-                <p>Your cancellation request has been <strong>${action === 'approve' ? 'approved' : 'reviewed and declined'}</strong> by the Administration.</p>
-                ${action === 'approve' ? `<p>Your booking has been successfully cancelled.</p>` : `<p>Your reservation remains active as scheduled.</p>`}
-                <p>Should you need further assistance, please contact us.</p>
-                <br/>
-                <p>Administration Office<br/>Mercedarian Retreat House</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Your cancellation request was ${action === 'approve' ? 'approved' : 'declined'}.</p>
+                ${action === 'approve' ? `<p>Your booking is now cancelled.</p>` : `<p>Your reservation remains active.</p>`}
+                <p>Mercedarian Retreat House</p>
             </div>
             `
         );

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { StaffContext } from "../../context/StaffContext";
 import {
   Star,
@@ -13,11 +14,14 @@ import {
   ChevronUp,
   Reply,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
+  Check,
   Clock,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MoreHorizontal
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -25,6 +29,7 @@ import { jwtDecode } from "jwt-decode";
 
 const StaffReviews = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
+  const location = useLocation();
 
   const decoded = sToken ? jwtDecode(sToken) : null; 
   const loggedInUserId = decoded?.id; 
@@ -37,6 +42,12 @@ const StaffReviews = () => {
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [showReviewMenu, setShowReviewMenu] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [readReviewIds, setReadReviewIds] = useState(() => new Set());
+  const [clearedReviewIds, setClearedReviewIds] = useState(() => new Set());
+  const [flashTargetId, setFlashTargetId] = useState(null);
+  const handledFlashRef = useRef(null);
   
   const [visibleHistoryId, setVisibleHistoryId] = useState(null); 
   const [visibleReviewHistoryId, setVisibleReviewHistoryId] = useState(null); 
@@ -63,6 +74,43 @@ const StaffReviews = () => {
       [reviewId]: !prev[reviewId],
     }));
   };
+
+  const getReviewKey = (review) => String(review?._id || "");
+
+  const markReviewRead = (reviewId) => {
+    const key = String(reviewId);
+    if (!key) return;
+    setReadReviewIds((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
+
+  const markAllReviewsRead = (reviewKeys) => {
+    setReadReviewIds((prev) => {
+      const next = new Set(prev);
+      reviewKeys.forEach((key) => next.add(key));
+      return next;
+    });
+  };
+
+  const clearAllReviews = (reviewKeys) => {
+    setClearedReviewIds((prev) => {
+      const next = new Set(prev);
+      reviewKeys.forEach((key) => next.add(key));
+      return next;
+    });
+    setShowClearConfirm(false);
+  };
+
+  const visibleReviews = useMemo(() => {
+    return reviews.filter((review) => !clearedReviewIds.has(getReviewKey(review)));
+  }, [reviews, clearedReviewIds]);
+
+  const unreadReviewCount = useMemo(() => {
+    return visibleReviews.filter((review) => !readReviewIds.has(getReviewKey(review))).length;
+  }, [visibleReviews, readReviewIds]);
 
   /* ==========================================
      HELPER: Name Formatting
@@ -130,8 +178,91 @@ const StaffReviews = () => {
   }, [backendUrl, sToken]);
 
   useEffect(() => {
-    setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), reviews.length || REVIEW_PAGE_SIZE));
-  }, [reviews.length]);
+    if (!reviews.length) return;
+    const params = new URLSearchParams(location.search);
+    const flashParam = params.get("flash");
+    const hasFlash = Boolean(flashParam || location.state?.flashNonce);
+    if (!hasFlash) return;
+    const flashKey = flashParam || location.state?.flashNonce;
+    if (handledFlashRef.current === flashKey) return;
+    handledFlashRef.current = flashKey;
+    const reviewIdParam = params.get("reviewId");
+    const replyIdParam = params.get("replyId");
+    const stateReviewId = location.state?.reviewId;
+    const stateReplyId = location.state?.replyId;
+
+    let resolvedReviewId = reviewIdParam || stateReviewId;
+    let resolvedReplyId = replyIdParam || stateReplyId;
+    let parentReplyId = null;
+
+    if (resolvedReplyId) {
+      const matchReview = reviews.find((review) =>
+        review.reviewChat?.some((chat) => String(chat._id) === String(resolvedReplyId))
+      );
+      if (matchReview) {
+        resolvedReviewId = resolvedReviewId || matchReview._id;
+        const replyMatch = matchReview.reviewChat.find(
+          (chat) => String(chat._id) === String(resolvedReplyId)
+        );
+        if (replyMatch?.parentReplyId) {
+          parentReplyId = String(replyMatch.parentReplyId);
+        }
+      }
+    }
+
+    if (resolvedReviewId) {
+      const reviewIndex = visibleReviews.findIndex(
+        (review) => String(review?._id) === String(resolvedReviewId)
+      );
+      if (reviewIndex !== -1) {
+        setVisibleReviewCount((prev) => Math.max(prev, reviewIndex + 1));
+      }
+      setExpandedReviewThreads((prev) => ({ ...prev, [resolvedReviewId]: true }));
+    }
+    if (parentReplyId) {
+      setExpandedReplies((prev) => ({ ...prev, [parentReplyId]: true }));
+    }
+
+    const targetId = resolvedReplyId
+      ? `reply-${resolvedReplyId}`
+      : resolvedReviewId
+        ? `review-${resolvedReviewId}`
+        : null;
+
+    if (!targetId) return;
+
+    setFlashTargetId(null);
+    setTimeout(() => setFlashTargetId(targetId), 80);
+    if (flashParam) {
+      params.delete("flash");
+      const cleanedSearch = params.toString();
+      const cleanedUrl = `${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ""}`;
+      window.history.replaceState(window.history.state, "", cleanedUrl);
+    }
+  }, [reviews, visibleReviews, location.search, location.state]);
+
+  useEffect(() => {
+    if (!flashTargetId) return;
+    let attempts = 0;
+    const maxAttempts = 12;
+    const interval = setInterval(() => {
+      const element = document.getElementById(flashTargetId);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+        clearInterval(interval);
+      } else if (attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+      attempts += 1;
+    }, 250);
+    return () => clearInterval(interval);
+  }, [flashTargetId, visibleReviews]);
+
+  useEffect(() => {
+    setVisibleReviewCount((prev) =>
+      Math.min(Math.max(REVIEW_PAGE_SIZE, prev), visibleReviews.length || REVIEW_PAGE_SIZE)
+    );
+  }, [visibleReviews.length]);
 
   /* ==========================================
      SEND REPLY
@@ -315,59 +446,143 @@ const StaffReviews = () => {
 
   return (
     <div className="reviews-page w-full min-h-screen text-slate-800 relative">
-      <div className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-x-0 top-0 h-56 bg-gradient-to-b from-slate-50 via-white to-transparent" />
-      </div>
+      <div className="pointer-events-none absolute inset-0 -z-10"></div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
         .reviews-page {
           font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
-          background-color: #f5f7fb;
+          background-color: #ffffff;
         }
         .review-card {
           position: relative;
           overflow: hidden;
+          box-shadow: none;
           transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        .review-card::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 2px;
-          background: #0f172a;
-          opacity: 0.12;
-        }
-        .review-card::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          top: 0;
-          height: 2px;
-          background: linear-gradient(90deg, rgba(15,23,42,0.08), rgba(37,99,235,0.18), rgba(15,23,42,0.08));
         }
         .review-card:hover {
           transform: translateY(-2px);
           box-shadow: 0 16px 30px -24px rgba(15, 23, 42, 0.45);
         }
+        @keyframes reviewFlash {
+          0% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            background-color: rgba(59, 130, 246, 0.06);
+          }
+          50% {
+            box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.25);
+            background-color: rgba(59, 130, 246, 0.12);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+            background-color: transparent;
+          }
+        }
+        .flash-highlight {
+          animation: reviewFlash 0.9s ease-in-out 0s 3;
+        }
       `}</style>
 
-      <div className="w-full max-w-none mx-auto px-4 lg:px-12 xl:px-16 2xl:px-20 pt-20 pb-20">
+      <div className="w-full max-w-none mx-auto px-4 lg:px-8 xl:px-10 2xl:px-12 pt-4 pb-20">
       
-      <div className="mb-10 w-full max-w-[1200px] mx-auto">
-        <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-slate-400">
-          Staff
-        </p>
-        <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
-        <p className="text-slate-500 mt-2 max-w-2xl">
-          Manage guest reviews and responses.
-        </p>
+      <div className="mb-10 w-full max-w-[1200px] mx-0">
+        <div className="w-full max-w-[1200px] mx-0 pb-0 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
+            <p className="text-slate-500 mt-2 max-w-2xl">
+              Manage guest reviews and responses.
+            </p>
+          </div>
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const willShow = !showReviewMenu;
+                setShowReviewMenu(willShow);
+                if (!willShow) {
+                  setShowClearConfirm(false);
+                }
+              }}
+              className={`rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 ${
+                showReviewMenu ? "bg-slate-100 text-slate-700" : ""
+              }`}
+              title="Review actions"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+
+            {showReviewMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowReviewMenu(false)}></div>
+                <div className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-md">
+                  {unreadReviewCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markAllReviewsRead(visibleReviews.map(getReviewKey));
+                        setShowReviewMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      <Check size={12} />
+                      Mark all read
+                    </button>
+                  )}
+                  {visibleReviews.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowClearConfirm(true);
+                        setShowReviewMenu(false);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      <Trash2 size={12} />
+                      Clear all
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {showClearConfirm && visibleReviews.length > 0 && (
+          <div className="mt-3 rounded-lg border border-rose-200/70 bg-rose-50/80 px-3 py-2 text-[10px] text-rose-700 shadow-sm">
+            <div className="flex items-start gap-2">
+              <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-rose-500 ring-1 ring-rose-200">
+                <AlertTriangle size={12} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-rose-600">
+                  Clear all reviews?
+                </p>
+                <p className="mt-0.5 text-[10px] font-medium text-rose-700">
+                  This only clears the list view.
+                </p>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-rose-600 transition-colors hover:bg-rose-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => clearAllReviews(visibleReviews.map(getReviewKey))}
+                className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-rose-700"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-auto">
-        <aside className="sticky top-28 h-fit">
+      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-0">
+        <aside className="h-fit">
           <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
             <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
@@ -398,15 +613,17 @@ const StaffReviews = () => {
           </div>
         </aside>
 
-        <div className="space-y-6 flex flex-col items-start w-full pl-8">
+        <div className="space-y-6 flex flex-col items-start w-full pl-4">
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
-        ) : reviews.length === 0 ? (
+        ) : visibleReviews.length === 0 ? (
           <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
-            <p className="text-slate-400 italic">No reviews found yet.</p>
+            <p className="text-slate-400 italic">
+              {reviews.length === 0 ? "No reviews found yet." : "All reviews cleared."}
+            </p>
           </div>
         ) : (
-          reviews.slice(0, visibleReviewCount).map((review) => {
+          visibleReviews.slice(0, visibleReviewCount).map((review) => {
             const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];
             const isThreadExpanded = expandedReviewThreads[review._id];
             const booking = review.bookingId;
@@ -414,9 +631,14 @@ const StaffReviews = () => {
             const reviewMessage = review.comment || "";
             const isReviewMessageExpanded = !!expandedReplyMessages[`review-${review._id}`];
             const shouldTruncateReviewMessage = reviewMessage.length > 300;
+            const isReviewRead = readReviewIds.has(getReviewKey(review));
 
             return (
-              <div key={review._id} className="group review-card bg-white rounded-2xl border border-slate-200 shadow-sm min-h-[180px] max-w-[700px] w-full">
+              <div
+                id={`review-${review._id}`}
+                key={review._id}
+                className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${isReviewRead ? "" : "ring-1 ring-blue-100"} ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
+              >
                 <div className="p-4 pl-5">
                   
                   {/* --- MAIN REVIEW HEADER --- */}
@@ -453,6 +675,18 @@ const StaffReviews = () => {
                       <p className="mt-2 text-[8px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1">
                         {formatDateTime(review.createdAt)} {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
                       </p>
+                      {!isReviewRead && (
+                        <div className="flex justify-end mt-2">
+                          <button
+                            type="button"
+                            onClick={() => markReviewRead(review._id)}
+                            className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors"
+                          >
+                            <Check size={10} />
+                            Mark as read
+                          </button>
+                        </div>
+                      )}
 
                       {review.isEdited && review.editHistory && review.editHistory.length > 0 && (
                         <div className="flex justify-end mt-1">
@@ -515,12 +749,14 @@ const StaffReviews = () => {
                           : (reviewMessage || "No written review provided.")}
                       </p>
                       {shouldTruncateReviewMessage && (
-                        <button
-                          onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [`review-${review._id}`]: !prev[`review-${review._id}`] }))}
-                          className="mt-1 text-[10px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
-                        >
-                          {isReviewMessageExpanded ? "See less" : "See more"}
-                        </button>
+                        <div className="mt-1 flex justify-center">
+                          <button
+                            onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [`review-${review._id}`]: !prev[`review-${review._id}`] }))}
+                            className="text-[10px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                          >
+                            {isReviewMessageExpanded ? "See less" : "See more"}
+                          </button>
+                        </div>
                       )}
                     </div>
                     {Array.isArray(review.images) && review.images.length > 0 && (
@@ -561,10 +797,10 @@ const StaffReviews = () => {
 
                   {/* REPLIES (THREADED VIEW) */}
                   {parentChats.length > 0 && (
-                    <div className="mb-6 space-y-4">
-                      
-                      {/* SHOW ONLY 1 PARENT CHAT UNLESS EXPANDED */}
-                      {(isThreadExpanded ? parentChats : parentChats.slice(0, 1)).map((parentChat) => {
+                    <>
+                    {isThreadExpanded && (
+                      <div className="mb-6 space-y-4">
+                      {parentChats.map((parentChat) => {
                         
                         // Check if there are any child replies to this parent reply
                         const childReplies = review.reviewChat.filter(child => child.parentReplyId === parentChat._id);
@@ -579,7 +815,10 @@ const StaffReviews = () => {
                           <div key={parentChat._id} className="space-y-3">
                             
                             {/* PARENT COMMENT BUBBLE */}
-                            <div className={`relative group/thread rounded-lg p-5 text-sm transition ${parentChat.senderRole === "admin" || parentChat.senderRole === "staff" ? "bg-[#f8fafc] ml-8 border border-slate-100" : "bg-white border border-slate-100"}`}>
+                            <div
+                              id={`reply-${parentChat._id}`}
+                              className={`relative group/thread rounded-lg p-5 text-sm transition ${parentChat.senderRole === "admin" || parentChat.senderRole === "staff" ? "bg-[#f8fafc] ml-8 border border-slate-100" : "bg-white border border-slate-100"} ${flashTargetId === `reply-${parentChat._id}` ? "flash-highlight" : ""}`}
+                            >
                               {(parentChat.senderRole === "admin" || parentChat.senderRole === "staff") && (
                                 <div className="absolute -left-6 top-5 text-[#cbd5e1]"><CornerDownRight size={20} /></div>
                               )}
@@ -590,7 +829,7 @@ const StaffReviews = () => {
                                     {parentChat.senderId?.image ? (
                                       <img src={parentChat.senderId.image.startsWith('http') ? parentChat.senderId.image : `${backendUrl}/${parentChat.senderId.image}`} alt="Profile" className="w-full h-full object-cover" />
                                     ) : (
-                                      <span className="text-[11px] font-bold uppercase text-slate-500">{parentChat.senderId?.firstName ? parentChat.senderId.firstName.charAt(0) : parentChat.senderRole.charAt(0)}</span>
+                                      <User size={14} className="text-slate-400" />
                                     )}
                                   </div>
                                 )}
@@ -638,12 +877,14 @@ const StaffReviews = () => {
                                       : parentMessage}
                                   </p>
                                   {shouldTruncateParentMessage && (
-                                    <button
-                                      onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [parentChat._id]: !prev[parentChat._id] }))}
-                                      className="mt-1 text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
-                                    >
-                                      {isParentMessageExpanded ? "See less" : "See more"}
-                                    </button>
+                                    <div className="mt-1 flex justify-center">
+                                      <button
+                                        onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [parentChat._id]: !prev[parentChat._id] }))}
+                                        className="text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                      >
+                                        {isParentMessageExpanded ? "See less" : "See more"}
+                                      </button>
+                                    </div>
                                   )}
                                   
                                   {/* PARENT HISTORY CONTENT */}
@@ -683,9 +924,11 @@ const StaffReviews = () => {
 
                             {/* TOGGLE REPLIES BUTTON */}
                             {childReplies.length > 0 && (
-                              <button onClick={() => toggleReplies(parentChat._id)} className="ml-12 mt-1 flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors">
-                                {isExpanded ? <><ChevronUp size={14} /> Hide {childReplies.length === 1 ? "reply" : "replies"}</> : <><CornerDownRight size={14} /> View {childReplies.length} {childReplies.length === 1 ? "reply" : "replies"}</>}
-                              </button>
+                              <div className="mt-1 flex justify-start ml-12">
+                                <button onClick={() => toggleReplies(parentChat._id)} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-800 transition-colors">
+                                  {isExpanded ? <><ChevronUp size={14} /> Hide {childReplies.length === 1 ? "reply" : "replies"}</> : <><CornerDownRight size={14} /> View {childReplies.length} {childReplies.length === 1 ? "reply" : "replies"}</>}
+                                </button>
+                              </div>
                             )}
 
                             {/* CHILD REPLIES */}
@@ -699,14 +942,18 @@ const StaffReviews = () => {
                                   const isMyChildReply = String(childReplyOwnerId || "") === String(loggedInUserId || "") && childChat.senderRole === "staff";
 
                                   return (
-                                  <div key={childChat._id} className={`relative group/thread rounded-lg p-4 text-sm transition ${childChat.senderRole === "admin" || childChat.senderRole === "staff" ? "bg-[#f8fafc] border border-slate-100" : "bg-white border border-slate-100"}`}>
+                                  <div
+                                    id={`reply-${childChat._id}`}
+                                    key={childChat._id}
+                                    className={`relative group/thread rounded-lg p-4 text-sm transition ${childChat.senderRole === "admin" || childChat.senderRole === "staff" ? "bg-[#f8fafc] border border-slate-100" : "bg-white border border-slate-100"} ${flashTargetId === `reply-${childChat._id}` ? "flash-highlight" : ""}`}
+                                  >
                                     <div className="flex items-center gap-2.5 mb-2 pr-10">
                                       {childChat.senderRole !== "admin" && (
                                         <div className="h-6 w-6 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
                                           {childChat.senderId?.image ? (
                                             <img src={childChat.senderId.image.startsWith('http') ? childChat.senderId.image : `${backendUrl}/${childChat.senderId.image}`} alt="Profile" className="w-full h-full object-cover" />
                                           ) : (
-                                            <span className="text-[10px] font-bold uppercase text-slate-500">{childChat.senderId?.firstName ? childChat.senderId.firstName.charAt(0) : childChat.senderRole.charAt(0)}</span>
+                                            <User size={12} className="text-slate-400" />
                                           )}
                                         </div>
                                       )}
@@ -754,12 +1001,14 @@ const StaffReviews = () => {
                                             : childMessage}
                                         </p>
                                         {shouldTruncateChildMessage && (
-                                          <button
-                                            onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [childChat._id]: !prev[childChat._id] }))}
-                                            className="mt-1 text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
-                                          >
-                                            {isChildMessageExpanded ? "See less" : "See more"}
-                                          </button>
+                                          <div className="mt-1 flex justify-center">
+                                            <button
+                                              onClick={() => setExpandedReplyMessages((prev) => ({ ...prev, [childChat._id]: !prev[childChat._id] }))}
+                                              className="text-[9px] font-semibold text-slate-400 hover:text-blue-600 transition-colors"
+                                            >
+                                              {isChildMessageExpanded ? "See less" : "See more"}
+                                            </button>
+                                          </div>
                                         )}
                                         
                                         <div className="mt-2 flex justify-start items-center">
@@ -833,15 +1082,14 @@ const StaffReviews = () => {
                         );
                       })}
 
-                      {/* "VIEW X MORE RESPONSES" TOGGLE */}
-                      {parentChats.length > 0 && (
-                        <div className="flex justify-end mt-2">
-                          <button onClick={() => toggleReviewThreads(review._id)} className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm">
-                            {isThreadExpanded ? <><ChevronUp size={14} /> Hide {parentChats.length === 1 ? "reply" : "replies"}</> : <><ChevronDown size={14} /> See {parentChats.length} {parentChats.length === 1 ? "reply" : "replies"}</>}
-                          </button>
-                        </div>
-                      )}
+                      </div>
+                    )}
+                    <div className="flex justify-center mt-2">
+                      <button onClick={() => toggleReviewThreads(review._id)} className="bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm">
+                        {isThreadExpanded ? <><ChevronUp size={14} /> Hide {parentChats.length === 1 ? "reply" : "replies"}</> : <><ChevronDown size={14} /> See {parentChats.length} {parentChats.length === 1 ? "reply" : "replies"}</>}
+                      </button>
                     </div>
+                    </>
                   )}
 
                   {/* MAIN LEVEL "WRITE A REPLY" */}
@@ -868,16 +1116,16 @@ const StaffReviews = () => {
             );
           })
         )}
-        {!isLoading && reviews.length > visibleReviewCount && (
-          <div className="flex justify-center pt-2">
-            <button
-              onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, reviews.length))}
-              className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
-            >
-              Show more reviews
-            </button>
-          </div>
-        )}
+          {!isLoading && visibleReviews.length > visibleReviewCount && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, visibleReviews.length))}
+                className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+              >
+                Show more reviews
+              </button>
+            </div>
+          )}
       </div>
     </div>
   </div>

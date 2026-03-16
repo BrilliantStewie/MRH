@@ -65,6 +65,15 @@ export const createCheckoutSession = async (req, res) => {
 
     const response = await axios.request(options);
 
+    try {
+      await bookingModel.findByIdAndUpdate(bookingId, {
+        paymentMethod: "gcash",
+        paymentStatus: "pending"
+      });
+    } catch (updateError) {
+      console.error("Failed to update booking payment method:", updateError.message);
+    }
+
     res.json({
       success: true,
       checkoutUrl: response.data.data.attributes.checkout_url,

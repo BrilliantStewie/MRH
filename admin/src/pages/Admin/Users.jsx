@@ -211,13 +211,6 @@ const Users = () => {
         
         <div className="flex items-center gap-2">
             <button 
-                onClick={() => { setEditData(null); setShowAddModal(true); }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-black transition-all shadow-md shadow-slate-200"
-            >
-                <UserPlus size={16} />
-                <span className="text-sm font-bold">Add Guest</span>
-            </button>
-            <button 
                 onClick={() => getAllUsers()} 
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
             >
@@ -354,13 +347,6 @@ const Users = () => {
                                 {u.disabled ? "Enable" : "Disable"}
                             </button>
 
-                            <button 
-                                onClick={() => handleEdit(u)}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[11px] font-bold hover:bg-black hover:text-white transition-all border border-indigo-100 shadow-sm"
-                            >
-                                <PenBox size={14} />
-                                Edit
-                            </button>
                           </>
                         )}
                       </div>

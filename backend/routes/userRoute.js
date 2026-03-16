@@ -5,10 +5,13 @@ import {
   googleAuth, 
   sendOTP, 
   sendPhoneOTP,          // ✅ ADDED
+  sendPhoneOTPUpdate,
+  verifyPhoneFirebase,
   requestPasswordReset, 
   requestPhoneReset,     // ✅ ADDED
   resetPassword,         
   verifyOTP, 
+  verifyPhoneOTPUpdate,
   getUserData, 
   updateUserProfile,
   getUserBookings,
@@ -35,7 +38,10 @@ userRouter.post("/login", loginUser);
 userRouter.post("/google-auth", googleAuth); 
 userRouter.post("/send-otp", sendOTP); 
 userRouter.post("/send-phone-otp", sendPhoneOTP);    // ✅ STEP 1: For Registration/Phone Login
+userRouter.post("/send-phone-otp-update", authUser, sendPhoneOTPUpdate);
 userRouter.post("/verify-otp", verifyOTP); 
+userRouter.post("/verify-phone-otp-update", authUser, verifyPhoneOTPUpdate);
+userRouter.post("/verify-phone-firebase", authUser, verifyPhoneFirebase);
 
 // ✅ New Check Routes
 userRouter.post("/check-email", checkEmailExists);   // ✅ ADDED

@@ -155,21 +155,20 @@ total_price,
 
 status:"pending",
 payment:false,
-paymentStatus:"unpaid",
-paymentMethod:""
+paymentStatus:"unpaid"
 
 });
 
 /* ---------- NOTIFY ADMINS ---------- */
 
-const admins = await bookingModel.db.model("User").find({role:"admin"});
+const recipients = await bookingModel.db.model("User").find({ role: { $in: ["admin", "staff"] } });
 
-const notifications = admins.map(admin=>({
-recipient:admin._id,
+const notifications = recipients.map(user=>({
+recipient:user._id,
 sender:userId,
 type:"booking_update",
-message:`New booking request: ${bookingName}`,
-link:"/admin/bookings",
+message:`Booking request received: ${bookingName}`,
+link:`/admin/bookings?bookingId=${booking._id}`,
 isRead:false
 }));
 

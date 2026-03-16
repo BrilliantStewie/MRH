@@ -103,11 +103,10 @@ const bookingSchema = new mongoose.Schema({
     default: "unpaid"
   },
 
- paymentMethod: {
-  type: String,
-  enum: ["cash", "gcash", ""],
-  default: ""
-},
+  paymentMethod: {
+    type: String,
+    enum: ["cash", "gcash"]
+  },
 
   payment: {
     type: Boolean,
@@ -158,6 +157,13 @@ const bookingSchema = new mongoose.Schema({
 /* =========================================
    VALIDATIONS BEFORE SAVE
 ========================================= */
+bookingSchema.pre("validate", function (next) {
+  if (this.paymentMethod && !["cash", "gcash"].includes(this.paymentMethod)) {
+    this.paymentMethod = undefined;
+  }
+  next();
+});
+
 bookingSchema.pre("save", function (next) {
 
   // Check date validity

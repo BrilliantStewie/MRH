@@ -1,9 +1,12 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { StaffContext } from "../../context/StaffContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import VerifyFirebasePhoneOtp from "../../components/VerifyFirebasePhoneOtp";
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
+import { auth } from "../../config/firebase";
 import {
-  User, Mail, Camera, Save, Edit3,
+  User, Mail, Phone, Camera, Save, Edit3,
   Eye, EyeOff, UserCircle, 
   CheckCircle, Shield, 
   Calendar, Info, Trash2, XCircle
@@ -30,6 +33,14 @@ const StaffProfile = () => {
     newPassword: "", 
     confirmPassword: "",
   });
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneOtpLoading, setPhoneOtpLoading] = useState(false);
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneOtpVerified, setPhoneOtpVerified] = useState(false);
+  const [showPhoneOtpModal, setShowPhoneOtpModal] = useState(false);
+  const [originalPhone, setOriginalPhone] = useState("");
+  const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
+  const recaptchaRef = useRef(null);
 
   // --- Helper: Roman Numeral to Integer ---
   const romanToInt = (str) => {
@@ -89,6 +100,16 @@ const StaffProfile = () => {
   };
 
   // --- Helpers: Phone Formatting ---
+  const normalizePhoneInput = (value) => {
+    const digits = String(value || "").replace(/\D/g, "");
+    if (digits.startsWith("63") && digits.length === 12) {
+      return `0${digits.slice(2)}`;
+    }
+    return digits;
+  };
+
+  const isValidPHNumber = (value) => /^09\d{9}$/.test(value);
+
   const formatPhoneForDisplay = (phone) => {
     if (!phone) return "";
     if (phone.startsWith("+63")) return "0" + phone.slice(3);
@@ -96,10 +117,7 @@ const StaffProfile = () => {
     return phone;
   };
 
-  const formatPhoneForSave = (phone) => {
-    if (phone.startsWith("0")) return "+63" + phone.slice(1);
-    return phone;
-  };
+  const formatPhoneForSave = (phone) => phone;
 
   // --- Helpers: Name Parsing ---
   const parseFullName = (fullName) => {
@@ -165,9 +183,16 @@ const StaffProfile = () => {
   };
 
   const handlePhoneChange = (e) => {
-    const val = e.target.value;
-    if (/^[0-9]*$/.test(val) && val.length <= 11) {
-        setLocalEditData(prev => ({ ...prev, phone: val }));
+    const normalized = normalizePhoneInput(e.target.value).slice(0, 11);
+    if (/^[0-9]*$/.test(normalized)) {
+      setLocalEditData((prev) => ({ ...prev, phone: normalized }));
+      if (normalized && !isValidPHNumber(normalized)) {
+        setPhoneError("Use an 11-digit PH number starting with 09.");
+      } else {
+        setPhoneError("");
+      }
+      setPhoneOtpSent(false);
+      setPhoneOtpVerified(false);
     }
   };
 
@@ -181,18 +206,24 @@ const StaffProfile = () => {
         setUserData(data.userData);
         
         const parsedName = parseFullName(data.userData.name || "");
+        const normalizedPhone = normalizePhoneInput(data.userData.phone || "");
 
         setLocalEditData({
           firstName: data.userData.firstName || parsedName.first,
           middleName: data.userData.middleName || parsedName.mid,
           lastName: data.userData.lastName || parsedName.last,
           suffix: parsedName.suffix || "",
-          phone: formatPhoneForDisplay(data.userData.phone || ""),
+          phone: normalizedPhone,
           email: data.userData.email || "",
           oldPassword: "", 
           newPassword: "", 
           confirmPassword: "",
         });
+        setOriginalPhone(normalizedPhone);
+        setPhoneError("");
+        setPhoneOtpSent(false);
+        setPhoneOtpVerified(false);
+        setFirebaseConfirmation(null);
         setImage(null);
         setRemoveImage(false);
       }
@@ -214,8 +245,15 @@ const StaffProfile = () => {
   // --- Update Profile ---
   const updateProfile = async () => {
     try {
-      if (localEditData.phone.length !== 11) {
-          return toast.error("Phone number must be exactly 11 digits");
+      const normalizedPhone = normalizePhoneInput(localEditData.phone);
+      const normalizedOriginal = normalizePhoneInput(originalPhone);
+      const phoneChanged = normalizedPhone !== normalizedOriginal;
+
+      if (normalizedPhone && !isValidPHNumber(normalizedPhone)) {
+        return toast.error("Phone number must be a valid PH format (09XXXXXXXXX)");
+      }
+      if (phoneChanged && !phoneOtpVerified) {
+        return toast.error("Please verify your phone number first.");
       }
       if (!localEditData.firstName || !localEditData.lastName) {
           return toast.error("First and Last name are required");
@@ -231,7 +269,7 @@ const StaffProfile = () => {
       formData.append("name", fullName);
 
       formData.append("email", localEditData.email);
-      formData.append("phone", formatPhoneForSave(localEditData.phone));
+      formData.append("phone", formatPhoneForSave(normalizedPhone));
 
       if (localEditData.newPassword) {
         if (localEditData.newPassword.length < 8) return toast.error("Password too short");
@@ -264,12 +302,78 @@ const StaffProfile = () => {
     }
   };
 
+  const ensureRecaptcha = async () => {
+    if (recaptchaRef.current) return recaptchaRef.current;
+    recaptchaRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+    });
+    await recaptchaRef.current.render();
+    return recaptchaRef.current;
+  };
+
+  const sendFirebasePhoneOtp = async () => {
+    const normalizedPhone = normalizePhoneInput(localEditData.phone);
+    if (!isValidPHNumber(normalizedPhone)) {
+      setPhoneError("Use an 11-digit PH number starting with 09.");
+      return { success: false, message: "Invalid phone number" };
+    }
+
+    setPhoneError("");
+    setPhoneOtpLoading(true);
+    try {
+      const verifier = await ensureRecaptcha();
+      const e164 = `+63${normalizedPhone.slice(1)}`;
+      const confirmation = await signInWithPhoneNumber(auth, e164, verifier);
+      setFirebaseConfirmation(confirmation);
+      setPhoneOtpSent(true);
+      setShowPhoneOtpModal(true);
+      toast.success("OTP sent to your phone.");
+      return { success: true };
+    } catch (err) {
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
+      toast.error(err?.message || "Failed to send OTP.");
+      return { success: false, message: err?.message || "Failed to send OTP." };
+    } finally {
+      setPhoneOtpLoading(false);
+    }
+  };
+
+  const handleVerifyFirebasePhone = async (otpCode) => {
+    if (!firebaseConfirmation) {
+      return { success: false, message: "Please request a new OTP." };
+    }
+    try {
+      const result = await firebaseConfirmation.confirm(otpCode);
+      const idToken = await result.user.getIdToken();
+      const { data } = await axios.post(
+        backendUrl + "/api/staff/verify-phone-firebase",
+        { idToken },
+        { headers: { token: sToken } }
+      );
+      if (data.success) {
+        setPhoneOtpVerified(true);
+        setPhoneOtpSent(true);
+        setOriginalPhone(normalizePhoneInput(data.phone));
+        loadStaffProfile();
+        await signOut(auth);
+        return { success: true };
+      }
+      return { success: false, message: data.message || "Failed to verify phone." };
+    } catch (err) {
+      return { success: false, message: err?.response?.data?.message || err?.message || "Failed to verify phone." };
+    }
+  };
+
   const handleDiscard = () => {
     setIsEdit(false);
     setImage(null);
     setRemoveImage(false);
     
     const parsedName = parseFullName(userData.name || "");
+    const normalizedPhone = normalizePhoneInput(userData.phone || "");
     setLocalEditData({
         ...localEditData,
         firstName: userData.firstName || parsedName.first,
@@ -277,8 +381,12 @@ const StaffProfile = () => {
         lastName: userData.lastName || parsedName.last,
         suffix: parsedName.suffix || "",
         email: userData.email,
-        phone: formatPhoneForDisplay(userData.phone)
+        phone: normalizedPhone
     });
+    setOriginalPhone(normalizedPhone);
+    setPhoneError("");
+    setPhoneOtpSent(false);
+    setPhoneOtpVerified(false);
   };
 
   const previewName = `${localEditData.firstName} ${localEditData.middleName} ${localEditData.lastName} ${localEditData.suffix}`.replace(/\|/g, " ").trim();
@@ -289,16 +397,25 @@ const StaffProfile = () => {
 
   return userData && (
     <div className="min-h-screen bg-slate-50/50 p-6 md:p-8 font-sans">
+      <div id="recaptcha-container" className="hidden"></div>
+      {showPhoneOtpModal && (
+        <VerifyFirebasePhoneOtp
+          phone={normalizePhoneInput(localEditData.phone)}
+          onClose={() => setShowPhoneOtpModal(false)}
+          onVerify={handleVerifyFirebasePhone}
+          onResend={sendFirebasePhoneOtp}
+        />
+      )}
       <div className="max-w-6xl mx-auto space-y-6">
         
         {/* --- HEADER --- */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-visible relative">
-          <div className="h-80 bg-[#0F172A] rounded-t-[2rem] w-full relative overflow-hidden">
+          <div className="h-40 bg-[#0F172A] rounded-t-[2rem] w-full relative overflow-hidden">
              <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-slate-800 opacity-90"></div>
              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#ffffff33_1px,transparent_1px)] [background-size:16px_16px]"></div>
           </div>
 
-          <div className="px-8 pb-8 flex flex-col md:flex-row items-end gap-6 -mt-16 relative z-10">
+          <div className="px-8 pb-8 flex flex-col md:flex-row items-end gap-6 -mt-14 relative z-10">
             {/* Profile Pic */}
             <div className="relative group">
               <div className="w-32 h-32 rounded-full border-[5px] border-white bg-slate-100 shadow-lg overflow-hidden flex items-center justify-center relative">
@@ -355,97 +472,157 @@ const StaffProfile = () => {
         {/* --- MAIN CONTENT --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
+          <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 h-full flex flex-col">
             <div className="flex items-center gap-3 mb-8">
-              <div className="p-3 bg-blue-50 text-blue-600 rounded-full"> <UserCircle size={20} /> </div>
-              <div> <h2 className="text-lg font-bold text-slate-800">Account Details</h2> <p className="text-xs text-slate-400">Manage your personal identifying information.</p> </div>
+              <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                <UserCircle size={22} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">Account Details</h2>
+                <p className="text-slate-400 text-xs font-medium">
+                  Manage your personal identifying information.
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-6">
-               {!isEdit ? (
-                    <div className="w-full">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Full Name</label>
-                        <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                            <User size={16} className="text-slate-400 shrink-0"/>
-                            <p className="w-full text-sm font-semibold text-slate-700">
-                                {headerName}
-                            </p>
-                        </div>
-                    </div>
-               ) : (
-                    <div className="w-full">
-                        <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Personal Name (First / Mid / Last / Suffix)</label>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <User size={16} className="text-slate-400 shrink-0"/>
-                                <input 
-                                    value={localEditData.firstName}
-                                    onChange={(e) => handleNameChange("firstName", e.target.value)}
-                                    placeholder="First Name"
-                                    className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-300"
-                                />
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <input 
-                                    value={localEditData.middleName}
-                                    onChange={(e) => handleNameChange("middleName", e.target.value)}
-                                    placeholder="Middle"
-                                    className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-300 text-center"
-                                />
-                            </div>
-                            <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                                <input 
-                                    value={localEditData.lastName}
-                                    onChange={(e) => handleNameChange("lastName", e.target.value)}
-                                    placeholder="Last Name"
-                                    className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-300"
-                                />
-                            </div>
-
-                            {/* =============================================
-                                SUFFIX: STRICT LEGAL ONLY (Value <= 100) + 1 DOT MAX
-                                ============================================= */}
-                            <div className={`border rounded-xl px-4 py-3 flex items-center gap-3 transition-colors ${
-                                isSuffixFilled 
-                                    ? "border-green-400 bg-green-50" // Valid/Filled
-                                    : "border-slate-100 bg-slate-50" // Empty/Neutral
-                            }`}>
-                                <input 
-                                    value={localEditData.suffix}
-                                    onChange={(e) => handleNameChange("suffix", e.target.value)}
-                                    placeholder="Suffix (Jr./III)"
-                                    className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-300 text-center"
-                                />
-                                {isSuffixFilled && (
-                                    <CheckCircle size={16} className="text-green-500 shrink-0" />
-                                )}
-                            </div>
-                            
-                        </div>
-                    </div>
-               )}
-
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-x-4 gap-y-6 flex-grow">
+              {!isEdit ? (
+                <div className="md:col-span-4">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                    Full Name
+                  </label>
+                  <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl">
+                    <User size={14} className="text-slate-400" />
+                    <p className="text-sm font-bold text-slate-800">{headerName}</p>
+                  </div>
+                </div>
+              ) : (
+                <>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Email Address</label>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                        <Mail size={16} className="text-slate-400"/>
-                        <input disabled={!isEdit} value={localEditData.email} onChange={(e) => setLocalEditData({...localEditData, email: e.target.value})} className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none disabled:text-slate-500" />
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                      First Name
+                    </label>
+                    <div className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl focus-within:border-blue-500 transition-all shadow-sm">
+                      <input
+                        value={localEditData.firstName}
+                        onChange={(e) => handleNameChange("firstName", e.target.value)}
+                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                        placeholder="First Name"
+                      />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 block">Phone Line (PH)</label>
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 flex items-center gap-3">
-                        <span className="text-lg leading-none" title="Philippines">🇵🇭</span>
-                        <input disabled={!isEdit} value={localEditData.phone} onChange={handlePhoneChange} maxLength={11} placeholder="09xxxxxxxxx" className="bg-transparent w-full text-sm font-semibold text-slate-700 outline-none disabled:text-slate-500 placeholder:text-slate-300 tracking-wide" />
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                      Middle Name
+                    </label>
+                    <div className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl focus-within:border-blue-500 transition-all shadow-sm">
+                      <input
+                        value={localEditData.middleName}
+                        onChange={(e) => handleNameChange("middleName", e.target.value)}
+                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none text-center"
+                        placeholder="Optional"
+                      />
                     </div>
                   </div>
-               </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                      Last Name
+                    </label>
+                    <div className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl focus-within:border-blue-500 transition-all shadow-sm">
+                      <input
+                        value={localEditData.lastName}
+                        onChange={(e) => handleNameChange("lastName", e.target.value)}
+                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
+                        placeholder="Last Name"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                      Suffix
+                    </label>
+                    <div
+                      className={`group flex items-center gap-3 px-4 py-3 rounded-xl transition-all shadow-sm ${
+                        isSuffixFilled
+                          ? "border border-green-300 bg-green-50"
+                          : "border border-slate-200 bg-white focus-within:border-blue-500"
+                      }`}
+                    >
+                      <input
+                        value={localEditData.suffix}
+                        onChange={(e) => handleNameChange("suffix", e.target.value)}
+                        className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none text-center"
+                        placeholder="Jr. / III"
+                      />
+                      {isSuffixFilled && <CheckCircle size={16} className="text-green-500" />}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="md:col-span-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                  Email Address
+                </label>
+                <div
+                  className={`group flex items-center gap-3 px-5 py-3.5 border rounded-xl transition-all ${
+                    isEdit ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-100"
+                  }`}
+                >
+                  <Mail size={16} className="text-slate-400" />
+                  <input
+                    disabled={!isEdit}
+                    value={localEditData.email}
+                    onChange={(e) => setLocalEditData({ ...localEditData, email: e.target.value })}
+                    className="bg-transparent outline-none w-full text-sm font-bold text-slate-800 disabled:opacity-60"
+                  />
+                </div>
+              </div>
+
+              <div className="md:col-span-4">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
+                  Phone Line (PH)
+                </label>
+                <div
+                  className={`group relative flex items-center gap-3 px-5 py-3.5 border rounded-xl transition-all ${
+                    isEdit ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-100"
+                  }`}
+                >
+                  <Phone size={16} className="text-slate-400" />
+                  <input
+                    disabled={!isEdit}
+                    value={localEditData.phone}
+                    onChange={handlePhoneChange}
+                    maxLength={11}
+                    placeholder="09XXXXXXXXX"
+                    className="bg-transparent outline-none w-full text-sm font-bold text-slate-800 disabled:opacity-60 placeholder:text-slate-300 tracking-wide pr-24"
+                  />
+                  {isEdit && isValidPHNumber(normalizePhoneInput(localEditData.phone)) && (
+                    <button
+                      type="button"
+                      onClick={sendFirebasePhoneOtp}
+                      disabled={phoneOtpLoading}
+                      className="absolute bottom-2 right-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black disabled:bg-slate-200 disabled:text-slate-400"
+                    >
+                      {phoneOtpLoading ? "Sending..." : (phoneOtpSent ? "OTP Sent" : "Send OTP")}
+                    </button>
+                  )}
+                </div>
+                {isEdit && phoneError && (
+                  <p className="mt-2 text-[10px] font-bold text-red-500">{phoneError}</p>
+                )}
+                {isEdit && phoneOtpVerified && !phoneError && (
+                  <p className="mt-2 text-[10px] font-bold text-emerald-600">Phone verified.</p>
+                )}
+                {isEdit && !phoneError && localEditData.phone && (
+                  <p className="mt-2 text-[10px] text-slate-400">PH format only. +639XXXXXXXXX will be saved as 09XXXXXXXXX.</p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8 h-fit">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 h-fit">
             <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-orange-50 text-orange-500 rounded-full"> <Shield size={20} /> </div>
                 <h2 className="text-lg font-bold text-slate-800">Security</h2>

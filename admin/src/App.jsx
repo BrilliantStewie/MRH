@@ -27,6 +27,9 @@ import Analytics from "./pages/Admin/Analytics";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
+import StaffRooms from "./pages/Staff/StaffRooms";
+import StaffPackages from "./pages/Staff/StaffPackages";
+import StaffUsers from "./pages/Staff/StaffUsers";
 
 // Route Guard
 import StaffProtectedRoute from "./routes/StaffProtectedRoute";
@@ -39,7 +42,7 @@ const App = () => {
   // This makes the App.jsx much cleaner and prevents duplicate logic.
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex h-screen flex-col overflow-hidden bg-white font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
       <div className="print:hidden">
         <ToastContainer position="top-right" autoClose={3000} />
       </div>
@@ -54,7 +57,7 @@ const App = () => {
             <div className="print:hidden">
               <Sidebar />
             </div>
-            <main className="flex-1 overflow-y-auto bg-slate-50 p-4 lg:p-8 print:overflow-visible print:bg-white print:p-0">
+            <main className="flex-1 overflow-y-auto bg-white p-4 lg:p-8 print:overflow-visible print:bg-white print:p-0">
               <div className="mx-auto max-w-7xl pb-20 print:mx-0 print:max-w-none print:pb-0">
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
@@ -82,7 +85,7 @@ const App = () => {
             <div className="print:hidden">
               <StaffSidebar />
             </div>
-            <main className="flex-1 overflow-y-auto bg-slate-50 p-6 print:overflow-visible print:bg-white print:p-0">
+            <main className="flex-1 overflow-y-auto bg-white p-6 print:overflow-visible print:bg-white print:p-0">
               <div className="mx-auto max-w-7xl print:mx-0 print:max-w-none">
                 <Routes>
                   <Route
@@ -114,6 +117,30 @@ const App = () => {
                     element={
                       <StaffProtectedRoute>
                         <StaffReviews />
+                      </StaffProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/staff-rooms"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffRooms />
+                      </StaffProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/staff-packages"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffPackages />
+                      </StaffProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/staff-users"
+                    element={
+                      <StaffProtectedRoute>
+                        <StaffUsers />
                       </StaffProtectedRoute>
                     }
                   />
