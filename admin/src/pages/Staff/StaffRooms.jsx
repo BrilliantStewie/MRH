@@ -68,7 +68,7 @@ const StaffRooms = () => {
   }, [rooms]);
 
   const filteredRooms = useMemo(() => {
-    return (rooms || []).filter((room) => {
+    const data = (rooms || []).filter((room) => {
       const rType = room.room_type || room.type || "";
       const matchesType = filterType
         ? rType.toLowerCase().trim() === filterType.toLowerCase().trim()
@@ -81,6 +81,36 @@ const StaffRooms = () => {
         : true;
       return matchesType && matchesBuilding && matchesStatus;
     });
+
+    const getFloorRank = (floorLabel) => {
+      const floor = floorLabel?.toLowerCase() || "";
+      if (floor.includes("1st") || floor.includes("upper")) return 1;
+      if (floor.includes("2nd") || floor.includes("basement")) return 2;
+      return 3;
+    };
+
+    data.sort((a, b) => {
+      const buildingRankA = a.building === "Margarita" ? 1 : 2;
+      const buildingRankB = b.building === "Margarita" ? 1 : 2;
+
+      if (buildingRankA !== buildingRankB) {
+        return buildingRankA - buildingRankB;
+      }
+
+      const floorRankA = getFloorRank(a.floor);
+      const floorRankB = getFloorRank(b.floor);
+
+      if (floorRankA !== floorRankB) {
+        return floorRankA - floorRankB;
+      }
+
+      return (a.name || "").localeCompare(b.name || "", undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    });
+
+    return data;
   }, [rooms, filterType, filterBuilding, filterStatus]);
 
   const clearFilters = () => {

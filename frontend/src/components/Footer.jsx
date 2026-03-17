@@ -71,8 +71,8 @@ const Footer = () => {
                     <div className="flex gap-4">
                         <MapPin size={18} className="text-blue-600 shrink-0 mt-1" />
                         <span className="text-sm text-slate-600 leading-relaxed font-light">
-                            Poblacion, Dauis, <br />
-                            Bohol, Philippines
+                           Sitio Union, Brgy. Totolan,<br />
+                           Dauis, Bohol, Philippines
                         </span>
                     </div>
                     <div className="flex items-center gap-4">

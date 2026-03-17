@@ -250,7 +250,7 @@ const Navbar = () => {
             />
             <div className="flex flex-col justify-center">
               <h1 className="text-lg font-bold text-gray-800 leading-tight">
-                Mercedarian Retreat House
+                MRH
               </h1>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-md w-fit mt-0.5 ${
                 isAdmin 

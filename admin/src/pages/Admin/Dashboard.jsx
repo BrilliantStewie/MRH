@@ -1,6 +1,10 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import AvailabilityCalendar from "./AvailabilityCalendar";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import reportHero from "../../assets/report_hero.png?inline";
+import reportLogo from "../../assets/logo.svg?inline";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -8,7 +12,9 @@ import {
   BedDouble,
   Bell,
   CalendarDays,
+  Check,
   FileDown,
+  MapPin,
   Printer,
   TrendingUp,
   Wallet,
@@ -47,6 +53,14 @@ const normalizeDate = (value) => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
+const formatAmenity = (value = "") =>
+  value
+    .toString()
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const Dashboard = () => {
   const {
@@ -57,6 +71,7 @@ const Dashboard = () => {
     getAllBookings,
     allUsers,
     getAllUsers,
+    allPackages,
     getAllPackages,
   } = useContext(AdminContext);
 
@@ -66,6 +81,10 @@ const Dashboard = () => {
   const [reportType, setReportType] = useState("monthly");
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [isReportVisible, setIsReportVisible] = useState(false);
+  const reportRef = useRef(null);
 
   useEffect(() => {
     if (aToken) {
@@ -183,8 +202,8 @@ const Dashboard = () => {
     return Array.from(years).sort((a, b) => b - a);
   }, [allBookings]);
 
-  const reportStats = useMemo(() => {
-    const filteredBookings = (allBookings || []).filter((booking) => {
+  const reportBookings = useMemo(() => {
+    return (allBookings || []).filter((booking) => {
       const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
 
       if (reportType === "monthly") {
@@ -193,44 +212,164 @@ const Dashboard = () => {
 
       return bookingDate.getFullYear() === reportYear;
     });
+  }, [allBookings, reportMonth, reportType, reportYear]);
+
+  const reportStats = useMemo(() => {
+    const filteredBookings = reportBookings;
 
     const totalIncome = filteredBookings
       .filter((booking) => booking.paymentStatus === "paid" || booking.status === "approved")
       .reduce((sum, booking) => sum + (Number(booking.total_price || booking.amount) || 0), 0);
 
     const totalParticipants = filteredBookings.reduce((sum, booking) => {
-      const count = Array.isArray(booking.participants)
-        ? booking.participants.length
-        : Number(booking.participants) || 0;
-      return sum + count;
+      const roomGuests = Array.isArray(booking.bookingItems)
+        ? booking.bookingItems.reduce((roomSum, item) => roomSum + Number(item?.participants || 0), 0)
+        : 0;
+      const venueGuests = Number(booking.venueParticipants || 0);
+
+      if (roomGuests === 0 && venueGuests === 0) {
+        const legacyCount = Array.isArray(booking.participants)
+          ? booking.participants.length
+          : Number(booking.participants) || 0;
+        return sum + legacyCount;
+      }
+
+      return sum + roomGuests + venueGuests;
+    }, 0);
+
+    const totalRoomsBooked = filteredBookings.reduce((sum, booking) => {
+      if (Array.isArray(booking.bookingItems)) {
+        return sum + booking.bookingItems.length;
+      }
+      return sum;
     }, 0);
 
     return {
       totalBookings: filteredBookings.length,
       totalIncome,
       totalParticipants,
+      totalRoomsBooked,
       avgValue: filteredBookings.length > 0 ? Math.round(totalIncome / filteredBookings.length) : 0,
     };
-  }, [allBookings, reportMonth, reportType, reportYear]);
+  }, [reportBookings]);
 
-  const trendInsight = useMemo(() => {
-    if (!chartData.length) {
-      return {
-        peakLabel: "N/A",
-        peakRevenue: 0,
-        averageRevenue: 0,
-      };
+  const reportStatusBreakdown = useMemo(() => {
+    return reportBookings.reduce(
+      (acc, booking) => {
+        const status = (booking.status || "").toLowerCase();
+        if (status === "approved") acc.approved += 1;
+        else if (status === "pending" || status === "cancellation_pending") acc.pending += 1;
+        else if (status === "declined") acc.declined += 1;
+        else if (status === "cancelled") acc.cancelled += 1;
+        return acc;
+      },
+      { approved: 0, pending: 0, declined: 0, cancelled: 0 }
+    );
+  }, [reportBookings]);
+
+  const roomUtilization = useMemo(() => {
+    const rooms = allRooms || [];
+    const total = rooms.length || 1;
+    const dormitoryCount = rooms.filter((room) => (room.room_type || "").toLowerCase().includes("dorm")).length;
+    const nolascoCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("nolasco")).length;
+    const margaritaCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("margarita")).length;
+    const toPercent = (count) => Math.round((count / total) * 100);
+
+    return [
+      { label: "Dormitory", value: toPercent(dormitoryCount) },
+      { label: "Nolasco Building", value: toPercent(nolascoCount) },
+      { label: "Margarita Building", value: toPercent(margaritaCount) },
+    ];
+  }, [allRooms]);
+
+  const commonAmenities = useMemo(() => {
+    const counts = new Map();
+
+    (allRooms || []).forEach((room) => {
+      (room.amenities || []).forEach((amenity) => {
+        const label = formatAmenity(amenity);
+        if (!label) return;
+        const key = label.toLowerCase();
+        counts.set(key, { label, count: (counts.get(key)?.count || 0) + 1 });
+      });
+    });
+
+    const sorted = Array.from(counts.values()).sort((a, b) => b.count - a.count);
+    const top = sorted.slice(0, 3).map((item) => item.label);
+
+    return top.length
+      ? top
+      : ["Air-conditioned Rooms", "Free Wi-Fi", "Chapel Access"];
+  }, [allRooms]);
+
+  const reportTrendData = useMemo(() => {
+    const filtered = reportBookings.filter(
+      (booking) => booking.paymentStatus === "paid" || booking.status === "approved"
+    );
+
+    if (reportType === "monthly") {
+      const start = new Date(reportYear, reportMonth, 1);
+      const end = new Date(reportYear, reportMonth + 1, 0);
+      const buckets = [
+        { label: "Week 1", start: 1, end: 7, revenue: 0 },
+        { label: "Week 2", start: 8, end: 14, revenue: 0 },
+        { label: "Week 3", start: 15, end: 21, revenue: 0 },
+        { label: "Week 4", start: 22, end: end.getDate(), revenue: 0 },
+      ];
+
+      filtered.forEach((booking) => {
+        const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+        if (bookingDate < start || bookingDate > end) return;
+        const day = bookingDate.getDate();
+        const bucket = buckets.find((b) => day >= b.start && day <= b.end);
+        if (bucket) {
+          bucket.revenue += Number(booking.total_price || booking.amount) || 0;
+        }
+      });
+
+      return buckets;
     }
 
-    const peakMonth = chartData.reduce((peak, month) => (month.revenue > peak.revenue ? month : peak), chartData[0]);
-    const totalRevenue = chartData.reduce((sum, month) => sum + month.revenue, 0);
+    const months = MONTH_NAMES_SHORT.map((label, index) => ({
+      label,
+      month: index,
+      revenue: 0,
+    }));
 
-    return {
-      peakLabel: peakMonth.label,
-      peakRevenue: peakMonth.revenue,
-      averageRevenue: Math.round(totalRevenue / chartData.length),
-    };
-  }, [chartData]);
+    filtered.forEach((booking) => {
+      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+      if (bookingDate.getFullYear() !== reportYear) return;
+      const bucket = months[bookingDate.getMonth()];
+      if (bucket) {
+        bucket.revenue += Number(booking.total_price || booking.amount) || 0;
+      }
+    });
+
+    return months;
+  }, [reportBookings, reportMonth, reportType, reportYear]);
+
+  const reportTrendLine = useMemo(() => {
+    if (!reportTrendData.length) {
+      return { path: "", points: [] };
+    }
+
+    const maxRevenue = Math.max(...reportTrendData.map((item) => item.revenue), 1);
+    const points = reportTrendData.map((item, index) => {
+      const x = reportTrendData.length === 1 ? 50 : (index / (reportTrendData.length - 1)) * 100;
+      const height = Math.max(Math.round((item.revenue / maxRevenue) * 70), 8);
+      const y = 100 - height;
+      return {
+        x,
+        y,
+        label: item.label,
+        value: item.revenue,
+        key: `${item.label}-${index}`,
+      };
+    });
+
+    const path = points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x},${point.y}`).join(" ");
+    return { path, points };
+  }, [reportTrendData]);
 
   const reportWindow = useMemo(() => {
     if (reportType === "monthly") {
@@ -248,14 +387,10 @@ const Dashboard = () => {
 
   const reportLabel =
     reportType === "monthly" ? `${MONTH_NAMES[reportMonth]} ${reportYear}` : `Annual ${reportYear}`;
+  const reportTitle = reportType === "monthly" ? "Monthly Report" : "Annual Report";
 
   const reportRange = `${formatLongDate(reportWindow.start)} to ${formatLongDate(reportWindow.end)}`;
-  const reportDescriptor =
-    reportType === "monthly" ? "Monthly operating digest" : "Annual operating digest";
-  const revenuePerGuest =
-    reportStats.totalParticipants > 0 ? Math.round(reportStats.totalIncome / reportStats.totalParticipants) : 0;
   const generatedOn = formatLongDate(new Date());
-  const auditId = `VPMS-${reportYear}-${reportType === "monthly" ? String(reportMonth + 1).padStart(2, "0") : "YR"}-${String(reportStats.totalBookings).padStart(3, "0")}`;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -264,174 +399,216 @@ const Dashboard = () => {
     return "Good evening";
   };
 
+  const waitForReportImages = async () => {
+    if (!reportRef.current) return;
+    const images = Array.from(reportRef.current.querySelectorAll("img"));
+    await Promise.all(
+      images.map(
+        (img) =>
+          new Promise((resolve) => {
+            if (img.complete && img.naturalWidth !== 0) {
+              resolve();
+              return;
+            }
+            const onDone = () => {
+              img.removeEventListener("load", onDone);
+              img.removeEventListener("error", onDone);
+              resolve();
+            };
+            img.addEventListener("load", onDone);
+            img.addEventListener("error", onDone);
+          })
+      )
+    );
+  };
+
+  const handleDownloadReport = async () => {
+    if (!reportRef.current || isDownloading) return;
+    setIsDownloading(true);
+    setIsReportVisible(true);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForReportImages();
+
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        allowTaint: false,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+
+      const safeLabel = reportLabel.replace(/\s+/g, "_");
+      pdf.save(`MRH_Report_${safeLabel}.pdf`);
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+    } finally {
+      setIsReportVisible(false);
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePrintReport = async () => {
+    if (!reportRef.current || isPrinting) return;
+    setIsPrinting(true);
+    setIsReportVisible(true);
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await waitForReportImages();
+      const onAfterPrint = () => {
+        window.removeEventListener("afterprint", onAfterPrint);
+        setIsReportVisible(false);
+        setIsPrinting(false);
+      };
+      window.addEventListener("afterprint", onAfterPrint);
+      window.print();
+    } finally {
+      // no-op: handled in onAfterPrint
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#f8fafc] p-4 font-sans text-slate-800 md:p-8 print:bg-white print:p-0">
-      <div className="hidden bg-white text-slate-900 print:block">
-        <div className="print-sheet flex flex-col gap-6 px-[14mm] py-[15mm]">
-          <div className="grid grid-cols-[1.45fr_0.85fr] gap-4">
-            <div className="rounded-[30px] border-2 border-slate-950 px-8 py-7">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.35em] text-slate-500">
-                    Mercedarian Retreat House
-                  </p>
-                  <h1 className="mt-5 text-[30px] font-black uppercase leading-none tracking-[-0.08em] text-slate-950">
-                    Trend
-                    <br />
-                    Overview
-                  </h1>
-                  <p className="mt-4 max-w-md text-[12px] leading-6 text-slate-600">
-                    Six-month booking revenue trend used as the lead visual for this {reportDescriptor.toLowerCase()}.
-                  </p>
+      <div
+        ref={reportRef}
+        className={`pointer-events-none absolute left-0 top-0 block bg-white text-slate-900 print:static print:z-auto print:opacity-100 print:block print:w-full ${
+          isReportVisible ? "z-10 opacity-100" : "-z-10 opacity-0"
+        }`}
+      >
+        <div className="print-sheet report-sheet flex flex-col gap-4 bg-white px-[12mm] py-[12mm] text-[#3f2a4e]">
+          <div className="relative overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-sm">
+            <img
+              src={reportHero}
+              alt="Mercedarian Retreat House"
+              crossOrigin="anonymous"
+              loading="eager"
+              decoding="sync"
+              className="h-[190px] w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-white/85 via-white/55 to-white/10"></div>
+            <div className="absolute inset-0 z-10 flex items-start justify-between gap-6 px-8 pt-7">
+              <div className="max-w-[65%]">
+                <p className="text-[56px] font-extrabold leading-none text-[#4a2b5f] tracking-tight">
+                  MRH
+                </p>
+                <p className="mt-1 text-[22px] font-semibold text-[#5a3a6b]">{reportTitle}</p>
+                <p className="mt-3 text-[12px] font-semibold text-[#5a3a6b]">
+                  Mercedarian Retreat House (MRH)
+                </p>
+                <div className="mt-1 flex items-center gap-2 text-[12px] text-[#5a3a6b]">
+                  <MapPin size={14} />
+                  <span>Sitio Union, Dauis, Bohol</span>
                 </div>
-                <div className="flex h-14 w-14 items-center justify-center rounded-[20px] bg-slate-950 text-white">
-                  <Zap size={24} />
+              </div>
+              <img
+                src={reportLogo}
+                alt="MRH Logo"
+                crossOrigin="anonymous"
+                loading="eager"
+                className="h-16 w-auto object-contain opacity-90"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-[18px] border border-slate-100 bg-white p-5 shadow-sm">
+            <h2 className="text-[18px] font-bold text-[#4a2b5f]">Overview</h2>
+            <p className="mt-2 text-[11px] leading-6 text-[#5f4b73]" style={{ textAlign: "justify" }}>
+              The Mercedarian Retreat House (MRH) continues to serve as a center for spiritual renewal,
+              reflection, and community formation. This {reportLabel.toLowerCase()} report highlights
+              booking activity, guest participation, and operational performance to guide decisions and
+              improve service delivery.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-[1.35fr_0.85fr] gap-4">
+            <div className="space-y-4">
+              <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+                <h3 className="text-[13px] font-bold text-[#4a2b5f]">Booking &amp; Sales Performance</h3>
+                <div className="mt-3 rounded-[14px] bg-[#f4eef8] p-3">
+                  <svg viewBox="0 0 100 100" className="h-[80px] w-full">
+                    <path d={reportTrendLine.path} fill="none" stroke="#8d61b5" strokeWidth="1.4" />
+                    {reportTrendLine.points.map((point) => (
+                      <circle key={point.key} cx={point.x} cy={point.y} r="2.6" fill="#8d61b5" />
+                    ))}
+                  </svg>
+                  <div className="mt-2 flex justify-between text-[9px] font-semibold text-[#6b5a7a]">
+                    {reportTrendLine.points.map((point) => (
+                      <span key={point.key}>{point.label}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-8 rounded-[24px] bg-slate-50 px-6 py-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      Last Six Months
-                    </p>
-                    <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                      <span className="inline-flex h-2.5 w-2.5 rounded-sm bg-blue-600"></span>
-                      <span>Monthly revenue bar indicator</span>
+              <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+                <h3 className="text-[13px] font-bold text-[#4a2b5f]">Room Utilization</h3>
+                <div className="mt-3 space-y-2 text-[11px] text-[#5f4b73]">
+                  {roomUtilization.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-[#b58ad3]"></span>
+                        {item.label} ({item.value}%)
+                      </span>
+                      <span className="font-semibold">{item.value}%</span>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      Peak Month
-                    </p>
-                    <p className="mt-1 text-sm font-black text-blue-700">
-                      {trendInsight.peakLabel} {formatCurrency(trendInsight.peakRevenue)}
-                    </p>
-                  </div>
+                  ))}
                 </div>
+              </div>
 
-                <div className="relative h-[180px]">
-                  <div className="absolute inset-0 flex flex-col justify-between">
-                    {[...Array(5)].map((_, index) => (
-                      <div key={index} className="border-t border-dashed border-slate-200"></div>
-                    ))}
-                  </div>
-
-                  <div className="relative z-10 flex h-full items-end justify-between gap-3 pt-4">
-                    {chartData.map((month) => (
-                      <div key={`${month.year}-${month.month}`} className="flex h-full flex-1 flex-col items-center justify-end">
-                        <div className="mb-2 text-[10px] font-bold text-slate-500">
-                          {month.revenue > 0 ? formatCurrency(month.revenue) : "0"}
-                        </div>
-                        <div
-                          className="relative w-full max-w-[50px] rounded-t-[14px] bg-blue-600"
-                          style={{ height: month.revenue > 0 ? `${Math.max(month.height, 10)}%` : "6px" }}
-                        >
-                          <div className="absolute inset-x-0 top-0 h-1/3 rounded-t-[14px] bg-blue-300/40"></div>
-                        </div>
-                        <div className="mt-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                          {month.label}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200 pt-4">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      Period
-                    </p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{reportLabel}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      Avg. Monthly
-                    </p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">
-                      {formatCurrency(trendInsight.averageRevenue)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                      Generated
-                    </p>
-                    <p className="mt-2 text-sm font-bold text-slate-900">{generatedOn}</p>
-                  </div>
-                </div>
+              <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+                <h3 className="text-[13px] font-bold text-[#4a2b5f]">Common Amenities Used</h3>
+                <ul className="mt-3 space-y-2 text-[11px] text-[#5f4b73]">
+                  {commonAmenities.map((amenity) => (
+                    <li key={amenity} className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-[#8d61b5]"></span>
+                      {amenity}
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
 
-            <div className="rounded-[30px] border border-slate-200 bg-slate-50 px-6 py-7">
-              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                Executive Signal
-              </p>
-              <p className="mt-4 text-4xl font-black leading-none tracking-[-0.08em] text-slate-950">
-                {formatCurrency(reportStats.totalIncome)}
-              </p>
-              <p className="mt-3 text-[12px] leading-6 text-slate-600">
-                Confirmed revenue captured from {reportStats.totalBookings} bookings between{" "}
-                {formatLongDate(reportWindow.start)} and {formatLongDate(reportWindow.end)}.
-              </p>
+            <div className="space-y-4">
+              <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+                <h3 className="text-[13px] font-bold text-[#4a2b5f]">Booking Status</h3>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-[11px] text-[#5f4b73]">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+                    Approved {reportStatusBreakdown.approved}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                    Cancelled {reportStatusBreakdown.cancelled}
+                  </div>
+                </div>
+              </div>
 
-              <div className="mt-6 space-y-3 border-t border-slate-200 pt-5">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-semibold text-slate-500">Average booking value</span>
-                  <span className="font-black text-slate-900">{formatCurrency(reportStats.avgValue)}</span>
+              <div className="rounded-[18px] border border-slate-100 bg-white p-4 text-[11px] text-[#5f4b73] shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-semibold">Report Month</span>
+                  <span className="font-semibold text-[#4a2b5f]">{reportLabel}</span>
                 </div>
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-semibold text-slate-500">Current occupancy</span>
-                  <span className="font-black text-slate-900">{stats.occupancyRate}%</span>
+                <div className="mt-2 flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-semibold">Coverage</span>
+                  <span className="text-right font-semibold text-[#4a2b5f]">{reportRange}</span>
                 </div>
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-semibold text-slate-500">Pending actions</span>
-                  <span className="font-black text-slate-900">{stats.pendingRequests}</span>
+                <div className="mt-2 flex items-center justify-between border-b border-slate-100 pb-2">
+                  <span className="font-semibold">Generated on</span>
+                  <span className="font-semibold text-[#4a2b5f]">{generatedOn}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-[1.15fr_0.85fr] gap-4">
-            <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                Summary
-              </p>
-              <p className="mt-3 text-[12px] leading-7 text-slate-700">
-                The property generated {formatCurrency(reportStats.totalIncome)} from{" "}
-                {reportStats.totalBookings} confirmed bookings during {reportLabel}. Average booking
-                value closed at {formatCurrency(reportStats.avgValue)}, with the strongest recent month
-                recorded in <span className="font-black text-blue-700">{trendInsight.peakLabel}</span>.
-              </p>
-            </div>
-
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-5">
-              <p className="text-[9px] font-black uppercase tracking-[0.28em] text-slate-400">
-                Report Meta
-              </p>
-              <div className="mt-4 space-y-3 text-[12px]">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-500">Period</span>
-                  <span className="font-black text-slate-900">{reportLabel}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-500">Coverage</span>
-                  <span className="text-right font-black text-slate-900">{reportRange}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-500">Generated</span>
-                  <span className="font-black text-slate-900">{generatedOn}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-slate-500">Audit ID</span>
-                  <span className="font-black text-slate-900">{auditId}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-auto flex items-center justify-between border-t border-slate-200 pt-4 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">
-            <p>Official internal performance statement</p>
-            <p>{"\u00A9"} Vantage Systems 2024</p>
+          <div className="mt-auto rounded-[14px] border border-slate-100 bg-white px-4 py-2 text-[10px] font-semibold text-[#6b5a7a]">
+            Generated by: MRH Web-Based Booking and Management System
           </div>
         </div>
       </div>
@@ -511,10 +688,10 @@ const Dashboard = () => {
                   </div>
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
                     <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-emerald-500">
-                      Avg. Per Booking
+                      Rooms Booked
                     </p>
                     <p className="text-xl font-black text-slate-900">
-                      {formatCurrency(reportStats.avgValue)}
+                      {Number(reportStats.totalRoomsBooked || 0).toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -535,17 +712,21 @@ const Dashboard = () => {
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={() => window.print()}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800"
+                    onClick={handleDownloadReport}
+                    disabled={isDownloading}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-slate-200 transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
-                    <Printer size={16} /> Print PDF
+                    <FileDown size={16} /> {isDownloading ? "Generating..." : "Download Report"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowReportModal(false)}
-                    className="flex-1 rounded-2xl border border-slate-200 bg-white py-3.5 text-xs font-bold uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-50"
+                    onClick={handlePrintReport}
+                    disabled={isPrinting}
+                    className="flex-1 rounded-2xl border border-slate-200 bg-white py-3.5 text-xs font-bold uppercase tracking-widest text-slate-600 transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
                   >
-                    Close
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Printer size={16} /> {isPrinting ? "Preparing..." : "Print"}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -679,10 +860,9 @@ const Dashboard = () => {
               </div>
 
               <div className="relative z-10 mt-auto">
-                <h3 className="mb-2 text-3xl font-black tracking-tight text-slate-900">Availability Map</h3>
+                <h3 className="mb-2 text-3xl font-black tracking-tight text-slate-900">Check Availability</h3>
                 <p className="mb-8 max-w-[90%] text-sm font-medium leading-relaxed text-slate-500">
-                  Visually track room occupancies, manage upcoming reservations, and block out dates
-                  across all properties instantly.
+                  Check available dates and reservation schedules in one place.
                 </p>
 
                 <button

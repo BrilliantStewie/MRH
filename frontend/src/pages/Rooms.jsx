@@ -410,22 +410,32 @@ const Rooms = () => {
           <div className="flex h-full w-full flex-col overflow-y-auto p-8 md:w-1/2">
             <div className="mb-4 flex items-start justify-between">
               <div>
-                <span className="mb-2 inline-block rounded-md bg-blue-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                  {room.building} &bull; {room.floor}
-                </span>
                 <h2 className="text-2xl font-bold text-slate-800">{room.name}</h2>
               </div>
-              <button onClick={onClose} className="rounded-full p-2 transition hover:bg-slate-100">
-                <X size={24} className="text-slate-400" />
-              </button>
+              <div className="flex items-center gap-2">
+                {room.building && (
+                  <span className="inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-600">
+                    {room.building}
+                  </span>
+                )}
+                <button onClick={onClose} className="rounded-full p-2 transition hover:bg-slate-100">
+                  <X size={24} className="text-slate-400" />
+                </button>
+              </div>
             </div>
 
-            <div className="mb-6 flex gap-4 text-sm font-medium text-slate-500">
-              <span className="flex items-center gap-1">
-                <User size={16} /> {room.capacity} Pax
+            <div className="mb-6 flex w-full items-center justify-between pr-[52px] text-xs font-semibold text-slate-600">
+              <span className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                <BedDouble size={14} className="text-slate-400" />
+                <span className="capitalize">
+                  {(room.room_type || room.type || "Room").replace(/_/g, " ")}
+                </span>
               </span>
-              <span className="flex items-center gap-1">
-                <BedDouble size={16} /> {room.room_type}
+              <span className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                <User size={14} className="text-slate-400" />
+                <span>
+                  {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
+                </span>
               </span>
             </div>
 
@@ -441,16 +451,16 @@ const Rooms = () => {
               Amenities
             </h3>
             <div className="mb-8 flex flex-wrap gap-2">
-              {room.amenities && Array.isArray(room.amenities) ? (
-                room.amenities.map((amenity, index) => (
-                  <span
-                    key={index}
-                    className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs capitalize text-slate-600"
-                  >
-                    {amenity}
-                  </span>
-                ))
-              ) : (
+                  {room.amenities && Array.isArray(room.amenities) ? (
+                    room.amenities.map((amenity, index) => (
+                      <span
+                        key={index}
+                        className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs capitalize text-slate-600"
+                      >
+                        {String(amenity || "").replace(/_/g, " ")}
+                      </span>
+                    ))
+                  ) : (
                 <span className="text-xs italic text-slate-400">
                   No specific amenities listed.
                 </span>
@@ -782,9 +792,9 @@ const Rooms = () => {
                       </div>
 
                       <div className="p-3">
-                        <div className="mb-2">
+                        <div className="mb-3">
                           <div className="mb-1 flex items-center justify-between gap-1.5">
-                            <h3 className={`text-[11px] font-bold leading-tight ${isUnavailable ? "text-slate-400" : "text-slate-800"}`}>
+                            <h3 className={`text-[12px] font-bold leading-tight ${isUnavailable ? "text-slate-400" : "text-slate-800"}`}>
                               {room.name}
                             </h3>
                             {room.building && (
@@ -799,18 +809,25 @@ const Rooms = () => {
                               </span>
                             )}
                           </div>
-                          <p className="text-[8px] font-bold uppercase tracking-wide text-slate-400">
-                            {room.room_type?.replace(/_/g, " ")}
-                          </p>
                         </div>
 
-                        <div className={`mb-3 flex flex-wrap gap-1.5 text-[10px] font-medium ${isUnavailable ? "text-slate-300" : "text-slate-500"}`}>
+                        <div className={`mb-3 flex flex-wrap gap-2 text-[10px] font-semibold ${isUnavailable ? "text-slate-300" : "text-slate-600"}`}>
                           <span
-                            className={`flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${
+                            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${
                               isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
                             }`}
                           >
-                            <Users size={11} className={isUnavailable ? "text-slate-300" : "text-slate-900"} />
+                            <BedDouble size={12} className={isUnavailable ? "text-slate-300" : "text-slate-500"} />
+                            <span className="capitalize">
+                              {(room.room_type || room.type || "Room").replace(/_/g, " ")}
+                            </span>
+                          </span>
+                          <span
+                            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${
+                              isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
+                            }`}
+                          >
+                            <Users size={12} className={isUnavailable ? "text-slate-300" : "text-slate-500"} />
                             {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
                           </span>
                         </div>
@@ -853,7 +870,7 @@ const Rooms = () => {
                 })}
               </div>
               <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-center sm:text-left">
+                <div className="w-full text-left sm:w-auto">
                   <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
                     Room Directory
                   </p>

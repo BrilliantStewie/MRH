@@ -38,6 +38,12 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;             /* Chrome, Safari and Opera */
   }
+
+  .report-sheet {
+    width: 210mm;
+    min-height: 297mm;
+    box-sizing: border-box;
+  }
 }
 
 @keyframes slideIn {
