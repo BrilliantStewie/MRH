@@ -1,56 +1,64 @@
 import express from "express";
 import {
-  registerUser, 
-  loginUser, 
-  googleAuth, 
-  sendOTP, 
-  sendPhoneOTP,          // ✅ ADDED
+  registerUser,
+  loginUser,
+  googleAuth,
+  sendOTP,
+  sendEmailChangeOTP,
+  sendPhoneOTP,
   sendPhoneOTPUpdate,
   verifyPhoneFirebase,
-  requestPasswordReset, 
-  requestPhoneReset,     // ✅ ADDED
-  resetPassword,         
-  verifyOTP, 
+  requestPasswordReset,
+  requestPhoneReset,
+  resetPassword,
+  verifyOTP,
+  verifyPhoneOTP,
+  verifyEmailChangeOTP,
   verifyPhoneOTPUpdate,
-  getUserData, 
+  getUserData,
   updateUserProfile,
   getUserBookings,
-  createBooking, 
+  createBooking,
   cancelBooking,
   createCheckoutSession,
   verifyPayment,
   markCashPayment,
   rateBooking,
-  addReviewChat, 
+  addReviewChat,
   deleteReviewReply,
-  checkEmailExists,      // ✅ ADDED
-  checkPhoneExists       // ✅ ADDED
+  checkEmailExists,
+  checkPhoneExists,
+  checkEmailExistsForUpdate,
+  checkPhoneExistsForUpdate
 } from "../controllers/userController.js";
 
-import authUser from "../middlewares/authUser.js"; 
+import authUser from "../middlewares/authUser.js";
 import upload from "../middlewares/multer.js";
 
 const userRouter = express.Router();
 
 // --- AUTH & PROFILE ---
-userRouter.post("/register", upload.single('image'), registerUser);
+userRouter.post("/register", upload.single("image"), registerUser);
 userRouter.post("/login", loginUser);
-userRouter.post("/google-auth", googleAuth); 
-userRouter.post("/send-otp", sendOTP); 
-userRouter.post("/send-phone-otp", sendPhoneOTP);    // ✅ STEP 1: For Registration/Phone Login
+userRouter.post("/google-auth", googleAuth);
+userRouter.post("/send-otp", sendOTP);
+userRouter.post("/send-email-change-otp", authUser, sendEmailChangeOTP);
+userRouter.post("/send-phone-otp", sendPhoneOTP);
 userRouter.post("/send-phone-otp-update", authUser, sendPhoneOTPUpdate);
-userRouter.post("/verify-otp", verifyOTP); 
+userRouter.post("/verify-otp", verifyOTP);
+userRouter.post("/verify-phone-otp", verifyPhoneOTP);
+userRouter.post("/verify-email-change-otp", authUser, verifyEmailChangeOTP);
 userRouter.post("/verify-phone-otp-update", authUser, verifyPhoneOTPUpdate);
 userRouter.post("/verify-phone-firebase", authUser, verifyPhoneFirebase);
 
-// ✅ New Check Routes
-userRouter.post("/check-email", checkEmailExists);   // ✅ ADDED
-userRouter.post("/check-phone", checkPhoneExists);   // ✅ ADDED
+userRouter.post("/check-email", checkEmailExists);
+userRouter.post("/check-phone", checkPhoneExists);
+userRouter.post("/check-email-update", authUser, checkEmailExistsForUpdate);
+userRouter.post("/check-phone-update", authUser, checkPhoneExistsForUpdate);
 
-// ✅ Forgot Password Routes
-userRouter.post("/request-reset", requestPasswordReset); 
-userRouter.post("/request-phone-reset", requestPhoneReset); // ✅ STEP 1: For Phone Reset
-userRouter.post("/reset-password", resetPassword); 
+userRouter.post("/request-reset", requestPasswordReset);
+userRouter.post("/request-phone-reset", requestPhoneReset);
+userRouter.post("/reset-password", resetPassword);
 
 userRouter.get("/profile", authUser, getUserData);
 userRouter.post("/update-profile", authUser, upload.single("image"), updateUserProfile);

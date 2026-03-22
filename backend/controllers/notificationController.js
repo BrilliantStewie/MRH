@@ -8,7 +8,10 @@ export const getUserNotifications = async (req, res) => {
   try {
     const userId = req.userId;
 
-    const notifications = await Notification.find({ recipient: userId })
+    const notifications = await Notification.find({
+      recipient: userId,
+      type: { $ne: "account_status" },
+    })
       .sort({ createdAt: -1 })
       .limit(20);
 

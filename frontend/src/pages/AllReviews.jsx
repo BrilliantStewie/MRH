@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import EmptyReviewsState from "../components/EmptyReviewsState";
 
 const AllReviews = () => {
   const { backendUrl, token, userData } = useContext(AppContext);
@@ -70,23 +71,6 @@ const AllReviews = () => {
   };
 
   /* ==========================================
-     CUSTOM TOAST STYLES
-  ========================================== */
-  const customToastOptions = {
-    position: "bottom-right",
-    autoClose: 3000,
-    hideProgressBar: true,
-    closeOnClick: true,
-    pauseOnHover: false,
-    draggable: true,
-    style: {
-      backgroundColor: '#0f172a', color: '#f8fafc', fontSize: '13px',
-      fontWeight: '600', borderRadius: '12px', padding: '12px 16px',
-      boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.2)', border: '1px solid #1e293b'
-    }
-  };
-
-  /* ==========================================
      API: FETCH REVIEWS
   ========================================== */
   const fetchReviews = async () => {
@@ -96,7 +80,7 @@ const AllReviews = () => {
         setReviews(response.data.reviews || []);
       }
     } catch (err) {
-      toast.error("Failed to load reviews", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to load reviews");
     } finally {
       setIsLoading(false);
     }
@@ -221,7 +205,7 @@ const AllReviews = () => {
   ========================================== */
   const handleSendReply = async (reviewId, parentReplyId = null) => {
     const message = replyText[reviewId];
-    if (!message?.trim()) return toast.warning("Please type a response first.", customToastOptions);
+    if (!message?.trim()) return toast.warning("Please type a response first.");
 
     try {
       const { data } = await axios.post(`${backendUrl}/api/reviews/reply/${reviewId}`, 
@@ -232,7 +216,7 @@ const AllReviews = () => {
 });
 
       if (data.success) {
-        toast.success("Response posted", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
+        toast.success("Response posted");
         setReplyText({ ...replyText, [reviewId]: "" });
         setActiveReplyId(null);
         
@@ -244,7 +228,7 @@ const AllReviews = () => {
         fetchReviews();
       }
     } catch (err) { 
-      toast.error("Failed to post response", customToastOptions); 
+      toast.error("Failed to post response"); 
     }
   };
 
@@ -265,7 +249,7 @@ const AllReviews = () => {
     const usedSlots = editReviewImages.length + editReviewNewImages.length;
     const availableSlots = MAX_REVIEW_IMAGES - usedSlots;
     if (availableSlots <= 0) {
-      toast.warning("You can upload up to 6 images.", customToastOptions);
+      toast.warning("You can upload up to 6 images.");
       event.target.value = "";
       return;
     }
@@ -273,15 +257,15 @@ const AllReviews = () => {
     const nextImages = [];
     for (const file of files) {
       if (!file.type.startsWith("image/")) {
-        toast.error("Only image files are allowed.", customToastOptions);
+        toast.error("Only image files are allowed.");
         continue;
       }
       if (file.size > MAX_REVIEW_IMAGE_SIZE) {
-        toast.error(`${file.name} exceeds the 5MB limit.`, customToastOptions);
+        toast.error(`${file.name} exceeds the 5MB limit.`);
         continue;
       }
       if (usedSlots + nextImages.length >= MAX_REVIEW_IMAGES) {
-        toast.warning("You can upload up to 6 images.", customToastOptions);
+        toast.warning("You can upload up to 6 images.");
         break;
       }
       nextImages.push({
@@ -317,7 +301,7 @@ const AllReviews = () => {
   };
 
   const handleEditReview = async (reviewId) => {
-    if (!editReviewText.trim()) return toast.warning("Review cannot be empty.", customToastOptions);
+    if (!editReviewText.trim()) return toast.warning("Review cannot be empty.");
     try {
       const reviewForm = new FormData();
       reviewForm.append("comment", editReviewText);
@@ -334,19 +318,19 @@ const AllReviews = () => {
       });
 
       if (data.success) {
-        toast.success("Review updated", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
+        toast.success("Review updated");
         setEditingReviewId(null);
         setEditReviewImages([]);
         clearEditReviewNewImages();
         fetchReviews();
       }
     } catch (err) { 
-      toast.error("Failed to update review", customToastOptions); 
+      toast.error("Failed to update review"); 
     }
   };
 
   const handleEditReply = async (replyId) => {
-    if (!editReplyText.trim()) return toast.warning("Reply cannot be empty.", customToastOptions);
+    if (!editReplyText.trim()) return toast.warning("Reply cannot be empty.");
     try {
       const { data } = await axios.put(`${backendUrl}/api/reviews/edit-reply/${replyId}`, { message: editReplyText }, {
   headers: {
@@ -354,12 +338,12 @@ const AllReviews = () => {
   }
 });
       if (data.success) {
-        toast.success("Reply updated", { ...customToastOptions, icon: <CheckCircle2 size={18} className="text-blue-400" /> });
+        toast.success("Reply updated");
         setEditingReplyId(null);
         fetchReviews();
       }
     } catch (err) { 
-      toast.error("Failed to update reply", customToastOptions); 
+      toast.error("Failed to update reply"); 
     }
   };
 
@@ -377,12 +361,12 @@ const AllReviews = () => {
 });
       
       if (data.success) {
-        toast.success(`${itemToDelete.type === 'reply' ? 'Reply' : 'Review'} deleted`, { ...customToastOptions, icon: <Trash2 size={18} className="text-red-400" /> });
+        toast.success(`${itemToDelete.type === 'reply' ? 'Reply' : 'Review'} deleted`);
         setItemToDelete(null);
         fetchReviews();
       }
     } catch (err) { 
-      toast.error("Failed to delete", customToastOptions); 
+      toast.error("Failed to delete"); 
     }
   };
 
@@ -451,6 +435,7 @@ const AllReviews = () => {
   const averageRating = totalReviews
     ? (reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / totalReviews).toFixed(1)
     : "0.0";
+  const hasNoReviews = !isLoading && reviews.length === 0;
   const totalEditImages = editReviewImages.length + editReviewNewImages.length;
   const remainingEditSlots = MAX_REVIEW_IMAGES - totalEditImages;
 
@@ -507,44 +492,46 @@ const AllReviews = () => {
           </p>
         </div>
 
-        <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-auto">
-          <aside className="sticky top-28 h-fit">
-            <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
-              <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
-                <div className="mt-1 flex items-center gap-2">
-                  <Star size={12} className="text-amber-400" fill="currentColor" />
-                  <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
-                </div>
-                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
-              </div>
-              <div className="space-y-2">
-                {ratingBuckets.map((rating) => (
-                  <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                    <div className="flex items-center gap-1 w-9">
-                      <span>{rating}</span>
-                      <Star size={12} className="text-amber-400" fill="currentColor" />
-                    </div>
-                    <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-400"
-                        style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+        <div className={`w-full max-w-[1200px] mx-auto ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+          {!hasNoReviews && (
+            <aside className="sticky top-28 h-fit">
+              <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
+                <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Star size={12} className="text-amber-400" fill="currentColor" />
+                    <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
                   </div>
-                ))}
+                  <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+                </div>
+                <div className="space-y-2">
+                  {ratingBuckets.map((rating) => (
+                    <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                      <div className="flex items-center gap-1 w-9">
+                        <span>{rating}</span>
+                        <Star size={12} className="text-amber-400" fill="currentColor" />
+                      </div>
+                      <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-400"
+                          style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          </aside>
+            </aside>
+          )}
 
-          <div className="space-y-6 flex flex-col items-start w-full pl-8">
+          <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-8"}`}>
           {isLoading ? (
             <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading experiences...</div>
           ) : reviews.length === 0 ? (
-            <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
-              <p className="text-slate-400 italic">No reviews found yet.</p>
+            <div className="flex min-h-[320px] w-full items-center justify-center">
+              <EmptyReviewsState />
             </div>
           ) : (
             reviews.slice(0, visibleReviewCount).map((review) => {

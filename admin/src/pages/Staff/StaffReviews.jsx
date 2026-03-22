@@ -26,6 +26,7 @@ import {
 import axios from "axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
+import EmptyReviewsState from "../../components/EmptyReviewsState";
 
 const StaffReviews = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
@@ -443,6 +444,7 @@ const StaffReviews = () => {
   const averageRating = totalReviews
     ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / totalReviews).toFixed(1)
     : "0.0";
+  const hasNoReviews = !isLoading && reviews.length === 0;
 
   return (
     <div className="reviews-page w-full min-h-screen text-slate-800 relative">
@@ -581,47 +583,55 @@ const StaffReviews = () => {
         )}
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-0">
-        <aside className="h-fit">
-          <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
-            <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
-              <div className="mt-1 flex items-center gap-2">
-                <Star size={12} className="text-amber-400" fill="currentColor" />
-                <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
-              </div>
-              <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
-            </div>
-            <div className="space-y-2">
-              {ratingBuckets.map((rating) => (
-                <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                  <div className="flex items-center gap-1 w-9">
-                    <span>{rating}</span>
-                    <Star size={12} className="text-amber-400" fill="currentColor" />
-                  </div>
-                  <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-amber-400"
-                      style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+        {!hasNoReviews && (
+          <aside className="h-fit">
+            <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
+              <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Star size={12} className="text-amber-400" fill="currentColor" />
+                  <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
                 </div>
-              ))}
+                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+              </div>
+              <div className="space-y-2">
+                {ratingBuckets.map((rating) => (
+                  <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center gap-1 w-9">
+                      <span>{rating}</span>
+                      <Star size={12} className="text-amber-400" fill="currentColor" />
+                    </div>
+                    <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-400"
+                        style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        <div className="space-y-6 flex flex-col items-start w-full pl-4">
+        <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (
-          <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
-            <p className="text-slate-400 italic">
-              {reviews.length === 0 ? "No reviews found yet." : "All reviews cleared."}
-            </p>
-          </div>
+          reviews.length === 0 ? (
+            <div className="flex min-h-[320px] w-full items-center justify-center">
+              <EmptyReviewsState />
+            </div>
+          ) : (
+            <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
+              <p className="text-slate-400 italic">
+                All reviews cleared.
+              </p>
+            </div>
+          )
         ) : (
           visibleReviews.slice(0, visibleReviewCount).map((review) => {
             const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];

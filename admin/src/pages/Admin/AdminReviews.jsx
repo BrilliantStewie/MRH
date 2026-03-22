@@ -26,6 +26,7 @@ import {
 import axios from "axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
+import EmptyReviewsState from "../../components/EmptyReviewsState";
 
 const AdminReviews = () => {
   const { backendUrl, aToken } = useContext(AdminContext);
@@ -129,28 +130,6 @@ const AdminReviews = () => {
   };
 
   /* ==========================================
-     CUSTOM TOAST STYLES
-  ========================================== */
-  const customToastOptions = {
-    position: "bottom-right",
-    autoClose: 3000,
-    hideProgressBar: true,
-    closeOnClick: true,
-    pauseOnHover: false,
-    draggable: true,
-    style: {
-      backgroundColor: '#0f172a', // slate-900
-      color: '#f8fafc', // slate-50
-      fontSize: '13px',
-      fontWeight: '600',
-      borderRadius: '12px',
-      padding: '12px 16px',
-      boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-      border: '1px solid #1e293b'
-    }
-  };
-
-  /* ==========================================
      FETCH REVIEWS
   ========================================== */
   const fetchReviews = async () => {
@@ -166,10 +145,7 @@ const AdminReviews = () => {
       }
     } catch (err) {
       console.error("Error fetching reviews:", err);
-      toast.error("Failed to load reviews", { 
-        ...customToastOptions, 
-        icon: <AlertCircle size={18} className="text-red-400" /> 
-      });
+      toast.error("Failed to load reviews");
     } finally {
       setIsLoading(false);
     }
@@ -273,11 +249,7 @@ const AdminReviews = () => {
     const message = replyText[reviewId];
 
     if (!message || message.trim() === "") {
-      return toast.warning("Please type a response first.", {
-        ...customToastOptions,
-        style: { ...customToastOptions.style, border: '1px solid #f59e0b' },
-        icon: <AlertCircle size={18} className="text-amber-400" />
-      });
+      return toast.warning("Please type a response first.");
     }
 
     try {
@@ -292,10 +264,7 @@ const AdminReviews = () => {
 );
 
       if (data.success) {
-        toast.success("Response sent successfully", { 
-          ...customToastOptions, 
-          icon: <CheckCircle2 size={18} className="text-blue-400" /> 
-        });
+        toast.success("Response sent successfully");
         setReplyText({ ...replyText, [reviewId]: "" });
         setActiveReplyId(null);
         
@@ -308,7 +277,7 @@ const AdminReviews = () => {
         fetchReviews();
       }
     } catch (err) {
-      toast.error("Failed to send response", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to send response");
     }
   };
 
@@ -334,15 +303,12 @@ const AdminReviews = () => {
       );
 
       if (data.success) {
-        toast.success("Reply permanently deleted", { 
-          ...customToastOptions, 
-          icon: <Trash2 size={18} className="text-red-400" /> 
-        });
+        toast.success("Reply permanently deleted");
         setItemToDelete(null);
         fetchReviews();
       }
     } catch (error) {
-      toast.error("Failed to delete reply", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to delete reply");
       setItemToDelete(null);
     }
   };
@@ -361,16 +327,13 @@ const AdminReviews = () => {
       );
 
       if (data.success) {
-        toast.success("Reply updated", { 
-          ...customToastOptions, 
-          icon: <CheckCircle2 size={18} className="text-blue-400" /> 
-        });
+        toast.success("Reply updated");
         setEditingReplyId(null);
         setEditText("");
         fetchReviews();
       }
     } catch (error) {
-      toast.error("Failed to update reply", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to update reply");
     }
   };
 
@@ -455,15 +418,16 @@ const AdminReviews = () => {
   const averageRating = totalReviews
     ? (reviews.reduce((acc, item) => acc + (item.rating || 0), 0) / totalReviews).toFixed(1)
     : "0.0";
+  const hasNoReviews = !isLoading && reviews.length === 0;
 
   return (
-    <div className="reviews-page w-full min-h-screen text-slate-800 relative">
+    <div className="reviews-page w-full min-h-full text-slate-800 relative">
       <div className="pointer-events-none absolute inset-0 -z-10"></div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
         .reviews-page {
           font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
-          background-color: #ffffff;
+          background-color: #f8fafc;
         }
         .review-card {
           position: relative;
@@ -494,7 +458,7 @@ const AdminReviews = () => {
         }
       `}</style>
 
-      <div className="w-full max-w-none mx-auto px-4 lg:px-8 xl:px-10 2xl:px-12 pt-4 pb-20">
+      <div className="w-full max-w-none mx-auto pt-0 pb-0">
        
       <div className="mb-10 w-full max-w-[1200px] mx-0">
         <div className="w-full max-w-[1200px] mx-0 pb-0 flex items-start justify-between gap-4">
@@ -593,47 +557,55 @@ const AdminReviews = () => {
         )}
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start w-full max-w-[1200px] mx-0">
-        <aside className="h-fit">
-          <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
-            <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
-              <div className="mt-1 flex items-center gap-2">
-                <Star size={12} className="text-amber-400" fill="currentColor" />
-                <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
-              </div>
-              <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
-            </div>
-            <div className="space-y-2">
-              {ratingBuckets.map((rating) => (
-                <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
-                  <div className="flex items-center gap-1 w-9">
-                    <span>{rating}</span>
-                    <Star size={12} className="text-amber-400" fill="currentColor" />
-                  </div>
-                  <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-amber-400"
-                      style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+        {!hasNoReviews && (
+          <aside className="h-fit">
+            <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400 mb-3">Ratings</p>
+              <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Overall</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <Star size={12} className="text-amber-400" fill="currentColor" />
+                  <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
                 </div>
-              ))}
+                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+              </div>
+              <div className="space-y-2">
+                {ratingBuckets.map((rating) => (
+                  <div key={rating} className="flex items-center gap-2 text-[11px] font-semibold text-slate-600">
+                    <div className="flex items-center gap-1 w-9">
+                      <span>{rating}</span>
+                      <Star size={12} className="text-amber-400" fill="currentColor" />
+                    </div>
+                    <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-400"
+                        style={{ width: `${(ratingCounts[rating] / maxRatingCount) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-slate-400 w-6 text-right">{ratingCounts[rating]}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        )}
 
-        <div className="space-y-6 flex flex-col items-start w-full pl-4">
+        <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (
-          <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
-            <p className="text-slate-400 italic">
-              {reviews.length === 0 ? "No reviews found yet." : "All reviews cleared."}
-            </p>
-          </div>
+          reviews.length === 0 ? (
+            <div className="flex min-h-[320px] w-full items-center justify-center">
+              <EmptyReviewsState />
+            </div>
+          ) : (
+            <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
+              <p className="text-slate-400 italic">
+                All reviews cleared.
+              </p>
+            </div>
+          )
         ) : (
           visibleReviews.slice(0, visibleReviewCount).map((review) => {
             const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];

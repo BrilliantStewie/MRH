@@ -1,6 +1,7 @@
 import express from "express";
 import {
   loginAdmin,
+  verifyAdminSession,
   adminDashboard,
   getAllUsers,
   addGuestUser,
@@ -46,6 +47,7 @@ const adminRouter = express.Router();
 
 // 🔐 AUTH & DASHBOARD
 adminRouter.post("/login", loginAdmin);
+adminRouter.get("/session", authAdmin, verifyAdminSession);
 adminRouter.get("/dashboard", authAdmin, adminDashboard);
 
 // 👥 USERS & STAFF

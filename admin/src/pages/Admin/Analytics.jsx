@@ -151,7 +151,7 @@ const Analytics = () => {
   }
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans pb-20">
+    <div className="bg-slate-50 font-sans">
       
       {/* Header */}
       <div className="mb-8">

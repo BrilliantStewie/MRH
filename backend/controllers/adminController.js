@@ -31,6 +31,16 @@ const streamUpload = (fileBuffer, folderName = "mrh_rooms") => {
     });
 };
 
+const formatPHNumber = (number) => {
+  if (!number) return null;
+
+  if (number.startsWith("+63")) {
+    return "0" + number.substring(3);
+  }
+
+  return number;
+};
+
 // ======================================================================
 // 🔐 AUTHENTICATION
 // ======================================================================
@@ -46,15 +56,22 @@ const loginAdmin = async (req, res) => {
       role: "admin"
     });
 
-    if (!admin) {
-      return res.json({
-        success: false,
-        message: "Admin not found"
-      });
-    }
+      if (!admin) {
+        return res.json({
+          success: false,
+          message: "Admin not found"
+        });
+      }
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, admin.password);
+      if (admin.disabled) {
+        return res.json({
+          success: false,
+          message: "Your account has been disabled."
+        });
+      }
+
+      // Compare password
+      const isMatch = await bcrypt.compare(password, admin.password);
 
     if (!isMatch) {
       return res.json({
@@ -85,6 +102,10 @@ const loginAdmin = async (req, res) => {
       message: error.message
     });
   }
+};
+
+const verifyAdminSession = async (req, res) => {
+  res.json({ success: true });
 };
 
 export default loginAdmin;
@@ -268,16 +289,6 @@ const updateStaff = async (req, res) => {
     }
 };
 
-const formatPHNumber = (number) => {
-  if (!number) return null;
-
-  if (number.startsWith("+63")) {
-    return "0" + number.substring(3);
-  }
-
-  return number;
-};
-
 const changeUserStatus = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -291,17 +302,8 @@ const changeUserStatus = async (req, res) => {
     user.disabled = !user.disabled;
     await user.save();
 
-    const statusText = user.disabled ? "disabled" : "re-enabled";
-    const accountStatusMessage = user.disabled ? "Account disabled." : "Account reactivated.";
 
     // 🔔 In-app notification
-    await Notification.create({
-      recipient: user._id,
-      type: "account_status",
-      message: accountStatusMessage,
-      link: "/login",
-      isRead: false
-    });
 
     // 📧 Email
     await sendEmail(
@@ -322,18 +324,18 @@ const changeUserStatus = async (req, res) => {
     );
 
     // 📱 SMS (ONLY if phone exists)
-   if (user.phone) {
-  try {
-    await sendSMS(
-      formatPHNumber(user.phone),
-      user.disabled
-        ? "Your MRH account has been disabled. Contact administration."
-        : "Your MRH account has been reactivated."
-    );
-  } catch (smsError) {
-    console.error("SMS failed but continuing:", smsError.message);
-  }
-}
+    if (user.phone) {
+      try {
+        await sendSMS(
+          formatPHNumber(user.phone),
+          user.disabled
+            ? "Your MRH account has been disabled. Contact administration."
+            : "Your MRH account has been reactivated."
+        );
+      } catch (smsError) {
+        console.error("SMS failed but continuing:", smsError.message);
+      }
+    }
 
     res.json({
       success: true,
@@ -449,8 +451,40 @@ const updateRoom = async (req, res) => {
 
 const getAllRooms = async (req, res) => {
     try {
-        const rooms = await roomModel.find({}).sort({ createdAt: -1 });
-        res.json({ success: true, rooms });
+        const [rooms, buildings, roomTypes] = await Promise.all([
+            roomModel.find({}).sort({ createdAt: -1 }).lean(),
+            buildingModel.find({}, "name").lean(),
+            roomTypeModel.find({}, "name").lean()
+        ]);
+
+        const validBuildings = new Set(
+            buildings
+                .map((building) => String(building.name || "").trim().toLowerCase())
+                .filter(Boolean)
+        );
+        const validRoomTypes = new Set(
+            roomTypes
+                .map((type) => String(type.name || "").trim().toLowerCase())
+                .filter(Boolean)
+        );
+
+        const sanitizedRooms = rooms.map((room) => {
+            const sanitizedRoom = { ...room };
+            const normalizedBuilding = String(room.building || "").trim().toLowerCase();
+            const normalizedRoomType = String(room.room_type || "").trim().toLowerCase();
+
+            if (!validBuildings.has(normalizedBuilding)) {
+                sanitizedRoom.building = "";
+            }
+
+            if (!validRoomTypes.has(normalizedRoomType)) {
+                sanitizedRoom.room_type = "";
+            }
+
+            return sanitizedRoom;
+        });
+
+        res.json({ success: true, rooms: sanitizedRooms });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -487,7 +521,7 @@ const deleteRoom = async (req, res) => {
 const allBookings = async (req, res) => {
     try {
         const bookings = await bookingModel.find({})
-            .populate('user_id', 'firstName middleName lastName suffix email image phone')
+            .populate('user_id', 'firstName middleName lastName suffix email image phone authProvider')
             .populate('bookingItems.room_id')
             .populate('bookingItems.package_id')
             .sort({ date: -1 });
@@ -788,6 +822,7 @@ const updateRoomType = async (req, res) => {
 
 export {
     loginAdmin, 
+    verifyAdminSession,
     adminDashboard, 
     getAllUsers, 
     getAllStaff, 

@@ -236,7 +236,7 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 shadow-sm">
+      <nav className="sticky top-0 z-50 w-full bg-[#f8fafc] border-b border-gray-200 shadow-sm">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           

@@ -3,9 +3,7 @@ import { AdminContext } from "../../context/AdminContext";
 import { 
   Search, 
   User, 
-  Users as UsersIcon, 
   Mail, 
-  Command, 
   Shield,
   CircleDot,
   XCircle,
@@ -91,7 +89,7 @@ const Users = () => {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); 
-  const [adminInfo, setAdminInfo] = useState({ email: "", isYou: false });
+  const [adminInfo, setAdminInfo] = useState({ id: "" });
   
   // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
@@ -108,15 +106,14 @@ const Users = () => {
     if (aToken) {
         try {
             const payload = JSON.parse(atob(aToken.split(".")[1]));
-            setAdminInfo({ email: payload.email || "", isYou: payload.role === "admin" });
+            setAdminInfo({ id: payload.id || "" });
         } catch (e) {
-            setAdminInfo({ email: "", isYou: false });
+            setAdminInfo({ id: "" });
         }
     }
   }, [aToken]);
 
   const getFullName = (u) => {
-    if (u.isSystem) return "MRH Admin";
     if (u.firstName) {
       const middle = u.middleName ? `${u.middleName} ` : '';
       return `${u.firstName} ${middle}${u.lastName}`.trim();
@@ -124,20 +121,23 @@ const Users = () => {
     return u.name || "Unknown User";
   };
 
-  const adminUser = {
-    _id: "system-root",
-    name: "MRH Admin",
-    email: "system@mrh.admin",
-    role: "admin",
-    image: "", 
-    isSystem: true,
-    isYou: adminInfo.isYou,
-    disabled: false
+  const getDisplayPhone = (value) => {
+    const normalized = String(value || "").trim();
+    return normalized && normalized !== "0000000000" ? normalized : "";
   };
 
   const filteredUsers = useMemo(() => {
     const users = Array.isArray(allUsers) ? allUsers : [];
-    const merged = [adminUser, ...users.filter((u) => u.email !== adminUser.email)];
+    const mappedUsers = users.map((u) => ({
+      ...u,
+      isYou: Boolean(adminInfo.id) && String(u._id) === String(adminInfo.id),
+    }));
+    const adminUsers = mappedUsers.filter((u) => u.role === "admin");
+    const primaryAdmin = adminUsers.find((u) => u.isYou) || adminUsers[0] || null;
+    const merged = [
+      ...(primaryAdmin ? [primaryAdmin] : []),
+      ...mappedUsers.filter((u) => u.role !== "admin"),
+    ];
     
     // Sort logic mapping
     const rolePriority = { admin: 1, staff: 2, user: 3 };
@@ -171,7 +171,7 @@ const Users = () => {
       return nameA.localeCompare(nameB);
     });
 
-  }, [allUsers, search, roleFilter, statusFilter, adminUser]);
+  }, [adminInfo.id, allUsers, search, roleFilter, statusFilter]);
 
   // Limit display
   const displayedUsers = expanded ? filteredUsers : filteredUsers.slice(0, 5);
@@ -195,14 +195,11 @@ const Users = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 p-4 lg:p-8">
+    <div className="min-h-full bg-slate-50 font-sans text-slate-900">
       
       {/* TOP BAR */}
       <div className="max-w-7xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
-                <UsersIcon className="text-white" size={24} />
-            </div>
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">Users</h1>
                 <p className="text-slate-500 text-sm font-medium">Manage system access and roles.</p>
@@ -221,7 +218,7 @@ const Users = () => {
       </div>
 
       {/* CONTROL BAR */}
-      <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-6">
+      <div className="max-w-7xl mx-auto mb-6">
         <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
@@ -263,13 +260,20 @@ const Users = () => {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {displayedUsers.length > 0 ? (
-                displayedUsers.map((u) => (
+                displayedUsers.map((u) => {
+                const isAdminRow = u.role === 'admin';
+
+                const displayPhone = getDisplayPhone(u.phone);
+
+                return (
                 <tr key={u._id} className={`group transition-colors ${u.disabled ? 'bg-slate-50/80' : 'hover:bg-slate-50/60'}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-full flex items-center justify-center overflow-hidden border border-slate-200 relative ${u.disabled ? 'grayscale opacity-70' : ''}`}>
-                          {u.isSystem ? (
-                            <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white"><Command size={14}/></div>
+                          {isAdminRow ? (
+                            <div className="bg-slate-900 w-full h-full flex items-center justify-center text-white">
+                              <Shield size={16} />
+                            </div>
                           ) : u.image ? (
                             <img src={u.image} alt="" className="w-full h-full object-cover" />
                           ) : (
@@ -277,8 +281,8 @@ const Users = () => {
                           )}
                         </div>
                         <div>
-                          <div className={`font-bold text-sm ${u.disabled ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
-                            {getFullName(u)} 
+                          <div className={`font-bold text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-900'}`}>
+                            {isAdminRow ? "Administrator" : getFullName(u)} 
                             {u.isYou && <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-wider">You</span>}
                           </div>
                         </div>
@@ -286,26 +290,23 @@ const Users = () => {
                     </td>
 
                     <td className="px-6 py-4">
-  {!u.isSystem ? (
-    <div className="flex flex-col gap-1.5">
-      {/* Email */}
-      <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
-        <Mail size={14} className="text-slate-400 opacity-70"/> 
-        <span className="truncate max-w-[200px]">
-          {u.email || <span className="italic text-slate-300">No Email</span>}
-        </span>
-      </div>
-      
-      {/* Phone */}
+  {isAdminRow ? null : (
+  <div className="flex flex-col gap-1.5">
+    {/* Email */}
+    <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
+      <Mail size={14} className="text-slate-400 opacity-70"/> 
+      <span className="truncate max-w-[200px]">
+        {u.email || <span className="italic text-slate-300">No Email</span>}
+      </span>
+    </div>
+    
+    {displayPhone && (
       <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
         <Phone size={14} className="text-slate-400 opacity-70"/> 
-        <span className="truncate max-w-[200px]">
-          {u.phone || <span className="italic text-slate-300">No Phone</span>}
-        </span>
+        <span className="truncate max-w-[200px]">{displayPhone}</span>
       </div>
-    </div>
-  ) : (
-    <span className="text-xs text-slate-400 italic">System Protected</span>
+    )}
+  </div>
   )}
 </td>
 
@@ -320,7 +321,7 @@ const Users = () => {
                     </td>
 
                     <td className="px-6 py-4">
-                      {u.disabled ? (
+                      {isAdminRow ? null : u.disabled ? (
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
                           <XCircle size={12} /> Disabled
                         </div>
@@ -333,14 +334,14 @@ const Users = () => {
 
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end items-center gap-3 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                        {!u.isYou && !u.isSystem && (
+                        {!u.isYou && u.role !== 'admin' && (
                           <>
                             <button 
                                 onClick={() => changeUserStatus(u._id)}
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
                                   u.disabled 
-                                    ? 'bg-white border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                                    : 'bg-white border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
+                                    : 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100'
                                 }`}
                             >
                                 {u.disabled ? <RefreshCcw size={14}/> : <Ban size={14}/>}
@@ -352,7 +353,7 @@ const Users = () => {
                       </div>
                     </td>
                 </tr>
-                ))
+            )})
             ) : (
               <tr>
                 <td colSpan="5" className="p-12 text-center text-slate-500 font-medium">No users found match your criteria.</td>
@@ -400,7 +401,7 @@ const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUse
         lastName: editData?.lastName || "",
         middleName: editData?.middleName || "",
         email: editData?.email || "",
-        phone: editData?.phone || "",
+        phone: editData?.phone && editData.phone !== "0000000000" ? editData.phone : "",
         password: ""
     });
 

@@ -476,11 +476,13 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] p-4 font-sans text-slate-800 md:p-8 print:bg-white print:p-0">
+    <div className="bg-[#f8fafc] font-sans text-slate-800 print:bg-white print:p-0">
       <div
         ref={reportRef}
-        className={`pointer-events-none absolute left-0 top-0 block bg-white text-slate-900 print:static print:z-auto print:opacity-100 print:block print:w-full ${
-          isReportVisible ? "z-10 opacity-100" : "-z-10 opacity-0"
+        className={`print:static print:z-auto print:block print:w-full print:bg-white print:text-slate-900 print:opacity-100 ${
+          isReportVisible
+            ? "pointer-events-none absolute left-0 top-0 z-10 block bg-white text-slate-900 opacity-100"
+            : "hidden"
         }`}
       >
         <div className="print-sheet report-sheet flex flex-col gap-4 bg-white px-[12mm] py-[12mm] text-[#3f2a4e]">

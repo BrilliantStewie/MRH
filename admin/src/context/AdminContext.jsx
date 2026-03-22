@@ -1,8 +1,14 @@
 import { createContext, useState, useEffect, useMemo } from "react"; // Added useMemo
 import axios from "axios";
 import { toast } from "react-toastify";
+import {
+  isAccountDisabledMessage,
+  storeDisabledAccountNotice,
+} from "../utils/accountStatusNotice";
 
 export const AdminContext = createContext();
+
+const SESSION_REFRESH_INTERVAL_MS = 15000;
 
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -13,10 +19,12 @@ const AdminContextProvider = ({ children }) => {
     headers: { token: aToken }
   };
 
-  const logoutAdmin = () => {
+  const logoutAdmin = ({ silent = false, disabledMessage = "" } = {}) => {
     localStorage.removeItem("aToken");
     setAToken("");
-    toast.info("Logged out successfully");
+    if (disabledMessage) {
+      storeDisabledAccountNotice(disabledMessage);
+    }
   };
 
   // ============================================================
@@ -26,18 +34,60 @@ const AdminContextProvider = ({ children }) => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 401) {
-          const msg = error.response.data.message || "";
-          if (msg.toLowerCase().includes("not authorized") || msg.toLowerCase().includes("disabled")) {
-            toast.error(msg);
-            logoutAdmin(); // Instantly clears state so App.jsx redirects
-          }
+        if (!aToken) {
+          return Promise.reject(error);
         }
+
+        const status = error.response?.status;
+        const msg = error.response?.data?.message || "";
+
+        if ((status === 401 || status === 403) && isAccountDisabledMessage(msg)) {
+          logoutAdmin({ silent: true, disabledMessage: msg });
+        } else if (status === 401) {
+          toast.error(msg || "Session expired. Please login again.");
+          logoutAdmin({ silent: true });
+        }
+
         return Promise.reject(error);
       }
     );
     return () => axios.interceptors.response.eject(interceptor);
-  }, []);
+  }, [aToken]);
+
+  useEffect(() => {
+    if (!aToken) return undefined;
+
+    const verifySession = async () => {
+      try {
+        await axios.get(`${backendUrl}/api/admin/session`, authHeader);
+      } catch (error) {
+        if (!error.response) {
+          console.error("Admin session check failed:", error.message);
+        }
+      }
+    };
+
+    const runVisibleCheck = () => {
+      if (document.visibilityState === "visible") {
+        verifySession();
+      }
+    };
+
+    verifySession();
+
+    const interval = setInterval(runVisibleCheck, SESSION_REFRESH_INTERVAL_MS);
+    const handleFocus = () => verifySession();
+    const handleVisibilityChange = () => runVisibleCheck();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [aToken, backendUrl]);
 
   // ============================================================
   // 📊 STATE MANAGEMENT
@@ -66,12 +116,15 @@ const AdminContextProvider = ({ children }) => {
       if (data.success) {
         localStorage.setItem("aToken", data.token);
         setAToken(data.token);
-        toast.success("Welcome back, Admin!");
+        return data;
       } else {
-        toast.error(data.message);
+        return data;
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message,
+      };
     }
   };
 

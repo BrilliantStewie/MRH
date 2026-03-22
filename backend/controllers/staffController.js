@@ -16,6 +16,63 @@ const normalizePHPhone = (value) => {
 
 const isValidPHPhone = (value) => /^09\d{9}$/.test(value);
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const verifyFirebasePhoneToken = async (idToken) => {
+  if (!idToken) {
+    throw new Error("Missing Firebase phone verification token");
+  }
+
+  initFirebaseAdmin();
+  const decoded = await admin.auth().verifyIdToken(idToken);
+  const signInProvider = decoded.firebase?.sign_in_provider;
+
+  if (signInProvider && signInProvider !== "phone") {
+    throw new Error("Invalid phone verification token");
+  }
+
+  const phoneNumber = decoded.phone_number;
+  if (!phoneNumber) {
+    throw new Error("Phone number not found in token");
+  }
+
+  const normalizedPhone = normalizePHPhone(phoneNumber);
+  if (!isValidPHPhone(normalizedPhone)) {
+    throw new Error("Invalid Philippine phone number");
+  }
+
+  return { decoded, normalizedPhone };
+};
+
+const parseStaffNamePayload = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return { firstName: "", middleName: "", lastName: "", suffix: "" };
+  }
+
+  if (raw.includes("|")) {
+    const [firstName = "", middleName = "", lastName = "", suffix = ""] = raw.split("|");
+    return {
+      firstName: firstName.trim(),
+      middleName: middleName.trim(),
+      lastName: lastName.trim(),
+      suffix: suffix.trim(),
+    };
+  }
+
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { firstName: parts[0], middleName: "", lastName: "", suffix: "" };
+  }
+
+  return {
+    firstName: parts[0] || "",
+    middleName: parts.slice(1, -1).join(" "),
+    lastName: parts[parts.length - 1] || "",
+    suffix: "",
+  };
+};
+
 const buildPhoneCandidates = (value) => {
   const rawDigits = String(value || "").replace(/\D/g, "");
   const normalized = normalizePHPhone(value);
@@ -151,14 +208,29 @@ export const getStaffProfile = async (req, res) => {
   }
 };
 
+export const verifyStaffSession = async (req, res) => {
+  return res.status(200).json({ success: true });
+};
+
 /* =====================================================
    UPDATE STAFF PROFILE
 ===================================================== */
 export const updateStaffProfile = async (req, res) => {
   try {
-    // 1. Destructure data (Note: 'name' comes as "First|Mid|Last|Suffix")
-    const { name, email, phone, oldPassword, newPassword, removeImage } = req.body;
-    
+    const {
+      name,
+      firstName,
+      middleName,
+      lastName,
+      suffix,
+      email,
+      phone,
+      phoneIdToken,
+      oldPassword,
+      newPassword,
+      removeImage,
+    } = req.body;
+
     const staffId = req.userId || req.user?.id;
     const staff = await userModel.findById(staffId);
 
@@ -169,30 +241,91 @@ export const updateStaffProfile = async (req, res) => {
       });
     }
 
-    // --- 2. NAME UPDATE LOGIC ---
-    // The frontend sends the composite string: "First|Mid|Last|Suffix"
-    if (name) {
-        staff.name = name; // Save the full pipe-string so frontend can parse it back later
+    const parsedName = parseStaffNamePayload(name);
+    const normalizedFirstName =
+      typeof firstName === "string" ? firstName.trim() : parsedName.firstName || staff.firstName;
+    const normalizedMiddleName =
+      typeof middleName === "string"
+        ? middleName.trim()
+        : parsedName.middleName || staff.middleName || "";
+    const normalizedLastName =
+      typeof lastName === "string" ? lastName.trim() : parsedName.lastName || staff.lastName;
+    const normalizedSuffix =
+      typeof suffix === "string" ? suffix.trim() : parsedName.suffix || staff.suffix || "";
+    const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : normalizeEmail(staff.email);
+    const normalizedPhone = typeof phone === "string" ? normalizePHPhone(phone.trim()) : normalizePHPhone(staff.phone || "");
+    const currentPhone = normalizePHPhone(staff.phone || "");
+    const currentEmail = normalizeEmail(staff.email);
 
-        if (name.includes('|')) {
-            const [first, mid, last, suffix] = name.split('|');
-            staff.firstName = first || "";
-            staff.middleName = mid || "";
-            // Append suffix to lastName for sorting/searching purposes if your DB lacks a suffix field
-            staff.lastName = suffix ? `${last} ${suffix}` : last || "";
-        } else {
-            // Fallback: If for some reason pipes aren't used
-            staff.firstName = name.split(' ')[0] || "";
-            staff.lastName = name.split(' ').slice(1).join(' ') || "";
-        }
+    if (!normalizedFirstName || !normalizedLastName) {
+      return res.status(400).json({
+        success: false,
+        message: "First name and last name are required",
+      });
     }
 
-    // --- 3. PHONE & EMAIL UPDATE ---
-    if (phone) staff.phone = phone.trim();
+    if (!validator.isEmail(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email",
+      });
+    }
 
-    if (email && email !== staff.email) {
+    if (!normalizedPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required",
+      });
+    }
+
+    if (!isValidPHPhone(normalizedPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone number",
+      });
+    }
+
+    if (normalizedPhone !== currentPhone) {
+      if (!phoneIdToken) {
+        return res.status(400).json({
+          success: false,
+          message: "Please verify your phone number first",
+        });
+      }
+
+      let verifiedPhone;
+      try {
+        verifiedPhone = await verifyFirebasePhoneToken(phoneIdToken);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message || "Please verify your phone number first",
+        });
+      }
+
+      if (verifiedPhone.normalizedPhone !== normalizedPhone) {
+        return res.status(400).json({
+          success: false,
+          message: "Verified phone number does not match the phone you entered",
+        });
+      }
+
+      const phoneConflictUser = await userModel.findOne({
+        phone: normalizedPhone,
+        _id: { $ne: staff._id },
+      });
+
+      if (phoneConflictUser && phoneConflictUser.isVerified) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number already taken",
+        });
+      }
+    }
+
+    if (normalizedEmail !== currentEmail) {
       const emailExists = await userModel.findOne({
-        email: email.trim(),
+        email: normalizedEmail,
         _id: { $ne: staff._id },
       });
 
@@ -202,29 +335,39 @@ export const updateStaffProfile = async (req, res) => {
           message: "Email already in use",
         });
       }
-      staff.email = email.trim();
     }
 
-    // --- 4. PASSWORD UPDATE ---
-    if (newPassword && oldPassword) {
-       const isMatch = await bcrypt.compare(oldPassword, staff.password);
-       if (!isMatch) {
-         return res.status(400).json({ success: false, message: "Old password is incorrect" });
-       }
-       if (newPassword.length < 8) {
-         return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
-       }
-       const salt = await bcrypt.genSalt(10);
-       staff.password = await bcrypt.hash(newPassword, salt);
-       staff.tokenVersion = (staff.tokenVersion || 0) + 1;
+    staff.firstName = normalizedFirstName;
+    staff.middleName = normalizedMiddleName;
+    staff.lastName = normalizedLastName;
+    staff.suffix = normalizedSuffix;
+    staff.email = normalizedEmail;
+    staff.phone = normalizedPhone;
+    if (normalizedPhone !== currentPhone) {
+      staff.phoneVerified = true;
+      staff.pendingPhone = "";
     }
 
-    // --- 5. IMAGE HANDLING (Upload OR Remove) ---
-    if (removeImage === 'true') {
-        // User clicked the trash icon
-        staff.image = ""; 
+    if (newPassword) {
+      if (!oldPassword) {
+        return res.status(400).json({ success: false, message: "Current password is required" });
+      }
+
+      const isMatch = await bcrypt.compare(oldPassword, staff.password);
+      if (!isMatch) {
+        return res.status(400).json({ success: false, message: "Old password is incorrect" });
+      }
+      if (newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: "Password must be at least 8 characters" });
+      }
+      const salt = await bcrypt.genSalt(10);
+      staff.password = await bcrypt.hash(newPassword, salt);
+      staff.tokenVersion = (staff.tokenVersion || 0) + 1;
+    }
+
+    if (removeImage === "true" || removeImage === true) {
+      staff.image = "";
     } else if (req.file) {
-      // User uploaded a new photo
       const streamUpload = (fileBuffer) => {
         return new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
@@ -243,11 +386,12 @@ export const updateStaffProfile = async (req, res) => {
     }
 
     await staff.save();
+    const safeStaff = await userModel.findById(staffId).select("-password");
 
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
-      userData: staff,
+      userData: safeStaff,
     });
 
   } catch (error) {
@@ -266,23 +410,7 @@ export const verifyStaffPhoneFirebase = async (req, res) => {
   try {
     const staffId = req.userId || req.user?.id;
     const { idToken } = req.body;
-
-    if (!idToken) {
-      return res.json({ success: false, message: "Missing Firebase token" });
-    }
-
-    initFirebaseAdmin();
-    const decoded = await admin.auth().verifyIdToken(idToken);
-    const phoneNumber = decoded.phone_number;
-
-    if (!phoneNumber) {
-      return res.json({ success: false, message: "Phone number not found in token" });
-    }
-
-    const normalizedPhone = normalizePHPhone(phoneNumber);
-    if (!isValidPHPhone(normalizedPhone)) {
-      return res.json({ success: false, message: "Invalid Philippine phone number" });
-    }
+    const { normalizedPhone } = await verifyFirebasePhoneToken(idToken);
 
     const conflictUser = await userModel.findOne({
       phone: normalizedPhone,
@@ -292,22 +420,35 @@ export const verifyStaffPhoneFirebase = async (req, res) => {
       return res.json({ success: false, message: "Phone number already taken" });
     }
 
-    const staff = await userModel.findById(staffId);
-    if (!staff || staff.role !== "staff") {
-      return res.json({ success: false, message: "Staff not found" });
-    }
-
-    staff.phone = normalizedPhone;
-    staff.phoneVerified = true;
-    staff.pendingPhone = "";
-    staff.otp = null;
-    staff.otpExpires = null;
-    await staff.save();
-
     return res.json({
       success: true,
       message: "Phone verified successfully",
       phone: normalizedPhone
+    });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
+  }
+};
+
+export const checkStaffPhoneAvailability = async (req, res) => {
+  try {
+    const staffId = req.userId || req.user?.id;
+    const { phone } = req.body;
+    const phoneCandidates = buildPhoneCandidates(phone);
+    const normalizedPhone = normalizePHPhone(phone);
+
+    if (!phoneCandidates.length || !isValidPHPhone(normalizedPhone)) {
+      return res.json({ success: true, exists: false });
+    }
+
+    const conflictUser = await userModel.findOne({
+      phone: { $in: phoneCandidates },
+      _id: { $ne: staffId }
+    });
+
+    return res.json({
+      success: true,
+      exists: Boolean(conflictUser && conflictUser.isVerified)
     });
   } catch (error) {
     return res.json({ success: false, message: error.message });
@@ -321,7 +462,7 @@ export const getStaffBookings = async (req, res) => {
   try {
 
     const bookings = await bookingModel.find({})
-      .populate("user_id", "name firstName middleName lastName email phone image")
+      .populate("user_id", "name firstName middleName lastName email phone image authProvider")
       .populate({
         path: "bookingItems.room_id",
         model: "Room"

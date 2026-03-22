@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 
 export const AppContext = createContext();
 
+const ROOM_REFRESH_INTERVAL_MS = 15000;
+
 const AppContextProvider = (props) => {
   const currencySymbol = "₱";
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -16,27 +18,6 @@ const AppContextProvider = (props) => {
     const savedRooms = localStorage.getItem("selectedRooms");
     return savedRooms ? JSON.parse(savedRooms) : [];
   });
-
-  // ================= SECURITY INTERCEPTOR =================
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        if (error.response?.data?.isAccountDisabled === true) {
-          if (error.response.data.isAccountDisabled) {
-            setToken(null);
-            setUserData(null);
-            localStorage.removeItem("token");
-            toast.error("Account disabled. Logging out...");
-          } else {
-            toast.error(error.response.data.message || "Unauthorized action.");
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-    return () => axios.interceptors.response.eject(interceptor);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem("selectedRooms", JSON.stringify(selectedRooms));
@@ -74,15 +55,47 @@ const AppContextProvider = (props) => {
     }
   }, [token]);
 
-  const getRoomsData = async () => {
+  const getRoomsData = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(backendUrl + "/api/room/list");
       if (data.success) setRooms(data.rooms);
-      else toast.error(data.message);
+      else if (!silent) toast.error(data.message);
     } catch (error) {
-      toast.error(error.message);
+      if (!silent) {
+        toast.error(error.message);
+      } else {
+        console.error("Rooms refresh error:", error.message);
+      }
     }
   };
+
+  useEffect(() => {
+    const refreshRooms = () => getRoomsData({ silent: true });
+
+    refreshRooms();
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshRooms();
+      }
+    }, ROOM_REFRESH_INTERVAL_MS);
+
+    const handleFocus = () => refreshRooms();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshRooms();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [backendUrl]);
 
   const addRoom = (room) => {
     setSelectedRooms((prev) =>

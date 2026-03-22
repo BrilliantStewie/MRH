@@ -66,6 +66,12 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   const [isAddingNewType, setIsAddingNewType] = useState(false);
   const [editingTypeId, setEditingTypeId] = useState(null);
   const [tempTypeName, setTempTypeName] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState({
+    open: false,
+    entity: "",
+    id: null,
+    name: "",
+  });
 
   const buildingRef = useRef(null);
   const typeRef = useRef(null);
@@ -143,17 +149,29 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     } catch (error) { toast.error("Building operation failed"); }
   };
 
-  const handleDeleteBuilding = async (e, id) => {
-    e.stopPropagation();
-    if (!window.confirm("Delete building? This may affect existing rooms.")) return;
+  const handleDeleteBuilding = async (id) => {
     try {
       const { data } = await axios.post(`${backendUrl}/api/admin/delete-building`, { id }, { headers: { token: aToken } });
       if (data.success) {
-        toast.success("Removed");
-        getBuildings();
-        if (building === buildings.find(b => b._id === id)?.name) setBuilding("");
+        const deletedBuilding = buildings.find((b) => b._id === id)?.name;
+        toast.success("Building removed");
+        await getBuildings();
+        if (building === deletedBuilding) setBuilding("");
+        resetBuildingStates();
       }
     } catch (error) { toast.error("Delete failed"); }
+  };
+
+  const requestDeleteBuilding = (e, id, name) => {
+    e.stopPropagation();
+    setShowBuildingDropdown(false);
+    resetBuildingStates();
+    setDeleteDialog({
+      open: true,
+      entity: "building",
+      id,
+      name,
+    });
   };
 
   const resetBuildingStates = () => { 
@@ -183,17 +201,29 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     } catch (error) { toast.error("Operation failed"); }
   };
 
-  const handleDeleteType = async (e, id) => {
-    e.stopPropagation();
-    if (!window.confirm("Delete room type? This may affect existing rooms.")) return;
+  const handleDeleteType = async (id) => {
     try {
       const { data } = await axios.post(`${backendUrl}/api/admin/delete-room-type`, { id }, { headers: { token: aToken } });
       if (data.success) {
-        toast.success("Removed");
-        getRoomTypes();
-        if (roomType === roomTypes.find(t => t._id === id)?.name) setRoomType("");
+        const deletedType = roomTypes.find((t) => t._id === id)?.name;
+        toast.success("Room type removed");
+        await getRoomTypes();
+        if (roomType === deletedType) setRoomType("");
+        resetTypeStates();
       }
     } catch (error) { toast.error("Delete failed"); }
+  };
+
+  const requestDeleteType = (e, id, name) => {
+    e.stopPropagation();
+    setShowTypeDropdown(false);
+    resetTypeStates();
+    setDeleteDialog({
+      open: true,
+      entity: "room type",
+      id,
+      name,
+    });
   };
 
   const resetTypeStates = () => { 
@@ -201,6 +231,27 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     setEditingTypeId(null); 
     setTempTypeName(""); 
     setShowAllTypes(false);
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteDialog({
+      open: false,
+      entity: "",
+      id: null,
+      name: "",
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteDialog.id) return;
+
+    if (deleteDialog.entity === "building") {
+      await handleDeleteBuilding(deleteDialog.id);
+    } else if (deleteDialog.entity === "room type") {
+      await handleDeleteType(deleteDialog.id);
+    }
+
+    closeDeleteDialog();
   };
 
   // ==============================
@@ -482,7 +533,7 @@ if (roomType === "Dormitory" && capacity < 3) {
                               <span onClick={() => { setRoomType(t.name); setShowTypeDropdown(false); }} className="flex-1 text-sm font-bold text-slate-600">{t.name}</span>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button type="button" onClick={() => { setEditingTypeId(t._id); setTempTypeName(t.name); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 size={14}/></button>
-                                <button type="button" onClick={(e) => handleDeleteType(e, t._id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                                <button type="button" onClick={(e) => requestDeleteType(e, t._id, t.name)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
                               </div>
                             </div>
                           ))}
@@ -530,7 +581,7 @@ if (roomType === "Dormitory" && capacity < 3) {
                                 <span onClick={() => { setBuilding(b.name); setShowBuildingDropdown(false); }} className="flex-1 text-sm font-bold text-slate-600">{b.name}</span>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button type="button" onClick={() => { setEditingBuildingId(b._id); setTempBuildingName(b.name); }} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><Edit3 size={14}/></button>
-                                  <button type="button" onClick={(e) => handleDeleteBuilding(e, b._id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
+                                  <button type="button" onClick={(e) => requestDeleteBuilding(e, b._id, b.name)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button>
                                 </div>
                               </div>
                             ))}
@@ -591,6 +642,58 @@ if (roomType === "Dormitory" && capacity < 3) {
             </button>
           </div>
         </div>
+
+        {deleteDialog.open && (
+          <div className="absolute inset-0 z-[80] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/50 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.55)]">
+              <div className="px-6 py-6">
+                <div className="mb-5 flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 shadow-sm">
+                    <AlertCircle size={22} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black uppercase tracking-[0.22em] text-rose-400">
+                      Delete {deleteDialog.entity}
+                    </p>
+                    <h3 className="mt-1 text-lg font-black tracking-tight text-slate-900">
+                      Remove "{deleteDialog.name}"?
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                      This will remove the {deleteDialog.entity} from the list and may affect
+                      existing rooms using it.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-rose-100 bg-rose-50/70 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-rose-500">
+                    Warning
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-rose-700">
+                    This action cannot be undone from this screen.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeDeleteDialog}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 transition-all hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  className="flex-1 rounded-2xl bg-rose-500 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-rose-200 transition-all hover:bg-rose-600"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -10,6 +10,12 @@ const VerifyFirebasePhoneOtp = ({ phone, onClose, onVerify, onResend }) => {
   const [timer, setTimer] = useState(59);
   const inputRefs = useRef([]);
 
+  const handleClose = (verified = false) => {
+    if (typeof onClose === "function") {
+      onClose({ verified });
+    }
+  };
+
   useEffect(() => {
     if (inputRefs.current[0]) inputRefs.current[0].focus();
     document.body.style.overflow = "hidden";
@@ -69,7 +75,7 @@ const VerifyFirebasePhoneOtp = ({ phone, onClose, onVerify, onResend }) => {
       if (result?.success) {
         setIsSuccess(true);
         setTimeout(() => {
-          if (typeof onClose === "function") onClose();
+          handleClose(true);
         }, 1500);
       } else {
         setError(result?.message || "Invalid security code");
@@ -83,7 +89,7 @@ const VerifyFirebasePhoneOtp = ({ phone, onClose, onVerify, onResend }) => {
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-zinc-950/60 backdrop-blur-[2px]" onClick={() => handleClose(false)} />
 
       <div className="relative bg-white w-full max-w-[420px] rounded-[24px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
         <div className="bg-zinc-900 px-8 py-6 flex items-center justify-between">
@@ -96,7 +102,7 @@ const VerifyFirebasePhoneOtp = ({ phone, onClose, onVerify, onResend }) => {
               <p className="text-[10px] text-zinc-500 font-medium">Verification Required</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <button onClick={() => handleClose(false)} className="text-zinc-500 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>

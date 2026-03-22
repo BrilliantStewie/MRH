@@ -1,6 +1,5 @@
 import React, { useContext } from "react"; // Removed useEffect, axios
-import { Routes, Route, Navigate } from "react-router-dom"; // Removed useNavigate
-import { ToastContainer } from "react-toastify";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom"; // Removed useNavigate
 import "react-toastify/dist/ReactToastify.css";
 
 // Contexts
@@ -12,6 +11,7 @@ import Sidebar from "./components/Admin/Sidebar";
 import Navbar from "./components/Admin/Navbar";
 import StaffNavbar from "./components/Staff/StaffNavbar";
 import StaffSidebar from "./components/Staff/StaffSidebar";
+import StyledToastContainer from "./components/StyledToastContainer";
 
 // Pages
 import Login from "./pages/Login";
@@ -27,9 +27,6 @@ import Analytics from "./pages/Admin/Analytics";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
-import StaffRooms from "./pages/Staff/StaffRooms";
-import StaffPackages from "./pages/Staff/StaffPackages";
-import StaffUsers from "./pages/Staff/StaffUsers";
 
 // Route Guard
 import StaffProtectedRoute from "./routes/StaffProtectedRoute";
@@ -37,14 +34,21 @@ import StaffProtectedRoute from "./routes/StaffProtectedRoute";
 const App = () => {
   const { aToken } = useContext(AdminContext);
   const { sToken } = useContext(StaffContext);
+  const location = useLocation();
+  const isBookingsRoute =
+    location.pathname === "/all-bookings" || location.pathname === "/staff-bookings";
+  const isAdminDashboardRoute = location.pathname === "/admin-dashboard";
+  const isAdminAnalyticsRoute = location.pathname === "/admin-analytics";
+  const isAdminRoomsRoute = location.pathname === "/rooms-list";
+  const isAdminPackagesRoute = location.pathname === "/admin-packages";
 
   // NOTE: The Security Interceptor is now handled inside AdminContext.jsx
   // This makes the App.jsx much cleaner and prevents duplicate logic.
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-white font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex h-screen flex-col overflow-hidden bg-[#f8fafc] font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
       <div className="print:hidden">
-        <ToastContainer position="top-right" autoClose={3000} />
+        <StyledToastContainer />
       </div>
 
       {/* ================= ADMIN LAYOUT ================= */}
@@ -53,12 +57,34 @@ const App = () => {
           <div className="print:hidden">
             <Navbar />
           </div>
-          <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+          <div className="flex flex-1 overflow-hidden bg-[#f8fafc] print:block print:overflow-visible">
             <div className="print:hidden">
               <Sidebar />
             </div>
-            <main className="flex-1 overflow-y-auto bg-white p-4 lg:p-8 print:overflow-visible print:bg-white print:p-0">
-              <div className="mx-auto max-w-7xl pb-20 print:mx-0 print:max-w-none print:pb-0">
+            <main
+              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
+                isAdminRoomsRoute
+                  ? "overflow-hidden p-0"
+                  : isBookingsRoute
+                    ? "overflow-y-auto p-0"
+                    : "overflow-y-auto p-4 lg:p-8"
+              }`}
+            >
+              <div
+                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${
+                  isAdminRoomsRoute
+                    ? "h-full max-w-none pb-0"
+                    : isAdminDashboardRoute
+                      ? "mx-auto max-w-7xl pb-0"
+                    : isAdminAnalyticsRoute
+                      ? "mx-auto max-w-7xl pb-0"
+                    : isAdminPackagesRoute
+                      ? "mx-auto max-w-7xl pb-0"
+                    : isBookingsRoute
+                      ? "max-w-none pb-0"
+                      : "mx-auto max-w-7xl pb-20"
+                }`}
+              >
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
                   <Route path="/admin-dashboard" element={<Dashboard />} />
@@ -81,12 +107,12 @@ const App = () => {
           <div className="print:hidden">
             <StaffNavbar />
           </div>
-          <div className="flex flex-1 overflow-hidden print:block print:overflow-visible">
+          <div className="flex flex-1 overflow-hidden bg-[#f8fafc] print:block print:overflow-visible">
             <div className="print:hidden">
               <StaffSidebar />
             </div>
-            <main className="flex-1 overflow-y-auto bg-white p-6 print:overflow-visible print:bg-white print:p-0">
-              <div className="mx-auto max-w-7xl print:mx-0 print:max-w-none">
+            <main className="flex-1 overflow-y-auto bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0">
+              <div className={`w-full print:mx-0 print:max-w-none ${isBookingsRoute ? "max-w-none" : "mx-auto max-w-7xl"}`}>
                 <Routes>
                   <Route
                     path="/staff-dashboard"
@@ -117,30 +143,6 @@ const App = () => {
                     element={
                       <StaffProtectedRoute>
                         <StaffReviews />
-                      </StaffProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/staff-rooms"
-                    element={
-                      <StaffProtectedRoute>
-                        <StaffRooms />
-                      </StaffProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/staff-packages"
-                    element={
-                      <StaffProtectedRoute>
-                        <StaffPackages />
-                      </StaffProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/staff-users"
-                    element={
-                      <StaffProtectedRoute>
-                        <StaffUsers />
                       </StaffProtectedRoute>
                     }
                   />

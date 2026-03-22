@@ -1,8 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Loader2, X, CheckCircle, Lock, RefreshCw } from "lucide-react";
+const validatePhone = (value) => /^09\d{9}$/.test(String(value || "").replace(/\D/g, ""));
 
-const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
+const VerifyOtp = ({
+  identifier,
+  identifierType,
+  email,
+  phone,
+  onClose,
+  onSuccess,
+  backendUrl,
+  isResetMode,
+  onResend,
+  onVerify,
+}) => {
   const [otp, setOtp] = useState(new Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -10,6 +22,13 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
   const [isSuccess, setIsSuccess] = useState(false);
   const [timer, setTimer] = useState(59);
   const inputRefs = useRef([]);
+  const targetValue = String(
+    identifier ||
+      phone ||
+      email ||
+      ""
+  ).trim();
+  const resolvedType = identifierType || (validatePhone(targetValue) ? "phone" : "email");
 
   useEffect(() => {
     if (inputRefs.current[0]) inputRefs.current[0].focus();
@@ -41,14 +60,23 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
     setResending(true);
     setError("");
     try {
-      // Use the standard send-otp endpoint for both cases
-      const { data } = await axios.post(`${backendUrl}/api/user/send-otp`, { email });
-      if (data.success) {
+      const result = onResend
+        ? await onResend()
+        : await axios
+            .post(
+              `${backendUrl}${resolvedType === "phone" ? "/api/user/send-phone-otp" : "/api/user/send-otp"}`,
+              resolvedType === "phone"
+                ? { phone: targetValue, isResetMode }
+                : { email: targetValue, isResetMode }
+            )
+            .then((response) => response.data);
+
+      if (result.success) {
         setTimer(59);
         setOtp(new Array(6).fill(""));
-        inputRefs.current[0].focus();
+        if (inputRefs.current[0]) inputRefs.current[0].focus();
       } else {
-        setError(data.message);
+        setError(result.message || "Failed to resend code.");
       }
     } catch (err) {
       setError("Failed to resend code.");
@@ -61,21 +89,34 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
     e.preventDefault();
     const otpCode = otp.join("").trim();
     if (otpCode.length < 6) return setError("Incomplete verification code");
-    
+
     setLoading(true);
     setError("");
 
     try {
-      const { data } = await axios.post(`${backendUrl}/api/user/verify-otp`, { 
-        email: email.toLowerCase().trim(),
-        otp: otpCode,
-        isResetMode: isResetMode // ✅ Pass this flag to the backend
-      });
-      
+      const data = onVerify
+        ? await onVerify(otpCode)
+        : await axios
+            .post(
+              `${backendUrl}${resolvedType === "phone" ? "/api/user/verify-phone-otp" : "/api/user/verify-otp"}`,
+              resolvedType === "phone"
+                ? {
+                    phone: targetValue,
+                    otp: otpCode,
+                    isResetMode,
+                  }
+                : {
+                    email: targetValue.toLowerCase().trim(),
+                    otp: otpCode,
+                    isResetMode,
+                  }
+            )
+            .then((response) => response.data);
+
       if (data.success) {
         setIsSuccess(true);
         if (typeof onSuccess === "function") {
-            onSuccess(otpCode); 
+          onSuccess(otpCode);
         }
 
         setTimeout(() => {
@@ -125,7 +166,7 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
               <div className="mb-8">
                 <h3 className="text-xl font-bold text-zinc-900">Enter Security Code</h3>
                 <p className="text-zinc-500 mt-2 text-sm leading-relaxed">
-                  Enter the code sent to <span className="text-zinc-900 font-semibold">{email}</span>
+                  Enter the code sent to <span className="text-zinc-900 font-semibold">{targetValue}</span>
                 </p>
               </div>
 
@@ -161,13 +202,15 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
                   </button>
 
                   <div className="flex items-center justify-between px-1">
-                    <button 
+                    <button
                       type="button"
                       onClick={handleResendOtp}
                       disabled={timer > 0 || resending}
-                      className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 ${timer > 0 || resending ? 'text-zinc-300' : 'text-zinc-900'}`}
+                      className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-2 ${
+                        timer > 0 || resending ? "text-zinc-300" : "text-zinc-900"
+                      }`}
                     >
-                      <RefreshCw size={12} className={resending ? 'animate-spin' : ''} /> Resend
+                      <RefreshCw size={12} className={resending ? "animate-spin" : ""} /> Resend
                     </button>
                     {timer > 0 && <span className="text-[11px] font-mono text-zinc-400">00:{timer < 10 ? `0${timer}` : timer}</span>}
                   </div>

@@ -67,6 +67,10 @@ const AppProvider = ({ children }) => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (!token) {
+          return Promise.reject(error);
+        }
+
         // If backend returns 403 (Forbidden) or 401 (Unauthorized)
         if (error.response && (error.response.status === 403 || error.response.status === 401)) {
           const msg = error.response.data.message || "";

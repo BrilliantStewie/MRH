@@ -1,8 +1,14 @@
 import { createContext, useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import {
+  isAccountDisabledMessage,
+  storeDisabledAccountNotice,
+} from "../utils/accountStatusNotice";
 
 export const StaffContext = createContext();
+
+const SESSION_REFRESH_INTERVAL_MS = 15000;
 
 const StaffContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -20,20 +26,63 @@ const StaffContextProvider = ({ children }) => {
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 401) {
-          localStorage.removeItem("sToken");
-          setSToken(null);
-          setStaffData(null); 
-          toast.error(
-            error.response.data.message || "Session expired. Please login again."
-          );
+        if (!sToken) {
+          return Promise.reject(error);
         }
+
+        const status = error.response?.status;
+        const message = error.response?.data?.message || "";
+
+        if ((status === 401 || status === 403) && isAccountDisabledMessage(message)) {
+          staffLogout({ silent: true, disabledMessage: message });
+        } else if (status === 401) {
+          staffLogout({ silent: true });
+          toast.error(message || "Session expired. Please login again.");
+        }
+
         return Promise.reject(error);
       }
     );
 
     return () => axios.interceptors.response.eject(interceptor);
-  }, []);
+  }, [sToken]);
+
+  useEffect(() => {
+    if (!sToken) return undefined;
+
+    const verifySession = async () => {
+      try {
+        await axios.get(`${backendUrl}/api/staff/session`, {
+          headers: { token: sToken },
+        });
+      } catch (error) {
+        if (!error.response) {
+          console.error("Staff session check failed:", error.message);
+        }
+      }
+    };
+
+    const runVisibleCheck = () => {
+      if (document.visibilityState === "visible") {
+        verifySession();
+      }
+    };
+
+    verifySession();
+
+    const interval = setInterval(runVisibleCheck, SESSION_REFRESH_INTERVAL_MS);
+    const handleFocus = () => verifySession();
+    const handleVisibilityChange = () => runVisibleCheck();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [sToken, backendUrl]);
 
   /* =====================================================
      ✅ CORRECTED: FETCH STAFF PROFILE DATA
@@ -76,16 +125,13 @@ const StaffContextProvider = ({ children }) => {
       if (data.success) {
         localStorage.setItem("sToken", data.token);
         setSToken(data.token);
-        toast.success("Staff Login Successful");
-        return data;
-      } else {
-        toast.error(data.message);
         return data;
       }
+
+      return data;
     } catch (error) {
       const errorMessage =
         error.response?.data?.message || "Login failed";
-      toast.error(errorMessage);
       return { success: false, message: errorMessage };
     }
   };
@@ -179,11 +225,13 @@ const StaffContextProvider = ({ children }) => {
   /* =====================================================
      STAFF LOGOUT
   ===================================================== */
-  const staffLogout = () => {
+  const staffLogout = ({ silent = false, disabledMessage = "" } = {}) => {
     localStorage.removeItem("sToken");
     setSToken(null);
     setStaffData(null); 
-    toast.info("Logged out");
+    if (disabledMessage) {
+      storeDisabledAccountNotice(disabledMessage);
+    }
   };
 
   return (

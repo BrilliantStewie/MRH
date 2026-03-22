@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState, useMemo } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import AddRoom from "./AddRoom"; 
-import { 
+import {
   RefreshCw, 
   Trash2, 
   Plus, 
@@ -22,6 +22,8 @@ import {
   BedSingle
 } from "lucide-react";
 
+const MODAL_AMENITIES_PREVIEW_COUNT = 4;
+
 const RoomsList = () => {
   const { aToken, allRooms, getAllRooms, changeAvailability, deleteRoom, buildings, getBuildings, roomTypes, getRoomTypes } = useContext(AdminContext);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -40,6 +42,8 @@ const RoomsList = () => {
   const [showMoreTypes, setShowMoreTypes] = useState(false);
 
   const [deletingRoom, setDeletingRoom] = useState(null); // State for delete confirmation
+  const [currentPage, setCurrentPage] = useState(1);
+  const roomsPerPage = 8;
 
   useEffect(() => {
     if (aToken) {
@@ -111,6 +115,47 @@ const RoomsList = () => {
     return data;
   }, [allRooms, filterType, filterBuilding, filterStatus]);
 
+  // Pagination Logic
+  const totalPages = Math.max(1, Math.ceil(filteredRooms.length / roomsPerPage));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const visiblePageCount = Math.min(3, totalPages);
+  const halfVisiblePageCount = Math.floor(visiblePageCount / 2);
+  let visiblePageStart = Math.max(1, currentPageSafe - halfVisiblePageCount);
+  let visiblePageEnd = visiblePageStart + visiblePageCount - 1;
+
+  if (visiblePageEnd > totalPages) {
+    visiblePageEnd = totalPages;
+    visiblePageStart = Math.max(1, visiblePageEnd - visiblePageCount + 1);
+  }
+
+  const visiblePageNumbers = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, index) => visiblePageStart + index
+  );
+  const paginatedRooms = filteredRooms.slice(
+    (currentPageSafe - 1) * roomsPerPage,
+    currentPageSafe * roomsPerPage
+  );
+  const visibleRoomStart =
+    filteredRooms.length === 0 ? 0 : (currentPageSafe - 1) * roomsPerPage + 1;
+  const visibleRoomEnd = Math.min(currentPageSafe * roomsPerPage, filteredRooms.length);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+  
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, filterBuilding, filterStatus]);
+
   const clearFilters = () => {
     setFilterType("");
     setFilterBuilding("");
@@ -142,8 +187,20 @@ const RoomsList = () => {
   const images = Array.isArray(room.images) && room.images.length > 0
     ? room.images
     : room.cover_image ? [room.cover_image] : [];
-    
+     
   const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const amenities = Array.isArray(room.amenities)
+    ? room.amenities.filter(Boolean)
+    : [];
+  const visibleAmenities = showAllAmenities
+    ? amenities
+    : amenities.slice(0, MODAL_AMENITIES_PREVIEW_COUNT);
+
+  useEffect(() => {
+    setActiveImgIndex(0);
+    setShowAllAmenities(false);
+  }, [room._id]);
 
   useEffect(() => {
     if (images.length <= 1) return; 
@@ -213,11 +270,11 @@ const RoomsList = () => {
           <div className="flex flex-col mb-6">
             {/* Top Header Row: Name on Left, Building on Right */}
             <div className="flex justify-between items-center w-full mb-4">
-              <h2 className="text-2xl font-extrabold text-slate-800 tracking-tight leading-none">
+              <h2 className="text-xl font-extrabold text-slate-800 tracking-tight leading-none">
                 {room.name}
               </h2>
               <div className="flex items-center gap-3">
-                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold uppercase tracking-widest rounded-lg border border-blue-100">
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-widest rounded-lg border border-blue-100">
                   {room.building}
                 </span>
                 <button onClick={onClose} className="p-2.5 bg-slate-50 hover:bg-red-50 hover:text-red-500 rounded-full transition-all group shrink-0">
@@ -228,7 +285,7 @@ const RoomsList = () => {
 
             {/* Sub-Header Row: Room Type (Left) and Capacity (Right) */}
             {/* Added pr-[52px] to align Capacity with Building Tag above (Button 40px + Gap 12px) */}
-            <div className="flex items-center justify-between w-full text-sm font-bold pr-[52px]">
+            <div className="flex items-center justify-between w-full pr-[52px] text-[11px] font-bold">
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl">
                 <BedSingle size={16} className="text-slate-400" />
                 <span>{room.room_type}</span>
@@ -243,29 +300,49 @@ const RoomsList = () => {
 
           <div className="space-y-8 flex-1 overflow-y-auto pr-2 custom-scrollbar mt-2 border-t border-slate-50 pt-6">
             <section>
-              <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-3">Description</h3>
-              <p className="text-slate-600 leading-relaxed text-sm">
+              <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-3">Description</h3>
+              <p className="text-xs leading-relaxed text-justify text-slate-600">
                 {room.description || "Indulge in a space where modern luxury meets functional design, perfect for both relaxation and productivity."}
               </p>
             </section>
 
             <section>
-              <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Included Amenities</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {room.amenities?.map((am, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <span className="text-[11px] font-bold text-slate-700 capitalize">{am}</span>
+              <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Included Amenities</h3>
+              {amenities.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    {visibleAmenities.map((am, i) => (
+                      <div key={`${am}-${i}`} className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-700">
+                          {String(am || "").replace(/_/g, " ").toUpperCase()}
+                        </span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                  {amenities.length > MODAL_AMENITIES_PREVIEW_COUNT && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllAmenities((value) => !value)}
+                      className="mt-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 transition hover:text-slate-700"
+                    >
+                      {showAllAmenities
+                        ? "Show Less"
+                        : `+${amenities.length - MODAL_AMENITIES_PREVIEW_COUNT} More`}
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div className="rounded-xl border border-dashed border-slate-100 bg-slate-50 px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  No Amenities Listed
+                </div>
+              )}
             </section>
           </div>
 
           <div className="mt-8">
             <button
               onClick={() => { handleEdit(room); onClose(); }}
-              className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95"
+              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-slate-900 py-4 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-2xl active:scale-95"
             >
               Edit Room Details <Edit3 size={18} />
             </button>
@@ -292,8 +369,8 @@ const RoomsList = () => {
             </div>
             
             <div className="text-center mb-8">
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Delete Room?</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
+              <h3 className="mb-2 text-lg font-bold text-slate-900">Delete Room?</h3>
+              <p className="text-xs leading-relaxed text-slate-500">
                 Are you sure you want to delete <span className="font-bold text-slate-800">"{deletingRoom.name}"</span>? 
                 This action is permanent and cannot be undone.
               </p>
@@ -302,7 +379,7 @@ const RoomsList = () => {
             <div className="flex gap-3">
               <button 
                 onClick={() => setDeletingRoom(null)}
-                className="flex-1 py-3.5 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all active:scale-95"
+                className="flex-1 rounded-xl bg-slate-100 py-3.5 text-sm font-bold text-slate-600 transition-all hover:bg-slate-200 active:scale-95"
               >
                 Cancel
               </button>
@@ -311,7 +388,7 @@ const RoomsList = () => {
                   deleteRoom(deletingRoom._id);
                   setDeletingRoom(null);
                 }}
-                className="flex-1 py-3.5 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 shadow-lg shadow-rose-200 transition-all active:scale-95"
+                className="flex-1 rounded-xl bg-rose-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-rose-200 transition-all hover:bg-rose-600 active:scale-95"
               >
                 Delete
               </button>
@@ -323,41 +400,30 @@ const RoomsList = () => {
       {/* --- HEADER --- */}
       <div className="flex flex-col md:flex-row justify-between items-start mb-5 gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Room Management</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your listings, availability, and details.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Room Management</h1>
+          <p className="mt-1 text-xs text-slate-500">Manage your listings, availability, and details.</p>
         </div>
         
-        <div className="flex flex-col items-end w-full md:w-auto">
-          <div className="flex gap-3">
-            <button onClick={handleRefresh} className="p-3 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 hover:text-black transition-all shadow-sm">
-              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-            </button>
-            
-            <button onClick={handleAddNew} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:bg-black transition-all">
-              <Plus size={20} /> 
-              <span>Add New Room</span>
-            </button>
-          </div>
-          
-          <div className="mt-10 flex items-center gap-2 px-3 bg-blue-50 border border-blue-100 rounded-full shadow-sm">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
-              {filteredRooms.length} {filteredRooms.length === 1 ? 'Room' : 'Rooms'} Available 
-              {filteredRooms.length !== allRooms.length && ` / ${allRooms.length} Total`}
-            </span>
-          </div>
+        <div className="flex w-full flex-col items-end md:w-auto">
+          <button
+            onClick={handleAddNew}
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
+          >
+            <Plus size={20} />
+            <span>Add New Room</span>
+          </button>
         </div>
       </div>
 
      {/* --- DYNAMIC FILTER BAR --- */}
-     <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between relative z-40">
-       <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
+       <div className="relative z-40 mb-6 flex flex-col items-center gap-4 md:flex-row">
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
          
          {/* BUILDING FILTER */}
          <div className="relative w-full md:w-48">
              <button 
                onClick={() => toggleDropdown('building')} 
-               className={`w-full px-4 py-2.5 border rounded-xl text-sm font-bold flex justify-between items-center transition-all ${
+                className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
                  filterBuilding ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
                }`}
              >
@@ -369,17 +435,17 @@ const RoomsList = () => {
              </button>
              {activeDropdown === 'building' && (
                  <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                     <div onClick={() => { setFilterBuilding(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-400 flex items-center gap-3">
+                      <div onClick={() => { setFilterBuilding(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
                        <Building2 size={14} /> All Buildings
                      </div>
                      <div className="h-px bg-slate-100 my-1 mx-2" />
                      {buildings.slice(0, showMoreBuildings ? buildings.length : 3).map((b) => (
-                         <div key={b._id} onClick={() => { setFilterBuilding(b.name); setActiveDropdown(null); }} className="px-4 py-3 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-700 transition-colors">
+                          <div key={b._id} onClick={() => { setFilterBuilding(b.name); setActiveDropdown(null); }} className="rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
                            {b.name}
                          </div>
                      ))}
                      {buildings.length > 3 && (
-                       <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreBuildings(!showMoreBuildings); }} className="w-full py-2 text-[10px] font-black uppercase text-slate-500 hover:bg-slate-100 border-t border-slate-50">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreBuildings(!showMoreBuildings); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100">
                          {showMoreBuildings ? "Show Less" : `+ ${buildings.length - 3} More`}
                        </button>
                      )}
@@ -391,7 +457,7 @@ const RoomsList = () => {
          <div className="relative w-full md:w-60">
              <button 
                onClick={() => toggleDropdown('type')} 
-               className={`w-full px-4 py-2.5 border rounded-xl text-sm font-bold flex justify-between items-center transition-all ${
+                className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
                  filterType ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
                }`}
              >
@@ -403,17 +469,17 @@ const RoomsList = () => {
              </button>
              {activeDropdown === 'type' && (
                  <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                     <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-400 flex items-center gap-3">
+                      <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
                        <BedSingle size={14} /> All Types
                      </div>
                      <div className="h-px bg-slate-100 my-1 mx-2" />
                      {roomTypes.slice(0, showMoreTypes ? roomTypes.length : 3).map((t) => (
-                         <div key={t._id} onClick={() => { setFilterType(t.name); setActiveDropdown(null); }} className="px-4 py-3 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-700 transition-colors">
+                          <div key={t._id} onClick={() => { setFilterType(t.name); setActiveDropdown(null); }} className="rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
                            {t.name}
                          </div>
                      ))}
                      {roomTypes.length > 3 && (
-                       <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreTypes(!showMoreTypes); }} className="w-full py-2 text-[10px] font-black uppercase text-slate-500 hover:bg-slate-100 border-t border-slate-50">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreTypes(!showMoreTypes); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100">
                          {showMoreTypes ? "Show Less" : `+ ${roomTypes.length - 3} More`}
                        </button>
                      )}
@@ -425,7 +491,7 @@ const RoomsList = () => {
          <div className="relative w-full md:w-48">
            <button 
              onClick={() => toggleDropdown('status')} 
-             className={`w-full px-4 py-2.5 border rounded-xl text-sm font-bold flex justify-between items-center transition-all ${
+              className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
                filterStatus ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
              }`}
            >
@@ -440,19 +506,19 @@ const RoomsList = () => {
            
            {activeDropdown === 'status' && (
              <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-               <div onClick={() => { setFilterStatus(""); setActiveDropdown(null); }} className="px-4 py-2.5 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-400 flex items-center gap-3">
+                <div onClick={() => { setFilterStatus(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
                  <Filter size={14} className="text-slate-400" /> All Status
                </div>
                <div className="h-px bg-slate-100 my-1 mx-2" />
-               <div onClick={() => { setFilterStatus("Available"); setActiveDropdown(null); }} className="px-4 py-3 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-700 flex items-center justify-between transition-colors">
+                <div onClick={() => { setFilterStatus("Available"); setActiveDropdown(null); }} className="flex items-center justify-between rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
                  <span>Available</span>
-                 <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
                    {allRooms.filter(r => r.available).length}
                  </span>
                </div>
-               <div onClick={() => { setFilterStatus("Unavailable"); setActiveDropdown(null); }} className="px-4 py-3 text-xs font-bold rounded-lg cursor-pointer hover:bg-slate-100 text-slate-700 flex items-center justify-between transition-colors">
+                <div onClick={() => { setFilterStatus("Unavailable"); setActiveDropdown(null); }} className="flex items-center justify-between rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
                  <span>Unavailable</span>
-                 <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
                    {allRooms.filter(r => !r.available).length}
                  </span>
                </div>
@@ -464,21 +530,21 @@ const RoomsList = () => {
          {(filterType || filterBuilding || filterStatus) && (
              <button 
                onClick={clearFilters} 
-               className="flex items-center gap-2 px-4 py-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl text-sm font-bold transition-all border border-transparent hover:border-rose-100 ml-auto"
+                className="ml-auto flex items-center gap-2 rounded-xl border border-transparent px-4 py-2.5 text-xs font-bold text-slate-500 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
              >
                <RotateCcw size={16} />
                <span>Reset Filters</span>
              </button>
          )}
        </div>
-     </div>
+      </div>
 
       {/* --- ROOMS GRID --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredRooms.map((room) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {paginatedRooms.map((room) => (
           <div key={room._id} className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-slate-300 flex flex-col">
             <div 
-                className="relative h-44 bg-slate-200 overflow-hidden cursor-zoom-in group/image"
+                className="relative h-28 bg-slate-200 overflow-hidden cursor-zoom-in group/image"
                 onClick={() => setViewingRoom(room)}
             >
               <img 
@@ -488,7 +554,7 @@ const RoomsList = () => {
               />
               
               {room.available && (
-                <div className="absolute top-3 right-3 bg-slate-900 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 z-20 pointer-events-none">
+                <div className="pointer-events-none absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1 text-[9px] font-bold text-white shadow-lg">
                     <CheckCircle2 size={10} strokeWidth={3} className="text-emerald-400" /> AVAILABLE
                 </div>
               )}
@@ -496,69 +562,122 @@ const RoomsList = () => {
               {!room.available && (
                 <div className="absolute inset-0 bg-slate-100/80 flex flex-col items-center justify-center text-slate-400 p-4 text-center z-10 pointer-events-none">
                     <Ban size={28} className="mb-1" />
-                    <span className="font-bold text-[10px] uppercase tracking-widest">Unavailable</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Unavailable</span>
                 </div>
               )}
 
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="bg-white/90 text-slate-900 text-[10px] font-bold uppercase px-3 py-1.5 rounded-full shadow-sm">
+                <span className="rounded-full bg-white/90 px-3 py-1.5 text-[9px] font-bold uppercase text-slate-900 shadow-sm">
                     View Details
                 </span>
               </div>
             </div>
 
-            <div className="p-5 flex-1 flex flex-col">
-              <div className="mb-4">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className={`font-bold text-sm leading-tight ${room.available ? 'text-slate-800' : 'text-slate-400'}`}>
+            <div className="p-2 flex-1 flex flex-col">
+              <div className="mb-2">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <h3 className={`text-[11px] font-bold leading-tight ${room.available ? 'text-slate-800' : 'text-slate-400'}`}>
                         {room.name}
                     </h3>
                     {room.building && (
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase border tracking-wider whitespace-nowrap ${
+                        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
                             room.available ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-slate-50 text-slate-300 border-slate-100"
                         }`}>
                             <Building2 size={8} /> {room.building}
                         </span>
                     )}
                 </div>
-                
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wide">
+
+                <div className={`mt-2 flex items-start justify-between gap-2 text-[11px] font-medium ${!room.available ? "text-slate-300" : "text-slate-500"}`}>
+                  <p className={`min-w-0 flex-1 text-[9px] font-bold uppercase tracking-wide ${
+                    room.available ? "text-slate-400" : "text-slate-300"
+                  }`}>
                     {room.room_type || room.type}
-                </p>
+                  </p>
+                  <span className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
+                    !room.available ? "text-slate-300" : "text-slate-500"
+                  }`}>
+                    <Users size={12} className={!room.available ? "text-slate-300" : "text-slate-900"} />
+                    <span className="pr-1.5 text-[10px] text-right">
+                      {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
+                    </span>
+                  </span>
+                </div>
               </div>
 
-              <div className={`flex flex-wrap gap-2 text-xs mb-5 font-medium ${!room.available ? "text-slate-300" : "text-slate-500"}`}>
-                <span className={`flex items-center gap-1.5 px-2 py-1 rounded-md border ${
-                    !room.available ? "bg-white border-slate-100" : "bg-slate-50 border-slate-100"
-                }`}>
-                    <Users size={14} className={!room.available ? "text-slate-300" : "text-slate-900"} />
-                    {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
-                </span>
-              </div>
-
-              <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-auto pt-1 border-t border-slate-100 flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer group/toggle">
                   <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors duration-300 ${room.available ? 'bg-emerald-500' : 'bg-slate-200'}`}>
                     <div className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${room.available ? 'translate-x-3.5' : ''}`}></div>
                   </div>
                   <input type="checkbox" className="hidden" checked={room.available} onChange={() => changeAvailability(room._id)} />
-                  <span className={`text-[10px] font-bold uppercase tracking-tight transition-colors ${room.available ? "text-emerald-600" : "text-slate-400"}`}>
+                   <span className={`text-[9px] font-bold uppercase tracking-tight transition-colors ${room.available ? "text-emerald-600" : "text-slate-400"}`}>
                     {room.available ? "Available" : "Unavailable"}
                   </span>
                 </label>
 
                 <div className="flex gap-1">
                   <button onClick={() => handleEdit(room)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
-                    <Edit3 size={15} />
+                    <Edit3 size={13} />
                   </button>
                   <button onClick={() => setDeletingRoom(room)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Delete">
-                    <Trash2 size={15} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="pt-3">
+        <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full text-left sm:w-auto">
+            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
+              Room Directory
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
+              Showing {visibleRoomStart}-{visibleRoomEnd} of {filteredRooms.length} rooms
+            </p>
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPageSafe === 1}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {visiblePageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold transition ${
+                      currentPageSafe === page
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPageSafe === totalPages}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* --- EDIT MODAL --- */}

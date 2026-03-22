@@ -79,6 +79,11 @@ const Testimonials = () => {
     return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   };
 
+  const truncateText = (text, maxLength = 60) => {
+    if (!text) return "";
+    return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
+  };
+
   const reviewCountLabel = stats.count
     ? `${stats.count} review${stats.count > 1 ? "s" : ""}`
     : "Reviews";
@@ -120,12 +125,12 @@ const Testimonials = () => {
              <div className="relative pt-4">
                 <Quote size={80} className="text-blue-100/50 absolute -top-4 -left-6 -z-10" />
                 <blockquote className="space-y-8">
-                   <p className="text-xl md:text-3xl lg:text-4xl font-serif leading-tight text-slate-900">
-                     {featuredReview?.comment
-                       ? `"${featuredReview.comment}"`
-                       : loading
-                         ? "Loading guest reflections..."
-                         : "No reviews yet. Be the first to share your experience."}
+                   <p className="text-xl md:text-3xl lg:text-4xl font-serif leading-tight text-justify text-slate-900">
+                      {featuredReview?.comment
+                        ? `"${truncateText(featuredReview.comment, 150)}"`
+                        : loading
+                          ? "Loading guest reflections..."
+                          : "No reviews yet. Be the first to share your experience."}
                    </p>
                    
                    <div className="flex items-center gap-4">
@@ -141,7 +146,7 @@ const Testimonials = () => {
                          )}
                       </div>
                       <div>
-                          <div className="text-sm font-bold uppercase tracking-wide text-slate-900">
+                          <div className="text-base font-bold tracking-wide text-slate-900">
                             {featuredReview ? getReviewerName(featuredReview) : "MRH Guest"}
                           </div>
                       </div>
@@ -202,10 +207,10 @@ const Testimonials = () => {
                           />
                         ))}
                       </div>
-                      <p className="text-sm text-slate-600 leading-relaxed mb-3 font-light">
+                      <p className="text-sm text-justify text-slate-600 leading-relaxed mb-3 font-light">
                         "{review.comment}"
                       </p>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <p className="text-[10px] font-bold text-slate-400 tracking-widest">
                         — {getReviewerName(review)}
                       </p>
                     </div>

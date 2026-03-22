@@ -3,6 +3,7 @@ import axios from "axios";
 import { StaffContext } from "../context/StaffContext"; 
 import { Star, User, MessageSquare, Loader2, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import EmptyReviewsState from "../components/EmptyReviewsState";
 
 const AllReviews = () => {
     const [reviews, setReviews] = useState([]);
@@ -89,8 +90,8 @@ const AllReviews = () => {
                 </div>
 
                 {reviews.length === 0 && (
-                    <div className="text-center py-20">
-                        <p className="text-slate-400 font-medium text-lg">No guest reviews yet.</p>
+                    <div className="flex min-h-[320px] items-center justify-center">
+                        <EmptyReviewsState />
                     </div>
                 )}
             </div>

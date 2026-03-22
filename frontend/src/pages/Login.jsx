@@ -1,13 +1,20 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Eye, EyeOff, Loader2, Info, Mail, ShieldCheck, Lock, Phone, UserCircle, ChevronRight, Check, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User, Camera, Eye, EyeOff, Loader2, Info, Mail, ShieldCheck, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../config/firebase";
 // ✅ IMPORT THE COMPONENT
 import VerifyOtp from './VerifyOtp'; 
+import VerifyFirebasePhoneOtp from './VerifyFirebasePhoneOtp';
+import AccountStatusModal from '../components/AccountStatusModal';
+import {
+  consumeDisabledAccountNotice,
+  DEFAULT_DISABLED_ACCOUNT_MESSAGE,
+  isAccountDisabledMessage,
+} from "../utils/accountStatusNotice";
 
 // ✅ VALIDATION CONSTANTS
 const TEXT_SUFFIXES = ["Jr.", "Sr."];
@@ -29,14 +36,23 @@ const Login = () => {
   const [showOtpModal, setShowOtpModal] = useState(false); 
   const [isResetMode, setIsResetMode] = useState(false); 
   const [verifiedOtp, setVerifiedOtp] = useState(''); 
+  const [otpTargetType, setOtpTargetType] = useState('email');
+  const [otpTargetValue, setOtpTargetValue] = useState('');
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [showFirebasePhoneOtpModal, setShowFirebasePhoneOtpModal] = useState(false);
+  const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
+  const [firebasePhoneTarget, setFirebasePhoneTarget] = useState('');
+  const [firebasePhonePurpose, setFirebasePhonePurpose] = useState('');
+  const [phoneIdToken, setPhoneIdToken] = useState('');
+  const recaptchaRef = useRef(null);
 
   // New state for Forgot Password flow
   const [showForgotEmailField, setShowForgotEmailField] = useState(false);
 
   // Error & Success States
-  const [isDisabled, setIsDisabled] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [disabledModalMessage, setDisabledModalMessage] = useState("");
 
   // Form States
   const [email, setEmail] = useState('');
@@ -65,9 +81,26 @@ const Login = () => {
     return err?.response?.data?.message || err?.message || "Google sign-in failed.";
   };
 
+  const openDisabledAccountModal = (message) => {
+    setDisabledModalMessage(message || DEFAULT_DISABLED_ACCOUNT_MESSAGE);
+    setError("");
+    setSuccessMessage("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowForgotEmailField(false);
+  };
+
   useEffect(() => {
     if (token) navigate('/');
   }, [token, navigate]);
+
+  useEffect(() => {
+    const notice = consumeDisabledAccountNotice();
+    if (notice) {
+      openDisabledAccountModal(notice);
+      setState('Login');
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +117,8 @@ const Login = () => {
         if (data.success) {
           localStorage.setItem('token', data.token);
           setToken(data.token);
+        } else if (isAccountDisabledMessage(data.message)) {
+          openDisabledAccountModal(data.message);
         } else {
           setError(data.message || "Google sign-in failed.");
         }
@@ -101,13 +136,15 @@ const Login = () => {
   }, [backendUrl, setToken]);
 
   useEffect(() => {
-    setIsDisabled(false);
     setError("");
     setSuccessMessage("");
     setIsEmailVerified(false);
+    setIsPhoneVerified(false);
     setShowVerificationNag(false);
     setIsAccountTaken(false);
     setIsPhoneFieldTaken(false); // Reset
+    setOtpTargetType('email');
+    setOtpTargetValue('');
     
     if (state !== 'Reset Password') {
         setIsResetMode(false);
@@ -199,35 +236,147 @@ const Login = () => {
 
   const formatPhone = (val) => val.replace(/\D/g, '');
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (value) => /^(09)\d{9}$/.test(value);
+
+  const ensureRecaptcha = async () => {
+    if (recaptchaRef.current) return recaptchaRef.current;
+
+    recaptchaRef.current = new RecaptchaVerifier(auth, "login-recaptcha-container", {
+      size: "invisible",
+    });
+
+    await recaptchaRef.current.render();
+    return recaptchaRef.current;
+  };
+
+  const sendFirebasePhoneOtp = async ({ targetPhone, purpose }) => {
+    const normalizedPhone = formatPhone(targetPhone);
+
+    if (!validatePhone(normalizedPhone)) {
+      const message = "Please enter a valid 11-digit phone number.";
+      setError(message);
+      return { success: false, message };
+    }
+
+    if (purpose === 'signup' && isPhoneFieldTaken) {
+      const message = "This phone number is already registered to another account.";
+      setError(message);
+      return { success: false, message };
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      if (purpose === 'reset') {
+        const { data } = await axios.post(`${backendUrl}/api/user/request-phone-reset`, {
+          phone: normalizedPhone,
+        });
+
+        if (!data.success) {
+          setError(data.message || "No account found with this phone number.");
+          return { success: false, message: data.message };
+        }
+
+        setIsResetMode(true);
+      }
+
+      const verifier = await ensureRecaptcha();
+      const confirmation = await signInWithPhoneNumber(auth, `+63${normalizedPhone.slice(1)}`, verifier);
+
+      setFirebaseConfirmation(confirmation);
+      setFirebasePhoneTarget(normalizedPhone);
+      setFirebasePhonePurpose(purpose);
+      setPhoneIdToken('');
+      setShowFirebasePhoneOtpModal(true);
+
+      if (purpose === 'signup') {
+        setPhone(normalizedPhone);
+        setIsPhoneVerified(false);
+      }
+
+      return { success: true };
+    } catch (err) {
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
+
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Could not send code. Please try again.";
+
+      setError(message);
+      return { success: false, message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyFirebasePhoneCode = async (otpCode) => {
+    if (!firebaseConfirmation) {
+      return { success: false, message: "Please request a new OTP." };
+    }
+
+    try {
+      const result = await firebaseConfirmation.confirm(otpCode);
+      const idToken = await result.user.getIdToken(true);
+
+      if (firebasePhonePurpose === 'signup') {
+        setPhoneIdToken(idToken);
+        setIsPhoneVerified(true);
+        setShowVerificationNag(false);
+      } else {
+        setPhoneIdToken(idToken);
+        setVerifiedOtp('');
+        setShowForgotEmailField(false);
+        setError("");
+        setTimeout(() => setState('Reset Password'), 50);
+      }
+
+      await signOut(auth);
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        message:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to verify phone number.",
+      };
+    }
+  };
 
   const handleVerifyClick = async (type = 'default') => {
+    if (type === 'phone') {
+      return sendFirebasePhoneOtp({ targetPhone: phone, purpose: 'signup' });
+    }
+
     const targetValue = (type === 'phone') ? phone : email;
     const isEmail = validateEmail(targetValue);
-    const isPhone = /^(09)\d{9}$/.test(targetValue);
+    const nextTargetType = 'email';
 
     // Block if the specific input being verified is already taken
     if (state === 'Sign Up') {
-      if (type === 'phone' && isPhoneFieldTaken) return;
       if (type === 'default' && isAccountTaken) return;
     }
 
     if (state === 'Sign Up' && type === 'default' && !isEmail) {
       return setError("Registration requires a valid email address.");
     }
-
-    if (state === 'Sign Up' && type === 'phone' && !isPhone) {
-      return setError("Please enter a valid 11-digit phone number (09XXXXXXXXX).");
-    }
     
     setError("");
     setLoading(true);
     try {
-      const endpoint = isEmail ? '/api/user/send-otp' : '/api/user/send-phone-otp';
-      const payload = isEmail ? { email: targetValue } : { phone: targetValue };
+      const endpoint = '/api/user/send-otp';
+      const payload = { email: targetValue };
       const { data } = await axios.post(backendUrl + endpoint, payload);
       
       if (data.success) {
         if (showForgotEmailField) setIsResetMode(true);
+        setOtpTargetType(nextTargetType);
+        setOtpTargetValue(targetValue);
         setShowOtpModal(true);
       } else {
         setError(data.message);
@@ -243,18 +392,29 @@ const Login = () => {
   
   const handleForgotPassword = async () => {
     const isEmail = validateEmail(email);
-    const isPhone = /^(09)\d{9}$/.test(email);
+    const isPhone = validatePhone(email);
     if (!isEmail && !isPhone) return setError("Please enter a valid email or 11-digit phone number.");
     
     setError("");
+
+    if (isPhone) {
+      const result = await sendFirebasePhoneOtp({ targetPhone: email, purpose: 'reset' });
+      if (result?.success) {
+        setShowForgotEmailField(false);
+      }
+      return;
+    }
+
     setLoading(true);
     try {
-      const endpoint = isEmail ? '/api/user/request-reset' : '/api/user/request-phone-reset'; 
-      const payload = isEmail ? { email } : { phone: email };
+      const endpoint = '/api/user/request-reset'; 
+      const payload = { email };
       const { data } = await axios.post(backendUrl + endpoint, payload);
       
       if (data.success) {
         setIsResetMode(true);
+        setOtpTargetType('email');
+        setOtpTargetValue(email);
         setShowOtpModal(true);
         setShowForgotEmailField(false); 
       } else {
@@ -267,27 +427,52 @@ const Login = () => {
     }
   };
 
+  const handleOtpResend = async () => {
+    const targetValue = otpTargetValue || (otpTargetType === 'phone' ? phone : email);
+    const isPhoneTarget = otpTargetType === 'phone';
+    const endpoint = isResetMode
+      ? (isPhoneTarget ? '/api/user/request-phone-reset' : '/api/user/request-reset')
+      : (isPhoneTarget ? '/api/user/send-phone-otp' : '/api/user/send-otp');
+    const payload = isPhoneTarget ? { phone: targetValue } : { email: targetValue };
+    const { data } = await axios.post(backendUrl + endpoint, payload);
+    return data;
+  };
+
   const handleResetSubmit = async (e) => {
     e.preventDefault();
     if (password !== confirmPassword) return setError("Passwords do not match!");
     if (password.length < 8) return setError("Password must be at least 8 characters");
-    if (!verifiedOtp) return setError("Verification code missing.");
+
+    const resetIdentifier = email.trim();
+    const isPhoneReset = validatePhone(resetIdentifier);
+    if (isPhoneReset && !phoneIdToken) return setError("Phone verification missing.");
+    if (!isPhoneReset && !verifiedOtp) return setError("Verification code missing.");
 
     setLoading(true);
     try {
-      const { data } = await axios.post(backendUrl + '/api/user/reset-password', {
-        email: email.toLowerCase().trim(),
-        otp: String(verifiedOtp).trim(),
-        newPassword: password
-      });
+      const payload = {
+        identifier: resetIdentifier,
+        newPassword: password,
+      };
+
+      if (isPhoneReset) {
+        payload.phoneIdToken = phoneIdToken;
+      } else {
+        payload.otp = String(verifiedOtp).trim();
+      }
+
+      const { data } = await axios.post(backendUrl + '/api/user/reset-password', payload);
       
       if (data.success) {
-        toast.success("Password reset successful!");
         setSuccessMessage("Password reset successful! You can now log in.");
         setState('Login');
         setPassword('');
         setConfirmPassword('');
         setVerifiedOtp(''); 
+        setPhoneIdToken('');
+        setFirebaseConfirmation(null);
+        setFirebasePhoneTarget('');
+        setFirebasePhonePurpose('');
         setError("");
       } else {
         setError(data.message);
@@ -310,6 +495,8 @@ const Login = () => {
       if (data.success) {
         localStorage.setItem('token', data.token);
         setToken(data.token);
+      } else if (isAccountDisabledMessage(data.message)) {
+        openDisabledAccountModal(data.message);
       } else {
         setError(data.message || "Google sign-in failed.");
       }
@@ -341,6 +528,10 @@ const Login = () => {
         setShowVerificationNag(true);
         return; 
       }
+      if (!isPhoneVerified) {
+        setShowVerificationNag(true);
+        return;
+      }
       if (suffixError) return setError("Please provide a valid suffix");
       if (password !== confirmPassword) return setError("Passwords do not match!");
       if (password.length < 8) return setError("Password must be at least 8 characters");
@@ -358,12 +549,17 @@ const Login = () => {
         formData.append('email', email);
         formData.append('password', password);
         formData.append('phone', phone);
+        formData.append('phoneIdToken', phoneIdToken);
         if (image) formData.append('image', image);
 
         const { data } = await axios.post(backendUrl + '/api/user/register', formData);
         if (data.success) {
-          toast.success("Registration successful!");
           setState('Login');
+          setPhoneIdToken('');
+          setFirebaseConfirmation(null);
+          setFirebasePhoneTarget('');
+          setFirebasePhonePurpose('');
+          setIsPhoneVerified(false);
         } else {
           setError(data.message);
         }
@@ -372,30 +568,90 @@ const Login = () => {
         if (data.success) {
           localStorage.setItem('token', data.token);
           setToken(data.token);
+        } else if (isAccountDisabledMessage(data.message)) {
+          openDisabledAccountModal(data.message);
         } else {
           setError(data.message);
         }
       }
     } catch (err) {
-      setError("Authentication Failed.");
+      const message = err.response?.data?.message || "Authentication Failed.";
+      if (isAccountDisabledMessage(message)) {
+        openDisabledAccountModal(message);
+      } else {
+        setError("Authentication Failed.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const handleFormSubmit = (e) => {
+    if (state === 'Reset Password') {
+      return handleResetSubmit(e);
+    }
+
+    if (showForgotEmailField) {
+      e.preventDefault();
+      return handleForgotPassword();
+    }
+
+    return onSubmitHandler(e);
+  };
+
   return (
     <div className='min-h-screen bg-[#F4F5F7] flex items-center justify-center p-6 font-sans relative'>
+      <div id="login-recaptcha-container" className="hidden"></div>
+      <AccountStatusModal
+        open={Boolean(disabledModalMessage)}
+        message={disabledModalMessage}
+        onClose={() => setDisabledModalMessage("")}
+      />
+
+      {showFirebasePhoneOtpModal && (
+        <VerifyFirebasePhoneOtp
+          phone={firebasePhoneTarget || phone}
+          onClose={({ verified } = {}) => {
+            setShowFirebasePhoneOtpModal(false);
+            setFirebaseConfirmation(null);
+            setFirebasePhoneTarget('');
+            setFirebasePhonePurpose('');
+            if (!verified && firebasePhonePurpose === 'reset') {
+              setIsResetMode(false);
+              setPhoneIdToken('');
+            }
+          }}
+          onVerify={verifyFirebasePhoneCode}
+          onResend={() =>
+            sendFirebasePhoneOtp({
+              targetPhone: firebasePhoneTarget || phone,
+              purpose: firebasePhonePurpose,
+            })
+          }
+        />
+      )}
       
       {showOtpModal && (
         <VerifyOtp 
-          email={email} 
-          phone={phone}
+          identifier={otpTargetValue || email}
+          identifierType={otpTargetType}
           backendUrl={backendUrl} 
           isResetMode={isResetMode} 
-          onClose={() => setShowOtpModal(false)} 
+          onResend={handleOtpResend}
+          onClose={() => {
+            setShowOtpModal(false);
+            if (isResetMode && state !== 'Reset Password') {
+              setIsResetMode(false);
+              setVerifiedOtp('');
+            }
+          }} 
           onSuccess={(otpCode) => {
             setVerifiedOtp(otpCode.toString().trim()); 
-            isResetMode ? setTimeout(() => setState('Reset Password'), 50) : setIsEmailVerified(true);
+            if (isResetMode) {
+              setTimeout(() => setState('Reset Password'), 50);
+            } else {
+              setIsEmailVerified(true);
+            }
           }}
         />
       )}
@@ -412,7 +668,7 @@ const Login = () => {
               </p>
             </div>
 
-            <form onSubmit={state === 'Reset Password' ? handleResetSubmit : onSubmitHandler} className='space-y-4'>
+            <form onSubmit={handleFormSubmit} className='space-y-4'>
               {state !== 'Reset Password' && (
                 <>
                   {state === 'Sign Up' && (
@@ -432,11 +688,11 @@ const Login = () => {
                       <div className='grid grid-cols-2 gap-4'>
                         <div className='space-y-1.5'>
                           <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>First Name</label>
-                          <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setFirstName(formatName(e.target.value))} value={firstName} required />
+                          <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setFirstName(formatName(e.target.value))} value={firstName} placeholder="First name" required />
                         </div>
                         <div className='space-y-1.5'>
                           <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>Last Name</label>
-                          <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setLastName(formatName(e.target.value))} value={lastName} required />
+                          <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setLastName(formatName(e.target.value))} value={lastName} placeholder="Last name" required />
                         </div>
                       </div>
 
@@ -457,15 +713,31 @@ const Login = () => {
                           <input 
                             className={`w-full bg-gray-50 border rounded-xl p-3 text-sm outline-none transition-all ${isPhoneFieldTaken ? 'border-red-400 bg-red-50' : 'border-gray-100 focus:border-blue-500'}`}
                             type="tel" 
-                            onChange={(e) => setPhone(formatPhone(e.target.value))} 
+                            onChange={(e) => {
+                              setPhone(formatPhone(e.target.value));
+                              if (state === 'Sign Up') setIsPhoneVerified(false);
+                              setPhoneIdToken('');
+                            }} 
                             value={phone} 
-                            placeholder="09XX-XXX-XXXX" 
+                            placeholder="Phone Number" 
                             required 
                           />
                           {state === 'Sign Up' && phone.length === 11 && !isPhoneFieldTaken && (
                             <button type="button" onClick={() => handleVerifyClick('phone')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight'>Send OTP</button>
                           )}
                         </div>
+
+                        {state === 'Sign Up' && isPhoneVerified && (
+                          <p className='mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600'>
+                            <CheckCircle2 size={12} /> Phone verified
+                          </p>
+                        )}
+
+                        {state === 'Sign Up' && showVerificationNag && !isPhoneVerified && !isPhoneFieldTaken && (
+                          <p className='mt-2 text-[10px] text-amber-600 font-bold flex items-center gap-1 animate-bounce'>
+                            <AlertCircle size={12} /> PLEASE VERIFY PHONE OTP BEFORE SIGNING UP
+                          </p>
+                        )}
                       </div>
                     </>
                   )}
@@ -479,6 +751,8 @@ const Login = () => {
                         onChange={(e) => {
                           const value = e.target.value;
                           const looksLikeEmail = value.includes("@") || /[a-zA-Z]/.test(value);
+                          if (state === 'Sign Up') setIsEmailVerified(false);
+                          if (state !== 'Sign Up') setPhoneIdToken('');
                           if (looksLikeEmail) {
                             setEmail(value);
                             return;
@@ -491,19 +765,41 @@ const Login = () => {
                         required 
                       />
                       
-                      {((state === 'Sign Up' && validateEmail(email)) || (showForgotEmailField && (validateEmail(email) || /^(09)\d{9}$/.test(email)))) && !isEmailVerified && !isAccountTaken && (
+                      {state === 'Sign Up' && validateEmail(email) && !isEmailVerified && !isAccountTaken && (
                         <button type="button" onClick={() => handleVerifyClick('default')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight'>Send OTP</button>
                       )}
-                      
-                      {state === 'Sign Up' && isEmailVerified && (
-                        <div className='absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 text-emerald-500 font-bold text-[10px] uppercase'><Check size={14} /> VERIFIED</div>
-                      )}
                     </div>
+
+                    {state === 'Sign Up' && isEmailVerified && (
+                      <p className='mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600'>
+                        <CheckCircle2 size={12} /> Verified
+                      </p>
+                    )}
+
+                    {state === 'Sign Up' && isAccountTaken && (
+                      <p className='mt-2 text-[10px] font-bold text-red-500 flex items-center gap-1'>
+                        <AlertCircle size={12} /> This email is already registered.
+                      </p>
+                    )}
 
                     {showForgotEmailField && state === 'Login' && (
                       <div className="mt-4 p-5 bg-white border border-gray-100 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400">
                         <div className="grid grid-cols-2 gap-3">
-                          <button type="button" onClick={() => setShowForgotEmailField(false)} className="py-3.5 rounded-xl text-[10px] font-extrabold text-gray-400 border border-gray-100 uppercase tracking-widest">Cancel</button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowForgotEmailField(false);
+                              setIsResetMode(false);
+                              setVerifiedOtp('');
+                              setPhoneIdToken('');
+                              setFirebaseConfirmation(null);
+                              setFirebasePhoneTarget('');
+                              setFirebasePhonePurpose('');
+                            }}
+                            className="py-3.5 rounded-xl text-[10px] font-extrabold text-gray-400 border border-gray-100 uppercase tracking-widest"
+                          >
+                            Cancel
+                          </button>
                           <button type="button" onClick={handleForgotPassword} disabled={loading} className="bg-[#1A2B32] text-white py-3.5 rounded-xl text-[10px] font-extrabold uppercase tracking-widest active:scale-[0.98]">Send Code</button>
                         </div>
                       </div>
@@ -552,7 +848,7 @@ const Login = () => {
                 </div>
               )}
 
-              {error && <p className='text-[11px] text-red-500 font-bold bg-red-50 p-3 rounded-xl border border-red-100 flex items-center gap-2'><AlertCircle size={14}/> {error}</p>}
+              {error && !(state === 'Sign Up' && isAccountTaken && error === "This email is already registered.") && <p className='text-[11px] text-red-500 font-bold bg-red-50 p-3 rounded-xl border border-red-100 flex items-center gap-2'><AlertCircle size={14}/> {error}</p>}
               {successMessage && <p className='text-[11px] text-emerald-600 font-bold bg-emerald-50 p-3 rounded-xl border border-emerald-100 flex items-center gap-2'><CheckCircle2 size={14}/> {successMessage}</p>}
 
               {/* ✅ UPDATED BUTTON DISABLED LOGIC */}

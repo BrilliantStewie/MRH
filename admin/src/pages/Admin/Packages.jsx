@@ -1,5 +1,8 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
 import { AdminContext } from "../../context/AdminContext";
+import { toast } from "react-toastify";
+
+const PACKAGES_PER_PAGE = 8;
 
 const Packages = () => {
   const {
@@ -25,9 +28,14 @@ const roomFilterRef = useRef(null);
   const [editingId, setEditingId] = useState(null);
 
   // Feedback states for custom UI
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   const [confirmDelete, setConfirmDelete] = useState({ show: false, id: null, type: "" });
   const [deleteContext, setDeleteContext] = useState(null);
+  const [editTypeDialog, setEditTypeDialog] = useState({
+    show: false,
+    index: null,
+    originalType: "",
+    value: "",
+  });
 
   // Dropdown States
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
@@ -35,6 +43,8 @@ const roomFilterRef = useRef(null);
 
   const [amenityInput, setAmenityInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedAmenities, setExpandedAmenities] = useState({});
 
   // Refs for closing dropdowns when clicking outside
   const dropdownRef = useRef(null);
@@ -93,16 +103,6 @@ const roomFilterRef = useRef(null);
   document.addEventListener("mousedown", handleClickOutside);
   return () => document.removeEventListener("mousedown", handleClickOutside);
 }, []);
-  /* =========================================
-  FEEDBACK HELPERS
-  ========================================= */
-  const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast((prev) => ({ ...prev, show: false }));
-    }, 3000);
-  };
-
   /* =========================================
   HANDLE INPUT
   ========================================= */
@@ -215,15 +215,12 @@ const roomFilterRef = useRef(null);
 
   const handleEditPackageType = (index, oldType, e) => {
     e.stopPropagation();
-    const editedType = window.prompt("Edit Package Type:", oldType);
-    if (editedType && editedType.trim() !== "" && editedType !== oldType) {
-      const updatedTypes = [...packageTypes];
-      updatedTypes[index] = editedType.trim();
-      setPackageTypes(updatedTypes);
-      if (formData.packageType === oldType) {
-        setFormData({ ...formData, packageType: editedType.trim() });
-      }
-    }
+    setEditTypeDialog({
+      show: true,
+      index,
+      originalType: oldType,
+      value: oldType,
+    });
   };
 
   const handleDeletePackageType = (index, typeToDelete, e) => {
@@ -238,14 +235,14 @@ const roomFilterRef = useRef(null);
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.packageType) {
-      showToast("Please select a package type.", "error");
+      toast.error("Please select a package type.");
       return;
     }
     const isRoomPackage =
       formData.packageType?.toLowerCase() === "room package";
 
     if (isRoomPackage && !formData.roomType) {
-      showToast("Please select a room base for room packages.", "error");
+      toast.error("Please select a room base for room packages.");
       return;
     }
 
@@ -266,7 +263,7 @@ const roomFilterRef = useRef(null);
 
     if (success) {
       handleCloseModal();
-      showToast(editingId ? "Package updated successfully" : "Package created successfully");
+      toast.success(editingId ? "Package updated successfully" : "Package created successfully");
     }
   };
 
@@ -274,10 +271,53 @@ const roomFilterRef = useRef(null);
     setConfirmDelete({ show: true, id, type: "package" });
   };
 
+  const closeEditTypeDialog = () => {
+    setEditTypeDialog({
+      show: false,
+      index: null,
+      originalType: "",
+      value: "",
+    });
+  };
+
+  const proceedWithTypeEdit = () => {
+    const editedType = editTypeDialog.value.trim();
+
+    if (!editedType) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    if (editedType === editTypeDialog.originalType) {
+      closeEditTypeDialog();
+      return;
+    }
+
+    if (packageTypes.includes(editedType)) {
+      toast.error("Category already exists");
+      return;
+    }
+
+    const updatedTypes = [...packageTypes];
+    updatedTypes[editTypeDialog.index] = editedType;
+    setPackageTypes(updatedTypes);
+
+    if (formData.packageType === editTypeDialog.originalType) {
+      setFormData((prev) => ({ ...prev, packageType: editedType }));
+    }
+
+    if (filterPackageType === editTypeDialog.originalType) {
+      setFilterPackageType(editedType);
+    }
+
+    toast.success("Category updated");
+    closeEditTypeDialog();
+  };
+
   const proceedWithDelete = async () => {
     if (confirmDelete.type === "package") {
       const success = await deletePackage(confirmDelete.id);
-      if (success) showToast("Package deleted successfully");
+      if (success) toast.success("Package deleted successfully");
     } else if (confirmDelete.type === "type") {
       const { index, typeToDelete } = deleteContext;
       const updatedTypes = packageTypes.filter((_, i) => i !== index);
@@ -285,7 +325,7 @@ const roomFilterRef = useRef(null);
       if (formData.packageType === typeToDelete) {
         setFormData({ ...formData, packageType: "" });
       }
-      showToast("Category removed");
+      toast.success("Category removed");
     }
     setConfirmDelete({ show: false, id: null, type: "" });
     setDeleteContext(null);
@@ -296,6 +336,8 @@ const roomFilterRef = useRef(null);
   ========================================= */
   const filteredPackages = allPackages.filter((pkg) => {
   const searchLower = searchTerm.toLowerCase();
+  const normalizedPackageFilter = filterPackageType.toLowerCase();
+  const shouldApplyRoomTypeFilter = normalizedPackageFilter === "room package";
   
   // Existing Search Filter
   const matchesSearch = 
@@ -307,82 +349,142 @@ const roomFilterRef = useRef(null);
 
   // Room Type Filter (handle object/ID comparison)
   const pkgRoomId = String(pkg.roomType?._id || pkg.roomType || "");
-  const matchesRoomType = filterRoomType === "All" || pkgRoomId === filterRoomType;
+  const matchesRoomType =
+    !shouldApplyRoomTypeFilter || filterRoomType === "All" || pkgRoomId === filterRoomType;
 
   return matchesSearch && matchesPkgType && matchesRoomType;
 });
+
+  const showRoomTypeFilter = filterPackageType.toLowerCase() === "room package";
+
+  useEffect(() => {
+    if (!showRoomTypeFilter) {
+      setFilterRoomType("All");
+      setIsRoomFilterOpen(false);
+    }
+  }, [showRoomTypeFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterPackageType, filterRoomType]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPackages.length / PACKAGES_PER_PAGE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const visiblePageCount = Math.min(4, totalPages);
+  const halfVisiblePageCount = Math.floor(visiblePageCount / 2);
+  let visiblePageStart = Math.max(1, currentPageSafe - halfVisiblePageCount);
+  let visiblePageEnd = visiblePageStart + visiblePageCount - 1;
+
+  if (visiblePageEnd > totalPages) {
+    visiblePageEnd = totalPages;
+    visiblePageStart = Math.max(1, visiblePageEnd - visiblePageCount + 1);
+  }
+
+  const visiblePageNumbers = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, index) => visiblePageStart + index
+  );
+  const paginatedPackages = filteredPackages.slice(
+    (currentPageSafe - 1) * PACKAGES_PER_PAGE,
+    currentPageSafe * PACKAGES_PER_PAGE
+  );
+  const visiblePackageStart =
+    filteredPackages.length === 0 ? 0 : (currentPageSafe - 1) * PACKAGES_PER_PAGE + 1;
+  const visiblePackageEnd = Math.min(
+    currentPageSafe * PACKAGES_PER_PAGE,
+    filteredPackages.length
+  );
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const toggleAmenitiesExpansion = (packageId) => {
+    setExpandedAmenities((prev) => ({
+      ...prev,
+      [packageId]: !prev[packageId],
+    }));
+  };
 
   /* =========================================
   UI CLASSES
   ========================================= */
   const inputClass =
-    "w-full bg-gray-50/50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all placeholder:text-gray-400 hover:bg-gray-50";
-  const labelClass = "text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block";
+    "w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50";
+  const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500";
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 bg-gray-50 min-h-screen font-sans text-gray-900 relative">
+    <div className="flex flex-col bg-slate-50 font-sans text-slate-900">
+      <div className="flex flex-1 flex-col">
 
       {/* HEADER SECTION */}
-<div className="flex flex-col gap-6">
+<div className="mb-4 flex flex-col gap-3">
   {/* Title Row */}
-  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
     <div>
-      <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900">
         Packages
       </h1>
-      <p className="text-gray-500 mt-2 text-sm max-w-md">
+      <p className="mt-1 text-xs text-slate-500">
         Design and manage your service offerings, room inclusions, and custom venue bundles.
       </p>
     </div>
-    
-    <button
-      onClick={handleOpenAddModal}
-      className="bg-black hover:bg-gray-800 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition-all shadow-md active:scale-95 w-full md:w-auto"
-    >
-      + Create Package
-    </button>
+
+    <div className="flex w-full flex-col items-end md:w-auto">
+      <button
+        onClick={handleOpenAddModal}
+        className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
+      >
+        + Add Package
+      </button>
+    </div>
   </div>
 
- <div className="flex items-center justify-between">
+ <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between">
 
   {/* SEARCH */}
-<div className="bg-white px-4 py-3 rounded-2xl border border-gray-200 shadow-sm w-full md:w-72">
+<div className="w-full rounded-xl border border-slate-200 bg-white px-4 shadow-sm lg:flex lg:h-[46px] lg:max-w-[294px] lg:items-center">
   <input
     type="text"
     placeholder="Search packages..."
     value={searchTerm}
     onChange={(e) => setSearchTerm(e.target.value)}
-    className="w-full text-sm bg-transparent outline-none placeholder-gray-400"
+    className="w-full bg-transparent py-2.5 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
   />
 </div>
 
-  <div className="bg-white p-3 rounded-2xl border border-gray-200/60 shadow-sm flex gap-2 items-center">
+  <div className="flex flex-wrap items-center gap-3 lg:ml-auto lg:justify-end">
 
   {/* PACKAGE TYPE FILTER */}
 <div ref={packageFilterRef} className="relative">
   <button
     onClick={() => setIsPackageFilterOpen(!isPackageFilterOpen)}
-    className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 hover:bg-gray-100"
+    className="flex h-[46px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100"
   >
-    {/* Update this line to show "All Types" instead of just "All" */}
-    {filterPackageType === "All" ? "All Types" : filterPackageType}
-    <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    {filterPackageType === "All" ? "Package Types" : filterPackageType}
+    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
     </svg>
   </button>
 
   {isPackageFilterOpen && (
-    <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-lg p-2 z-50">
-      
+    <div className="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl animate-in fade-in zoom-in-95 duration-200">
       <div
         onClick={() => {
           setFilterPackageType("All");
           setIsPackageFilterOpen(false);
         }}
-        className="px-3 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm"
+        className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-bold text-slate-400 cursor-pointer hover:bg-slate-100"
       >
-        All Types
+        <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+        All Package Types
       </div>
+
+      <div className="mx-1 my-1.5 h-px bg-slate-100" />
 
       {packageTypes.map(t => (
         <div
@@ -391,7 +493,7 @@ const roomFilterRef = useRef(null);
             setFilterPackageType(t);
             setIsPackageFilterOpen(false);
           }}
-          className="px-3 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm"
+          className="cursor-pointer rounded-lg px-4 py-3.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
         >
           {t}
         </div>
@@ -402,32 +504,40 @@ const roomFilterRef = useRef(null);
 
 
   {/* ROOM FILTER */}
+  {showRoomTypeFilter && (
   <div ref={roomFilterRef} className="relative">
     <button
       onClick={() => setIsRoomFilterOpen(!isRoomFilterOpen)}
-      className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold text-gray-700 flex items-center gap-2 hover:bg-gray-100"
+      className="flex h-[46px] min-w-[190px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100"
     >
-      {filterRoomType === "All"
-        ? "All Rooms"
-        : roomTypes.find(r => r._id === filterRoomType)?.name}
+      <span className="truncate">
+        {filterRoomType === "All"
+          ? "Room Types"
+          : roomTypes.find((r) => String(r._id) === String(filterRoomType))?.name}
+      </span>
 
-      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
       </svg>
     </button>
 
     {isRoomFilterOpen && (
-      <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-100 rounded-xl shadow-lg p-2 z-50">
+      <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl animate-in fade-in zoom-in-95 duration-200">
 
         <div
           onClick={() => {
             setFilterRoomType("All");
             setIsRoomFilterOpen(false);
           }}
-          className="px-3 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm"
+          className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-bold text-slate-400 cursor-pointer hover:bg-slate-100"
         >
-          All Rooms
+          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M5 19h14a1 1 0 001-1V8a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1z" />
+          </svg>
+          All Room Types
         </div>
+
+        <div className="mx-1 my-1.5 h-px bg-slate-100" />
 
         {roomTypes.map(rt => (
           <div
@@ -436,7 +546,7 @@ const roomFilterRef = useRef(null);
               setFilterRoomType(rt._id);
               setIsRoomFilterOpen(false);
             }}
-            className="px-3 py-2 rounded-lg hover:bg-gray-100 cursor-pointer text-sm"
+            className="cursor-pointer rounded-lg px-4 py-3.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
           >
             {rt.name}
           </div>
@@ -445,6 +555,7 @@ const roomFilterRef = useRef(null);
       </div>
     )}
   </div>
+  )}
 
 
   {/* RESET */}
@@ -454,9 +565,17 @@ const roomFilterRef = useRef(null);
       setFilterPackageType("All");
       setFilterRoomType("All");
     }}
-    className="text-xs font-bold text-gray-400 hover:text-red-500 px-2 transition-colors"
+    type="button"
+    title="Reset filters"
+    aria-label="Reset filters"
+    className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-red-500"
   >
-    Reset
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 20v-5h-5" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.6 13.2A7 7 0 0017 17.4L20 15" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.4 10.8A7 7 0 007 6.6L4 9" />
+    </svg>
   </button>
 
 </div>
@@ -466,117 +585,172 @@ const roomFilterRef = useRef(null);
 
       {/* COMPACT CARDS GRID */}
       {filteredPackages.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200/60 py-20 flex flex-col items-center justify-center space-y-3 shadow-sm">
-          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-2">
-            <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
+        <div className="flex flex-col items-center justify-center space-y-3 rounded-2xl border border-slate-200 bg-white py-20 shadow-sm">
+          <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-slate-50">
+            <svg className="h-8 w-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
           </div>
-          <p className="text-gray-500 font-semibold text-lg">No packages found</p>
-          <p className="text-gray-400 text-sm">Try adjusting your search or create a new one.</p>
+          <p className="text-lg font-semibold text-slate-500">No packages found</p>
+          <p className="text-sm text-slate-400">Try adjusting your search or create a new one.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredPackages.map((pkg) => {
+        <div className="flex flex-1 flex-col gap-2.5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {paginatedPackages.map((pkg) => {
             const roomId = pkg.roomType?._id || pkg.roomType;
             const localRoomTypeMatch = roomTypes.find((rt) => String(rt._id) === String(roomId));
             const roomName = localRoomTypeMatch ? localRoomTypeMatch.name : (pkg.roomType?.name || "No rooms added");
             const pkgAmenities = Array.isArray(pkg.amenities) ? pkg.amenities : [];
+            const amenitiesExpanded = Boolean(expandedAmenities[pkg._id]);
+            const visibleAmenities = amenitiesExpanded ? pkgAmenities : pkgAmenities.slice(0, 2);
 
-            const pType = (pkg.packageType || "").toLowerCase();
-            let theme = {
-              headerBg: "bg-gradient-to-br from-blue-50/80 to-indigo-50/80",
-              borderColor: "border-blue-100/60",
-              hoverBorder: "hover:border-blue-300",
-              titleColor: "text-blue-950",
-              priceColor: "text-blue-700",
-              badge: "bg-white text-blue-700 border-blue-200",
+            const theme = {
+              cardBg: "bg-white",
+              headerBg: "bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90",
+              borderColor: "border-slate-200",
+              hoverBorder: "hover:border-slate-300",
+              titleColor: "text-slate-900",
+              priceColor: "text-slate-900",
+              badge: "border-slate-200 bg-white text-slate-700",
+              subText: "text-slate-500",
+              divider: "border-gray-100",
+              amenity: "border-gray-100 bg-gray-50 text-gray-600",
             };
-
-            if (pType.includes("room")) {
-              theme = {
-                headerBg: "bg-gradient-to-br from-emerald-50/80 to-teal-50/80",
-                borderColor: "border-emerald-100/60",
-                hoverBorder: "hover:border-emerald-300",
-                titleColor: "text-emerald-950",
-                priceColor: "text-emerald-700",
-                badge: "bg-white text-emerald-700 border-emerald-200",
-              };
-            } else if (pType.includes("venue")) {
-              theme = {
-                headerBg: "bg-gradient-to-br from-gray-50 to-slate-100/80",
-                borderColor: "border-slate-200/60",
-                hoverBorder: "hover:border-slate-400",
-                titleColor: "text-slate-900",
-                priceColor: "text-slate-800",
-                badge: "bg-white text-slate-700 border-slate-200",
-              };
-            }
 
             return (
               <div
                 key={pkg._id}
-                className={`group relative bg-white rounded-xl border ${theme.borderColor} shadow-sm transition-all duration-200 flex flex-col overflow-hidden ${theme.hoverBorder}`}
+                className={`group relative flex min-h-[218px] flex-col overflow-hidden rounded-lg border shadow-sm transition-all duration-200 ${theme.cardBg} ${theme.borderColor} ${theme.hoverBorder}`}
               >
-                <div className={`p-4 ${theme.headerBg} border-b ${theme.borderColor} relative`}>
-                  <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className={`relative border-b p-2 ${theme.headerBg} ${theme.borderColor}`}>
+                  <div className="absolute right-2.5 top-2.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
                       onClick={() => handleOpenEditModal(pkg)}
-                      className="p-1.5 text-gray-500 bg-white/90 rounded-md border border-gray-200 hover:text-blue-600 shadow-sm"
+                      className="rounded-md border border-gray-200 bg-white/90 p-1 text-gray-500 shadow-sm hover:text-blue-600"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </button>
                     <button
-  onClick={(e) => {
-    e.stopPropagation();
-    handleDeleteTrigger(pkg._id);
-  }}
-  className="p-1.5 text-gray-500 bg-white/90 rounded-md border border-gray-200 hover:text-red-600 shadow-sm"
->
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTrigger(pkg._id);
+                      }}
+                      className="rounded-md border border-gray-200 bg-white/90 p-1 text-gray-500 shadow-sm hover:text-red-600"
+                    >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   </div>
 
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border mb-2 ${theme.badge}`}>
-                    {pkg.packageType}
-                  </span>
+                  <div className="mb-1 pr-7">
+                    <h3 className={`text-[17px] font-bold leading-tight ${theme.titleColor} line-clamp-1`}>
+                      {pkg.name}
+                    </h3>
 
-                  <h3 className={`text-base font-bold ${theme.titleColor} leading-tight mb-2 pr-8 line-clamp-1`}>
-                    {pkg.name}
-                  </h3>
+                    <div className="mt-1.5 flex items-center justify-between gap-2">
+                      <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${theme.badge}`}>
+                        {pkg.packageType}
+                      </span>
 
-                  <div className="flex items-baseline">
-                    <span className={`text-xs font-bold ${theme.priceColor} opacity-70 mr-0.5`}>₱</span>
-                    <span className={`text-xl font-black ${theme.priceColor} tracking-tight`}>
-                      {Number(pkg.price).toLocaleString()}
-                    </span>
+                      <div className="flex items-baseline justify-end">
+                        <span className={`mr-1 text-[9px] font-bold ${theme.priceColor} opacity-60`}>₱</span>
+                        <span className={`text-[15px] font-black tracking-tight ${theme.priceColor}`}>
+                          {Number(pkg.price).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div className="p-4 flex flex-col flex-grow bg-white">
-                  <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-50">
-                    <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                    <span className={`text-[11px] truncate ${roomName !== "No room selected" ? "font-bold text-gray-600" : "text-gray-400 italic"}`}>
+                <div className="flex flex-grow flex-col p-2">
+                  <div className="mb-1 flex items-center gap-1.5">
+                    <svg className="h-3 w-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                    <span className={`truncate text-[10px] ${roomName !== "No room selected" ? "font-bold text-gray-600" : "italic text-gray-400"}`}>
                       {roomName}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-gray-500 leading-normal mb-4 flex-grow line-clamp-2">
-                    {pkg.description || "No additional details provided."}
-                  </p>
+                  <div className="mb-1.5 flex-grow rounded-lg border border-gray-100 bg-gray-50/70 px-2 py-1.5">
+                    <p className={`text-[9px] leading-relaxed ${theme.subText} line-clamp-2`}>
+                      {pkg.description || "No additional details provided."}
+                    </p>
+                  </div>
 
-                  <div className="flex flex-wrap gap-1">
-                    {pkgAmenities.slice(0, 3).map((am, i) => (
-                      <div key={i} className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 rounded border border-gray-100">
-                        <span className="text-[9px] font-bold text-gray-600 uppercase tracking-tight">{am}</span>
+                  <div className="flex min-h-[28px] flex-wrap content-start gap-1">
+                    {visibleAmenities.map((am, i) => (
+                      <div key={i} className={`flex items-center gap-1 rounded border px-1.5 py-0.5 ${theme.amenity}`}>
+                        <span className="text-[8px] font-bold uppercase tracking-tight">{am}</span>
                       </div>
                     ))}
-                    {pkgAmenities.length > 3 && (
-                      <span className="text-[9px] font-bold text-gray-400 px-1 pt-0.5">+{pkgAmenities.length - 3} MORE</span>
+                    {pkgAmenities.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={() => toggleAmenitiesExpansion(pkg._id)}
+                        className="px-1 pt-0.5 text-[8px] font-bold text-gray-400 transition-colors hover:text-gray-700"
+                      >
+                        {amenitiesExpanded ? "SHOW LESS" : `+${pkgAmenities.length - 2} MORE`}
+                      </button>
                     )}
                   </div>
                 </div>
               </div>
             );
           })}
+          </div>
+
+          <div className="mt-4">
+            <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-gray-400">
+                  Package Directory
+                </p>
+                <p className="mt-0.5 text-[11px] font-semibold text-gray-700 sm:text-xs">
+                  Showing {visiblePackageStart}-{visiblePackageEnd} of {filteredPackages.length} packages
+                </p>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                  <button
+                    type="button"
+                    aria-label="Previous page"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPageSafe === 1}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-700 disabled:cursor-not-allowed disabled:border-gray-100 disabled:text-gray-300"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+
+                  {visiblePageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`min-w-8 rounded-md px-2.5 py-1.5 text-[9px] font-bold transition ${
+                        currentPageSafe === page
+                          ? "bg-black text-white shadow-sm"
+                          : "border border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    aria-label="Next page"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPageSafe === totalPages}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-700 disabled:cursor-not-allowed disabled:border-gray-100 disabled:text-gray-300"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -602,27 +776,46 @@ const roomFilterRef = useRef(null);
               </button>
             </div>
 
-            <div className="p-6 max-h-[60vh] overflow-y-auto bg-white">
-              <form id="package-form" onSubmit={handleSubmit} className="space-y-5">
+            <div className="max-h-[65vh] overflow-y-auto bg-white p-6">
+              <form id="package-form" onSubmit={handleSubmit} className="space-y-4">
 
-                <div>
-                  <label className={labelClass}>Package Name</label>
-                  <input
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    placeholder="e.g., Ultimate Honeymoon Suite"
-                    className={inputClass}
-                    required
-                  />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={labelClass}>Package Name</label>
+                    <input
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="e.g., Ultimate Honeymoon Suite"
+                      className={inputClass}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelClass}>Price Base (₱)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-2.5 text-sm font-medium text-gray-400">₱</span>
+                      <input
+                        type="number"
+                        name="price"
+                        min="0"
+                        value={formData.price}
+                        onChange={handleChange}
+                        placeholder="0.00"
+                        className={`${inputClass} pl-14`}
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
                   <div className="relative" ref={dropdownRef}>
                     <label className={labelClass}>Package Type</label>
                     <div
                       onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                      className={`${inputClass} cursor-pointer flex justify-between items-center select-none ${!formData.packageType && "text-gray-400"}`}
+                      className={`${inputClass} flex cursor-pointer items-center justify-between select-none ${!formData.packageType && "text-gray-400"}`}
                     >
                       {formData.packageType || "Select Type"}
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${isTypeDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -690,7 +883,7 @@ const roomFilterRef = useRef(null);
                           setIsRoomDropdownOpen(!isRoomDropdownOpen);
                         }
                       }}
-                      className={`${inputClass} flex justify-between items-center select-none 
+                      className={`${inputClass} flex items-center justify-between select-none 
 ${formData.packageType?.toLowerCase() !== "room package" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
 ${!formData.roomType && "text-gray-400"}`}
                     >
@@ -732,76 +925,66 @@ ${!formData.roomType && "text-gray-400"}`}
                   </div>
                 </div>
 
-                <div>
-                  <label className={labelClass}>Price Base (₱)</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-2.5 text-gray-400 font-medium">₱</span>
-                    <input
-                      type="number"
-                      name="price"
-                      min="0"
-                      value={formData.price}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+                  <div>
+                    <label className={labelClass}>Description</label>
+                    <textarea
+                      name="description"
+                      value={formData.description}
                       onChange={handleChange}
-                      placeholder="0.00"
-                      className={`${inputClass} pl-8`}
-                      required
+                      rows="5"
+                      className={`${inputClass} min-h-[132px] resize-none py-3`}
                     />
                   </div>
-                </div>
 
-                <div className="bg-gray-50/50 border border-gray-200 rounded-xl p-3">
-                  <label className={labelClass}>Included Amenities</label>
-                  <div className="flex gap-2 mb-1.5">
-                    <input
-                      type="text"
-                      value={amenityInput}
-                      onChange={(e) => setAmenityInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddAmenity();
-                        }
-                      }}
-                      placeholder="Type an amenity and press Enter..."
-                      className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddAmenity}
-                      className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
-                    >
-                      Add
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {formData.amenities.map((amenity, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-100/50 text-blue-800 border border-blue-200/50"
+                  <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3">
+                    <label className={labelClass}>Included Amenities</label>
+                    <div className="mb-2 flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={amenityInput}
+                        onChange={(e) => setAmenityInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddAmenity();
+                          }
+                        }}
+                        placeholder="Type an amenity and press Enter..."
+                        className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddAmenity}
+                        className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                       >
-                        {amenity}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAmenity(amenity)}
-                          className="text-blue-400 hover:text-red-500 font-bold ml-0.5"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                        Add
+                      </button>
+                    </div>
 
-                <div>
-                  <label className={labelClass}>Description</label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows="2"
-                    className={`${inputClass} resize-none`}
-                  />
+                    <div className="flex min-h-[132px] flex-wrap content-start gap-1.5 rounded-lg border border-dashed border-gray-200 bg-white/70 p-2.5">
+                      {formData.amenities.map((amenity, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 rounded-md border border-blue-200/50 bg-blue-100/50 px-2.5 py-1 text-xs font-semibold text-blue-800"
+                        >
+                          {amenity}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAmenity(amenity)}
+                            className="ml-0.5 font-bold text-blue-400 hover:text-red-500"
+                          >
+                            x
+                          </button>
+                        </span>
+                      ))}
+                      {formData.amenities.length === 0 && (
+                        <span className="text-xs font-medium text-gray-400">
+                          No amenities added yet.
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </form>
             </div>
@@ -857,13 +1040,81 @@ ${!formData.roomType && "text-gray-400"}`}
         </div>
       )}
 
+      {editTypeDialog.show && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/50 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.55)]">
+            <div className="px-6 py-6">
+              <div className="mb-5 flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-400">
+                    Edit Category
+                  </p>
+                  <h3 className="mt-1 text-lg font-black tracking-tight text-slate-900">
+                    Rename package type
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                    Update the category label used for package organization.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.16em] text-blue-500">
+                  Category Name
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={editTypeDialog.value}
+                  onChange={(e) =>
+                    setEditTypeDialog((prev) => ({
+                      ...prev,
+                      value: e.target.value,
+                    }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      proceedWithTypeEdit();
+                    }
+                  }}
+                  className="w-full rounded-2xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-all focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={closeEditTypeDialog}
+                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-slate-500 transition-all hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={proceedWithTypeEdit}
+                className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CUSTOM TOAST FEEDBACK */}
-      {toast.show && (
+      {false && (
         <div className="fixed bottom-6 right-6 z-[200] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border bg-white border-gray-100 animate-in slide-in-from-right duration-300">
           <div className={`w-2 h-2 rounded-full ${toast.type === 'success' ? 'bg-emerald-400' : 'bg-red-400'}`} />
           <span className="text-xs font-bold text-gray-700 tracking-tight">{toast.message}</span>
           <button
-            onClick={() => setToast({ ...toast, show: false })}
+            onClick={() => {}}
             className="ml-2 text-gray-400 hover:text-gray-600 text-xs"
           >
             ✕
@@ -871,6 +1122,7 @@ ${!formData.roomType && "text-gray-400"}`}
         </div>
       )}
 
+      </div>
     </div>
   );
 };

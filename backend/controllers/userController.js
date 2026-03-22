@@ -64,6 +64,34 @@ const buildPhoneCandidates = (value) => {
     return Array.from(candidates);
 };
 
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const verifyFirebasePhoneToken = async (idToken) => {
+    if (!idToken) {
+        throw new Error("Missing Firebase phone verification token");
+    }
+
+    initFirebaseAdmin();
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    const signInProvider = decoded.firebase?.sign_in_provider;
+
+    if (signInProvider && signInProvider !== "phone") {
+        throw new Error("Invalid phone verification token");
+    }
+
+    const phoneNumber = decoded.phone_number;
+    if (!phoneNumber) {
+        throw new Error("Phone number not found in token");
+    }
+
+    const normalizedPhone = normalizePHPhone(phoneNumber);
+    if (!isValidPHPhone(normalizedPhone)) {
+        throw new Error("Invalid Philippine phone number");
+    }
+
+    return { decoded, normalizedPhone };
+};
+
 const streamUpload = (fileBuffer) => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -113,7 +141,8 @@ const sendOTP = async (req, res) => {
                 firstName: "Pending",
                 lastName: "Verification",
                 password: dummyPassword,
-                phone: "0000000000",
+                passwordSet: false,
+                phone: null,
                 isVerified: false
             });
             await user.save();
@@ -214,20 +243,79 @@ const requestPasswordReset = async (req, res) => {
     }
 };
 
+const sendEmailChangeOTP = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const normalizedEmail = normalizeEmail(req.body.email);
+
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        const currentEmail = normalizeEmail(user.email);
+        if (normalizedEmail === currentEmail) {
+            return res.json({ success: false, message: "Please enter a different email address" });
+        }
+
+        const existingUser = await userModel.findOne({
+            email: normalizedEmail,
+            _id: { $ne: userId }
+        });
+
+        if (existingUser) {
+            return res.json({ success: false, message: "Email already taken" });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000;
+
+        user.pendingEmail = normalizedEmail;
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        await user.save();
+
+        await sendEmail(
+            normalizedEmail,
+            "Confirm your new email address",
+            `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                    <p>Use this code to confirm your new email address:</p>
+                    <p style="font-size: 20px; font-weight: 700; letter-spacing: 2px;">${otp}</p>
+                    <p>This code expires in 10 minutes.</p>
+                    <p>If you did not request this change, you can ignore this email.</p>
+                    <p>Mercedarian Retreat House</p>
+                </div>
+            `
+        );
+
+        res.json({ success: true, message: "OTP sent to your new email address" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 // ✅ Handle Password Reset Request (Phone)
 const requestPhoneReset = async (req, res) => {
     try {
         const { phone } = req.body;
         const normalizedPhone = normalizePHPhone(phone);
-        const user = await userModel.findOne({ phone: normalizedPhone });
+
+        if (!isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        const user = await userModel.findOne({
+            phone: { $in: buildPhoneCandidates(normalizedPhone) }
+        });
 
         if (!user) {
             return res.json({ success: false, message: "No account found with this phone number" });
         }
 
-        req.body.phone = normalizedPhone;
-        req.body.isResetMode = true;
-        return sendPhoneOTP(req, res);
+        return res.json({ success: true, message: "Phone account found" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -275,26 +363,9 @@ const sendPhoneOTPUpdate = async (req, res) => {
 
 const verifyPhoneFirebase = async (req, res) => {
     try {
-        const userId = req.userId;
         const { idToken } = req.body;
-
-        if (!idToken) {
-            return res.json({ success: false, message: "Missing Firebase token" });
-        }
-
-        initFirebaseAdmin();
-        const decoded = await admin.auth().verifyIdToken(idToken);
-        const phoneNumber = decoded.phone_number;
-
-        if (!phoneNumber) {
-            return res.json({ success: false, message: "Phone number not found in token" });
-        }
-
-        const normalizedPhone = normalizePHPhone(phoneNumber);
-        if (!isValidPHPhone(normalizedPhone)) {
-            return res.json({ success: false, message: "Invalid Philippine phone number" });
-        }
-
+        const { normalizedPhone } = await verifyFirebasePhoneToken(idToken);
+        const userId = req.userId;
         const conflictUser = await userModel.findOne({
             phone: normalizedPhone,
             _id: { $ne: userId }
@@ -302,16 +373,6 @@ const verifyPhoneFirebase = async (req, res) => {
         if (conflictUser && conflictUser.isVerified) {
             return res.json({ success: false, message: "Phone number already taken" });
         }
-
-        const user = await userModel.findById(userId);
-        if (!user) return res.json({ success: false, message: "User not found" });
-
-        user.phone = normalizedPhone;
-        user.phoneVerified = true;
-        user.pendingPhone = "";
-        user.otp = null;
-        user.otpExpires = null;
-        await user.save();
 
         res.json({ success: true, message: "Phone verified successfully", phone: normalizedPhone });
     } catch (error) {
@@ -356,24 +417,54 @@ const verifyPhoneOTPUpdate = async (req, res) => {
 
 const resetPassword = async (req, res) => {
     try {
-        const { email, otp, newPassword } = req.body;
-        const user = await userModel.findOne({ email: email.toLowerCase().trim() });
+        const { otp, newPassword, phoneIdToken } = req.body;
+        const rawIdentifier = String(req.body.identifier || req.body.email || req.body.phone || "").trim();
+        const normalizedPhone = normalizePHPhone(rawIdentifier);
+        const isEmail = validator.isEmail(rawIdentifier);
+        const isPhone = isValidPHPhone(normalizedPhone);
+
+        if (!isEmail && !isPhone) {
+            return res.json({ success: false, message: "Invalid email or phone number" });
+        }
+
+        const user = await userModel.findOne(
+            isEmail
+                ? { email: rawIdentifier.toLowerCase().trim() }
+                : { phone: { $in: buildPhoneCandidates(normalizedPhone) } }
+        );
 
         if (!user) return res.json({ success: false, message: "User not found" });
 
-        const storedOtp = user.otp ? String(user.otp).trim() : null;
-        const providedOtp = otp ? String(otp).trim() : null;
+        if (isPhone) {
+            let verifiedPhone;
+            try {
+                verifiedPhone = await verifyFirebasePhoneToken(phoneIdToken);
+            } catch (error) {
+                return res.json({ success: false, message: error.message || "Invalid phone verification token" });
+            }
 
-        if (!storedOtp || storedOtp !== providedOtp) {
-            return res.json({ success: false, message: "Invalid reset code" });
-        }
+            if (verifiedPhone.normalizedPhone !== normalizedPhone) {
+                return res.json({ success: false, message: "Verified phone number does not match the selected account" });
+            }
+        } else {
+            const storedOtp = user.otp ? String(user.otp).trim() : null;
+            const providedOtp = otp ? String(otp).trim() : null;
 
-        if (new Date() > new Date(user.otpExpires)) {
-            return res.json({ success: false, message: "Code has expired" });
+            if (!storedOtp || storedOtp !== providedOtp) {
+                return res.json({ success: false, message: "Invalid reset code" });
+            }
+
+            if (new Date() > new Date(user.otpExpires)) {
+                return res.json({ success: false, message: "Code has expired" });
+            }
         }
 
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
+        user.passwordSet = true;
+        if (isPhone) {
+            user.phoneVerified = true;
+        }
         
         user.otp = null;
         user.otpExpires = null;
@@ -494,7 +585,8 @@ const googleAuth = async (req, res) => {
                 email,
                 image: photoURL,
                 password: hashedPassword,
-                phone: "0000000000",
+                passwordSet: false,
+                phone: null,
                 isVerified: true,
                 authProvider: "google"
             });
@@ -522,16 +614,54 @@ const googleAuth = async (req, res) => {
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, middleName, lastName, suffix, email, password, phone } = req.body;
+        const { firstName, middleName, lastName, suffix, email, password, phone, phoneIdToken } = req.body;
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePHPhone(phone);
 
-        if (!firstName || !lastName || !email || !password || !phone) {
+        if (!firstName || !lastName || !normalizedEmail || !password || !normalizedPhone) {
             return res.json({ success: false, message: "Missing details" });
+        }
+
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        if (!isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        let verifiedPhone;
+        try {
+            verifiedPhone = await verifyFirebasePhoneToken(phoneIdToken);
+        } catch (error) {
+            return res.json({ success: false, message: error.message || "Please verify your phone number first" });
+        }
+
+        if (verifiedPhone.normalizedPhone !== normalizedPhone) {
+            return res.json({ success: false, message: "Verified phone number does not match the submitted number" });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const existingUser = await userModel.findOne({ email });
+        const existingUser = await userModel.findOne({ email: normalizedEmail });
+        const phoneConflictUser = await userModel.findOne({
+            phone: { $in: buildPhoneCandidates(normalizedPhone) },
+            ...(existingUser ? { _id: { $ne: existingUser._id } } : {})
+        });
+
+        if (phoneConflictUser) {
+            const isDisposablePlaceholder =
+                !phoneConflictUser.isVerified &&
+                phoneConflictUser.firstName === "Pending" &&
+                /@mrh\.local$/i.test(String(phoneConflictUser.email || ""));
+
+            if (isDisposablePlaceholder) {
+                await userModel.findByIdAndDelete(phoneConflictUser._id);
+            } else {
+                return res.json({ success: false, message: "Phone number already taken" });
+            }
+        }
 
         if (existingUser) {
             if (existingUser.isVerified && existingUser.firstName !== "Pending") {
@@ -542,7 +672,13 @@ const registerUser = async (req, res) => {
             existingUser.lastName = lastName;
             existingUser.suffix = suffix || "";
             existingUser.password = hashedPassword;
-            existingUser.phone = phone;
+            existingUser.passwordSet = true;
+            existingUser.email = normalizedEmail;
+            existingUser.phone = normalizedPhone;
+            existingUser.phoneVerified = true;
+            existingUser.pendingPhone = "";
+            existingUser.otp = null;
+            existingUser.otpExpires = null;
             existingUser.isVerified = true; 
             await existingUser.save();
         } else {
@@ -551,16 +687,18 @@ const registerUser = async (req, res) => {
                 middleName: middleName || "",
                 lastName,
                 suffix: suffix || "",
-                email,
+                email: normalizedEmail,
                 password: hashedPassword,
-                phone,
+                passwordSet: true,
+                phone: normalizedPhone,
+                phoneVerified: true,
                 isVerified: true 
             });
             await newUser.save();
         }
 
         await sendEmail(
-            email,
+            normalizedEmail,
             "Welcome to Mercedarian Retreat House",
             `
                 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
@@ -642,6 +780,88 @@ const verifyOTP = async (req, res) => {
   }
 };
 
+const verifyPhoneOTP = async (req, res) => {
+  try {
+    const normalizedPhone = normalizePHPhone(req.body.phone);
+    const { otp, isResetMode } = req.body;
+
+    if (!isValidPHPhone(normalizedPhone)) {
+      return res.json({ success: false, message: "Invalid phone number" });
+    }
+
+    const user = await userModel.findOne({
+      phone: { $in: buildPhoneCandidates(normalizedPhone) }
+    });
+
+    if (!user) return res.json({ success: false, message: "No verification request found" });
+
+    if (!user.otp || String(user.otp) !== String(otp).trim()) {
+      return res.json({ success: false, message: "Invalid OTP" });
+    }
+
+    if (new Date() > new Date(user.otpExpires)) {
+      return res.json({ success: false, message: "OTP expired" });
+    }
+
+    user.phoneVerified = true;
+
+    if (!isResetMode) {
+      user.otp = null;
+      user.otpExpires = null;
+    }
+
+    await user.save();
+    return res.json({ success: true, message: "Phone OTP verified successfully" });
+  } catch (error) {
+    return res.json({ success: false, message: error.message });
+  }
+};
+
+const verifyEmailChangeOTP = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const providedOtp = String(req.body.otp || "").trim();
+
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        if (!user.pendingEmail) {
+            return res.json({ success: false, message: "No email change request found" });
+        }
+
+        if (!user.otp || String(user.otp).trim() !== providedOtp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (new Date() > new Date(user.otpExpires)) {
+            return res.json({ success: false, message: "OTP expired" });
+        }
+
+        const existingUser = await userModel.findOne({
+            email: user.pendingEmail,
+            _id: { $ne: userId }
+        });
+
+        if (existingUser) {
+            return res.json({ success: false, message: "Email already taken" });
+        }
+
+        user.email = user.pendingEmail;
+        user.pendingEmail = "";
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+
+        return res.json({
+            success: true,
+            message: "Email updated successfully",
+            email: user.email
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
 const getUserData = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId; 
@@ -655,23 +875,91 @@ const getUserData = async (req, res) => {
 const updateUserProfile = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { firstName, middleName, lastName, suffix, phone, oldPassword, newPassword, removeImage } = req.body;
+        const { firstName, middleName, lastName, suffix, phone, email, oldPassword, newPassword, removeImage, phoneIdToken } = req.body;
 
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
 
-        if (firstName) user.firstName = firstName;
-        if (lastName) user.lastName = lastName;
-        if (typeof suffix !== "undefined") user.suffix = suffix;
-        if (typeof middleName !== 'undefined') user.middleName = middleName;
-        if (phone) user.phone = phone;
+        const normalizedFirstName = typeof firstName === "string" ? firstName.trim() : user.firstName;
+        const normalizedLastName = typeof lastName === "string" ? lastName.trim() : user.lastName;
+        const normalizedMiddleName = typeof middleName === "string" ? middleName.trim() : middleName;
+        const normalizedSuffix = typeof suffix === "string" ? suffix.trim() : suffix;
+        const normalizedPhone = typeof phone === "string" ? phone.trim() : phone;
+        const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : normalizeEmail(user.email);
+        const currentEmail = normalizeEmail(user.email);
+        const isGoogleUser = user.authProvider === "google";
+
+        if (!normalizedFirstName || !normalizedLastName) {
+            return res.json({ success: false, message: "First name and last name are required" });
+        }
+
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        if (normalizedEmail !== currentEmail) {
+            return res.json({ success: false, message: "Please verify your new email address first" });
+        }
+
+        if (!normalizedPhone && !isGoogleUser) {
+            return res.json({ success: false, message: "Phone number is required" });
+        }
+
+        if (normalizedPhone && !isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        const currentPhone = normalizePHPhone(user.phone || "");
+        if (normalizedPhone && normalizedPhone !== currentPhone) {
+            if (!phoneIdToken) {
+                return res.json({ success: false, message: "Please verify your phone number first" });
+            }
+
+            let verifiedPhone;
+            try {
+                verifiedPhone = await verifyFirebasePhoneToken(phoneIdToken);
+            } catch (error) {
+                return res.json({ success: false, message: error.message || "Please verify your phone number first" });
+            }
+
+            if (verifiedPhone.normalizedPhone !== normalizedPhone) {
+                return res.json({ success: false, message: "Verified phone number does not match the phone you entered" });
+            }
+
+            const phoneConflictUser = await userModel.findOne({
+                phone: normalizedPhone,
+                _id: { $ne: userId }
+            });
+
+            if (phoneConflictUser && phoneConflictUser.isVerified) {
+                return res.json({ success: false, message: "Phone number already taken" });
+            }
+        }
+
+        user.firstName = normalizedFirstName;
+        user.lastName = normalizedLastName;
+        user.email = normalizedEmail;
+        if (typeof normalizedSuffix !== "undefined") user.suffix = normalizedSuffix;
+        if (typeof normalizedMiddleName !== 'undefined') user.middleName = normalizedMiddleName;
+        user.phone = normalizedPhone || null;
+        if (!normalizedPhone) {
+            user.phoneVerified = false;
+            user.pendingPhone = "";
+        } else if (normalizedPhone !== currentPhone) {
+            user.phoneVerified = true;
+            user.pendingPhone = "";
+        }
 
         if (newPassword) {
-            if (!oldPassword) return res.json({ success: false, message: "Current password is required" });
-            const isMatch = await bcrypt.compare(oldPassword, user.password);
-            if (!isMatch) return res.json({ success: false, message: "Current password is incorrect" });
+            const canSetPasswordWithoutCurrent = user.authProvider === "google" && user.passwordSet !== true;
+            if (!canSetPasswordWithoutCurrent) {
+                if (!oldPassword) return res.json({ success: false, message: "Current password is required" });
+                const isMatch = await bcrypt.compare(oldPassword, user.password);
+                if (!isMatch) return res.json({ success: false, message: "Current password is incorrect" });
+            }
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(newPassword, salt);
+            user.passwordSet = true;
         }
 
         if (removeImage === 'true' || removeImage === true) user.image = "";
@@ -1133,6 +1421,26 @@ const checkEmailExists = async (req, res) => {
 };
 
 // ✅ CHECK PHONE LOGIC
+const checkEmailExistsForUpdate = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const normalizedEmail = normalizeEmail(req.body.email);
+
+        if (!normalizedEmail || !validator.isEmail(normalizedEmail)) {
+            return res.json({ success: true, exists: false });
+        }
+
+        const user = await userModel.findOne({
+            email: normalizedEmail,
+            _id: { $ne: userId }
+        });
+
+        res.json({ success: true, exists: Boolean(user) });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 const checkPhoneExists = async (req, res) => {
     try {
         const { phone } = req.body;
@@ -1153,10 +1461,32 @@ const checkPhoneExists = async (req, res) => {
     }
 };
 
+const checkPhoneExistsForUpdate = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { phone } = req.body;
+        const phoneCandidates = buildPhoneCandidates(phone);
+
+        if (phoneCandidates.length === 0 || !isValidPHPhone(normalizePHPhone(phone))) {
+            return res.json({ success: true, exists: false });
+        }
+
+        const user = await userModel.findOne({
+            phone: { $in: phoneCandidates },
+            _id: { $ne: userId }
+        });
+
+        res.json({ success: true, exists: Boolean(user && user.isVerified) });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
 export {
     registerUser, 
     loginUser, 
     sendOTP,
+    sendEmailChangeOTP,
     sendPhoneOTP,
     sendPhoneOTPUpdate,
     verifyPhoneFirebase,
@@ -1164,9 +1494,13 @@ export {
     requestPhoneReset,
     resetPassword,
     verifyOTP,
+    verifyPhoneOTP,
+    verifyEmailChangeOTP,
     verifyPhoneOTPUpdate,
     checkEmailExists,
-    checkPhoneExists, 
+    checkEmailExistsForUpdate,
+    checkPhoneExists,
+    checkPhoneExistsForUpdate,
     googleAuth, 
     getUserData, 
     updateUserProfile,

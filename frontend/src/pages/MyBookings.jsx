@@ -405,6 +405,17 @@ const MyBookings = () => {
     return () => clearInterval(id);
   }, []);
 
+  const getBookingSortTimestamp = (booking) => {
+    const status = String(booking?.status || "").toLowerCase();
+    const sortSource =
+      status === "pending" || status === "cancellation_pending"
+        ? booking?.createdAt || booking?.date || booking?.updatedAt || booking?.check_in
+        : booking?.check_in || booking?.slotDate || booking?.date || booking?.createdAt;
+
+    const parsedDate = new Date(sortSource);
+    return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
+  };
+
   const filteredBookings = useMemo(() => {
   return bookings.filter(b => {
 
@@ -430,8 +441,8 @@ const MyBookings = () => {
 
   }).sort((a, b) =>
     sortOrder === 'newest'
-      ? new Date(b.check_in) - new Date(a.check_in)
-      : new Date(a.check_in) - new Date(b.check_in)
+      ? getBookingSortTimestamp(b) - getBookingSortTimestamp(a)
+      : getBookingSortTimestamp(a) - getBookingSortTimestamp(b)
   );
 }, [bookings, activeTab, searchQuery, buildingFilter, monthFilter, yearFilter, sortOrder]);
   const buildingOptions = [{ label: "Margarita", value: "Margarita" }, { label: "Nolasco", value: "Nolasco" }];
@@ -860,12 +871,6 @@ const MyBookings = () => {
                             >
                               Cancel
                             </button>
-                          )}
-
-                          {isCancellationPending && (
-                            <span className="flex-1 md:flex-none px-4 py-2.5 text-orange-600 bg-orange-50 font-bold text-sm rounded-xl border border-orange-100 flex items-center gap-2">
-                              <Clock size={14} /> Cancellation Pending
-                            </span>
                           )}
                         </div>
                       </div>

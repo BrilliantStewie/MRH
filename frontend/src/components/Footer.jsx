@@ -5,11 +5,11 @@ import { MapPin, Phone, Mail, Facebook, Instagram, Youtube, ArrowRight, Cross } 
 
 const Footer = () => {
   return (
-    <footer className="bg-white border-t border-slate-100 pt-10 font-sans text-slate-900">
+    <footer className="bg-white border-t border-slate-100 pt-10 pb-8 font-sans text-slate-900">
       <div className="mx-auto max-w-[1750px] px-4 lg:px-6 xl:px-[100px]">
         
         {/* --- MAIN LAYOUT GRID --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-16 mb-24">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-16">
           
           {/* 1. PRIMARY BRAND BLOCK (5 Columns) */}
           <div className="lg:col-span-5 space-y-10">
@@ -47,7 +47,7 @@ const Footer = () => {
 
           {/* 2. NAVIGATION (2 Columns) */}
           <div className="lg:col-span-2 space-y-8">
-            <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">Sanctuary</h3>
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-300">Links</h3>
             <ul className="space-y-5">
               {['Home', 'Rooms', 'About', 'Contact'].map((item) => (
                  <li key={item}>
@@ -77,13 +77,13 @@ const Footer = () => {
                     </div>
                     <div className="flex items-center gap-4">
                         <Phone size={18} className="text-blue-600 shrink-0" />
-                        <span className="text-sm text-slate-600 font-light">(+63) 000 0000 000</span>
+                        <span className="text-sm text-slate-600 font-light">(+63) 934 8194 573</span>
                     </div>
                 </div>
                 <div className="space-y-6">
                     <div className="flex items-center gap-4">
                         <Mail size={18} className="text-blue-600 shrink-0" />
-                        <span className="text-sm text-slate-600 font-light truncate">info@mercedarian.com</span>
+                        <span className="text-sm text-slate-600 font-light truncate">mrhbohol@gmail.com</span>
                     </div>
                     
                 </div>

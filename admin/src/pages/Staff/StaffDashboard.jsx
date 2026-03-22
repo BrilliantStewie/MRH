@@ -1,19 +1,16 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
-import { StaffContext } from "../../context/StaffContext";
 import axios from "axios";
 import {
   AlertCircle,
   ArrowUpRight,
   BarChart3,
   BedDouble,
-  Bell,
-  Calendar,
-  Clock,
-  Search,
+  CalendarDays,
   Users,
-  Zap,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import AvailabilityCalendar from "../Admin/AvailabilityCalendar";
+import { StaffContext } from "../../context/StaffContext";
 
 const normalizeDate = (value) => {
   const d = new Date(value);
@@ -24,10 +21,11 @@ const normalizeDate = (value) => {
 
 const StaffDashboard = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
-  
+
   const [allBookings, setAllBookings] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   useEffect(() => {
     const fetchOperationalData = async () => {
@@ -36,7 +34,7 @@ const StaffDashboard = () => {
         const [bookingsRes, roomsRes, usersRes] = await Promise.all([
           axios.get(`${backendUrl}/api/staff/bookings`, { headers }),
           axios.get(`${backendUrl}/api/staff/rooms`, { headers }),
-          axios.get(`${backendUrl}/api/staff/users`, { headers })
+          axios.get(`${backendUrl}/api/staff/users`, { headers }),
         ]);
 
         if (bookingsRes.data.success) setAllBookings(bookingsRes.data.bookings);
@@ -51,7 +49,6 @@ const StaffDashboard = () => {
     if (sToken) fetchOperationalData();
   }, [sToken, backendUrl]);
 
-  // --- SYNCED DATA LOGIC (Matching Admin Dashboard) ---
   const stats = useMemo(() => {
     const bookings = allBookings || [];
     const rooms = allRooms || [];
@@ -96,7 +93,20 @@ const StaffDashboard = () => {
   const chartData = useMemo(() => {
     const months = [];
     const currentDate = new Date();
-    const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthLabels = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
 
     for (let i = 5; i >= 0; i -= 1) {
       const targetMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
@@ -128,6 +138,12 @@ const StaffDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] p-4 font-sans text-slate-800 md:p-8">
+      <AvailabilityCalendar
+        isOpen={isCalendarOpen}
+        onClose={() => setIsCalendarOpen(false)}
+        bookings={allBookings || []}
+      />
+
       <header className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900">Good day, Staff</h1>
@@ -235,84 +251,40 @@ const StaffDashboard = () => {
 
             <div className="relative z-10 mb-6 flex items-start justify-between">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 shadow-sm">
-                <Zap size={28} className="text-indigo-600" />
+                <CalendarDays size={28} className="text-indigo-600" />
               </div>
               <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 shadow-sm">
                 <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                Operations
+                Management
               </span>
             </div>
 
             <div className="relative z-10 mt-auto">
-              <h3 className="mb-2 text-3xl font-black tracking-tight text-slate-900">Express Access</h3>
+              <h3 className="mb-2 text-3xl font-black tracking-tight text-slate-900">Check Availability</h3>
               <p className="mb-8 max-w-[90%] text-sm font-medium leading-relaxed text-slate-500">
-                Quick shortcuts to common staff tools and daily activity lookup.
+                Check available dates and reservation schedules in one place.
               </p>
 
-              <div className="flex flex-col gap-3">
-                <SidebarButton icon={<Search size={18} />} label="Search Records" />
-                <SidebarButton icon={<Calendar size={18} />} label="Duty Schedule" />
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen(true)}
+                className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-6 py-4 text-xs font-bold uppercase tracking-widest text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95"
+              >
+                <span>View Calendar</span>
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors group-hover/btn:bg-white group-hover/btn:text-indigo-600">
+                  <ArrowUpRight
+                    size={16}
+                    className="transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5"
+                  />
+                </div>
+              </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="mt-6 bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-          <h2 className="font-black text-slate-800 text-lg flex items-center gap-2 uppercase tracking-tight">
-            <Clock size={18} className="text-indigo-500"/> Recent Logs
-          </h2>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/50 text-slate-400 text-[9px] uppercase font-black tracking-[0.15em]">
-              <tr>
-                <th className="px-6 py-4">Guest Profile</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {allBookings?.slice(0, 5).map((booking, i) => (
-                <tr key={i} className="hover:bg-slate-50/80 transition-colors group">
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center font-black text-slate-400">
-                         {booking.user_id?.image ? (
-                            <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
-                         ) : (
-                            <span>{booking.user_id?.firstName?.[0] || "G"}</span>
-                         )}
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-700 text-sm">
-                          {booking.user_id?.firstName} {booking.user_id?.lastName}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-bold flex items-center gap-1">
-                            <Calendar size={10} /> {new Date(booking.check_in || booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <StatusBadge status={booking.status} />
-                  </td>
-                  <td className="px-6 py-5 text-right font-black text-slate-800 text-sm">
-                    ₱{Number(booking.total_price || booking.amount).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
   );
 };
-
-// --- HELPER COMPONENTS ---
 
 const StatCard = ({ label, value, icon, color, subValue }) => {
   const themes = {
@@ -324,46 +296,17 @@ const StatCard = ({ label, value, icon, color, subValue }) => {
   const activeTheme = themes[color] || themes.indigo;
 
   return (
-    <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
-      <div className="flex justify-between items-start">
-         <div className={`p-3 rounded-2xl border ${activeTheme}`}>{icon}</div>
+    <div className="flex h-40 flex-col justify-between rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div className={`rounded-2xl border p-3 ${activeTheme}`}>{icon}</div>
       </div>
       <div>
-        <p className="text-slate-400 text-[9px] font-black uppercase tracking-widest mb-1">{label}</p>
-        <h3 className="text-2xl font-black text-slate-900 tracking-tight">{value}</h3>
-        <p className="text-[10px] text-slate-400 font-bold mt-1">{subValue}</p>
+        <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+        <h3 className="text-2xl font-black tracking-tight text-slate-900">{value}</h3>
+        <p className="mt-1 text-[10px] font-bold text-slate-400">{subValue}</p>
       </div>
     </div>
   );
-};
-
-const SidebarButton = ({ icon, label }) => (
-    <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group">
-        <div className="flex items-center gap-4">
-            <span className="text-slate-500 group-hover:text-yellow-400 transition-colors">{icon}</span>
-            <span className="text-xs font-black text-slate-300 group-hover:text-white transition-colors uppercase tracking-widest">{label}</span>
-        </div>
-        <ArrowUpRight size={14} className="text-slate-600 group-hover:text-white" />
-    </button>
-);
-
-const StatusBadge = ({ status }) => {
-    let styles = "bg-slate-100 text-slate-500 border-slate-200";
-    const s = (status || "").toLowerCase();
-
-    if (["approved", "confirmed", "checked_in"].includes(s)) 
-        styles = "bg-emerald-50 text-emerald-700 border-emerald-100";
-    else if (s === 'pending' || s === 'cancellation_pending') 
-        styles = "bg-amber-50 text-amber-700 border-amber-100";
-    else if (["cancelled", "declined"].includes(s)) 
-        styles = "bg-rose-50 text-rose-700 border-rose-100";
-
-    return (
-        <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase border ${styles} inline-flex items-center gap-2`}>
-            <div className={`w-1 h-1 rounded-full bg-current`}></div>
-            {status?.replace('_', ' ')}
-        </span>
-    );
 };
 
 export default StaffDashboard;

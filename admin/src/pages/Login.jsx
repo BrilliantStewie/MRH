@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { AdminContext } from "../context/AdminContext";
 import { StaffContext } from "../context/StaffContext";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,15 @@ import { Eye, EyeOff } from "lucide-react";
 // Toast import removed
 import BannerImage from "../assets/login_bg.png"; 
 import VerifyOtp from "./VerifyOtp";
+import VerifyFirebasePhoneOtp from "../components/VerifyFirebasePhoneOtp";
+import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
+import { auth } from "../config/firebase";
+import AccountStatusModal from "../components/AccountStatusModal";
+import {
+  consumeDisabledAccountNotice,
+  DEFAULT_DISABLED_ACCOUNT_MESSAGE,
+  isAccountDisabledMessage,
+} from "../utils/accountStatusNotice";
 
 const Login = () => {
   const [state, setState] = useState("Admin"); 
@@ -20,28 +29,50 @@ const Login = () => {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [verifiedOtp, setVerifiedOtp] = useState("");
+  const [phoneIdToken, setPhoneIdToken] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetError, setResetError] = useState("");
   const [resetSuccess, setResetSuccess] = useState("");
   const [staffView, setStaffView] = useState("Login");
+  const [showFirebasePhoneOtpModal, setShowFirebasePhoneOtpModal] = useState(false);
+  const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
+  const [firebasePhoneTarget, setFirebasePhoneTarget] = useState("");
+  const recaptchaRef = useRef(null);
   
-  // Inline error state for disabled accounts
-  const [isDisabled, setIsDisabled] = useState(false);
   // General error state for "Invalid Credentials" since toasts are removed
   const [error, setError] = useState("");
+  const [disabledModalMessage, setDisabledModalMessage] = useState("");
 
   const { adminLogin } = useContext(AdminContext);
   const { staffLogin } = useContext(StaffContext);
   const navigate = useNavigate();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
+  const openDisabledAccountModal = (message) => {
+    setDisabledModalMessage(message || DEFAULT_DISABLED_ACCOUNT_MESSAGE);
+    setError("");
+    setResetError("");
+    setResetSuccess("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowForgotEmailField(false);
+  };
+
   // Reset errors when switching roles or typing
   useEffect(() => {
-    setIsDisabled(false);
     setError("");
   }, [state, identifier, password]);
+
+  useEffect(() => {
+    const notice = consumeDisabledAccountNotice();
+    if (notice) {
+      openDisabledAccountModal(notice);
+      setShowForgotEmailField(false);
+      setStaffView("Login");
+    }
+  }, []);
 
   // Reset staff-only flows when leaving Staff view
   useEffect(() => {
@@ -50,26 +81,31 @@ const Login = () => {
       setShowOtpModal(false);
       setIsResetMode(false);
       setVerifiedOtp("");
+      setPhoneIdToken("");
       setConfirmPassword("");
       setResetError("");
       setResetSuccess("");
       setStaffView("Login");
+      setShowFirebasePhoneOtpModal(false);
+      setFirebaseConfirmation(null);
+      setFirebasePhoneTarget("");
     }
   }, [state]);
 
   const onSubmitHandler = async (event) => {
     event.preventDefault();
     setLoading(true);
-    setIsDisabled(false);
     setError("");
 
     try {
       if (state === "Admin") {
-        const ok = await adminLogin(identifier, password);
-        if (ok) {
+        const response = await adminLogin(identifier, password);
+        if (response?.success) {
           navigate("/admin-dashboard");
+        } else if (isAccountDisabledMessage(response?.message)) {
+          openDisabledAccountModal(response.message);
         } else {
-          setError("Invalid admin credentials");
+          setError(response?.message || "Invalid admin credentials");
         }
       } else {
         // STAFF LOGIN
@@ -77,20 +113,16 @@ const Login = () => {
         
         if (response && response.success) {
             navigate("/staff-dashboard");
+        } else if (isAccountDisabledMessage(response?.message)) {
+            openDisabledAccountModal(response.message);
         } else if (response && response.message) {
-            const msg = response.message.toLowerCase();
-            
-            if (msg.includes("disabled") || msg.includes("frozen")) {
-                setIsDisabled(true);
-            } else {
-                setError(response.message);
-            }
+            setError(response.message);
         }
       }
     } catch (err) {
       const errMsg = err.response?.data?.message || err.message || "";
-      if (errMsg.toLowerCase().includes("disabled") || errMsg.toLowerCase().includes("frozen")) {
-        setIsDisabled(true);
+      if (isAccountDisabledMessage(errMsg)) {
+        openDisabledAccountModal(errMsg);
       } else {
         setError("Authentication Failed");
       }
@@ -100,6 +132,98 @@ const Login = () => {
   };
 
   const validateEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const validatePhone = (value) => /^(09)\d{9}$/.test(String(value || "").replace(/\D/g, ""));
+
+  const ensureRecaptcha = async () => {
+    if (recaptchaRef.current) return recaptchaRef.current;
+
+    recaptchaRef.current = new RecaptchaVerifier(auth, "admin-login-recaptcha-container", {
+      size: "invisible",
+    });
+
+    await recaptchaRef.current.render();
+    return recaptchaRef.current;
+  };
+
+  const sendFirebasePhoneResetOtp = async (targetPhone = identifier) => {
+    const normalizedPhone = String(targetPhone || "").replace(/\D/g, "").slice(0, 11);
+
+    if (!validatePhone(normalizedPhone)) {
+      const message = "Please enter a valid 11-digit phone number.";
+      setResetError(message);
+      return { success: false, message };
+    }
+
+    setResetError("");
+    setResetLoading(true);
+
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/user/request-phone-reset`, {
+        phone: normalizedPhone,
+      });
+
+      if (!data?.success) {
+        const message = data?.message || "No account found with this phone number.";
+        setResetError(message);
+        return { success: false, message };
+      }
+
+      const verifier = await ensureRecaptcha();
+      const confirmation = await signInWithPhoneNumber(auth, `+63${normalizedPhone.slice(1)}`, verifier);
+
+      setFirebaseConfirmation(confirmation);
+      setFirebasePhoneTarget(normalizedPhone);
+      setPhoneIdToken("");
+      setShowFirebasePhoneOtpModal(true);
+      setIsResetMode(true);
+      return { success: true };
+    } catch (err) {
+      if (recaptchaRef.current) {
+        recaptchaRef.current.clear();
+        recaptchaRef.current = null;
+      }
+
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to send reset code.";
+      setResetError(message);
+      return { success: false, message };
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
+  const verifyFirebasePhoneReset = async (otpCode) => {
+    if (!firebaseConfirmation) {
+      return { success: false, message: "Please request a new OTP." };
+    }
+
+    try {
+      const result = await firebaseConfirmation.confirm(otpCode);
+      const idToken = await result.user.getIdToken(true);
+
+      setPhoneIdToken(idToken);
+      setVerifiedOtp("");
+      setPassword("");
+      setConfirmPassword("");
+      setResetError("");
+      setResetSuccess("");
+      setShowForgotEmailField(false);
+      setTimeout(() => setStaffView("Reset Password"), 50);
+
+      await signOut(auth);
+      return { success: true };
+    } catch (err) {
+      return {
+        success: false,
+        message:
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to verify phone number.",
+      };
+    }
+  };
 
   const handleForgotToggle = () => {
     if (showForgotEmailField) {
@@ -107,8 +231,12 @@ const Login = () => {
       setResetSuccess("");
       setIsResetMode(false);
       setVerifiedOtp("");
+      setPhoneIdToken("");
       setPassword("");
       setConfirmPassword("");
+      setShowFirebasePhoneOtpModal(false);
+      setFirebaseConfirmation(null);
+      setFirebasePhoneTarget("");
     }
     setShowForgotEmailField((prev) => !prev);
     setResetError("");
@@ -125,10 +253,19 @@ const Login = () => {
 
     setResetError("");
     setResetSuccess("");
+
+    if (isPhone) {
+      const result = await sendFirebasePhoneResetOtp(identifier);
+      if (result?.success) {
+        setShowForgotEmailField(false);
+      }
+      return;
+    }
+
     setResetLoading(true);
     try {
-      const endpoint = isEmail ? "/api/user/request-reset" : "/api/user/request-phone-reset";
-      const payload = isEmail ? { email: identifier } : { phone: identifier };
+      const endpoint = "/api/user/request-reset";
+      const payload = { email: identifier };
       const { data } = await axios.post(`${backendUrl}${endpoint}`, payload);
 
       if (data?.success) {
@@ -150,17 +287,27 @@ const Login = () => {
     e.preventDefault();
     if (password !== confirmPassword) return setResetError("Passwords do not match!");
     if (password.length < 8) return setResetError("Password must be at least 8 characters");
-    if (!verifiedOtp) return setResetError("Verification code missing.");
+
+    const isPhoneReset = validatePhone(identifier);
+    if (isPhoneReset && !phoneIdToken) return setResetError("Phone verification missing.");
+    if (!isPhoneReset && !verifiedOtp) return setResetError("Verification code missing.");
 
     setResetLoading(true);
     setResetError("");
     setResetSuccess("");
     try {
-      const { data } = await axios.post(`${backendUrl}/api/user/reset-password`, {
-        email: identifier.toLowerCase().trim(),
-        otp: String(verifiedOtp).trim(),
+      const payload = {
+        identifier: identifier.trim(),
         newPassword: password
-      });
+      };
+
+      if (isPhoneReset) {
+        payload.phoneIdToken = phoneIdToken;
+      } else {
+        payload.otp = String(verifiedOtp).trim();
+      }
+
+      const { data } = await axios.post(`${backendUrl}/api/user/reset-password`, payload);
 
       if (data?.success) {
         setResetSuccess("Password reset successful! You can now log in.");
@@ -169,6 +316,9 @@ const Login = () => {
         setPassword("");
         setConfirmPassword("");
         setVerifiedOtp("");
+        setPhoneIdToken("");
+        setFirebaseConfirmation(null);
+        setFirebasePhoneTarget("");
         setResetError("");
       } else {
         setResetError(data?.message || "Failed to reset password.");
@@ -196,10 +346,39 @@ const Login = () => {
 
   return (
     <div className="flex w-full h-screen overflow-hidden bg-white font-sans">
+      <div id="admin-login-recaptcha-container" className="hidden"></div>
+      <AccountStatusModal
+        open={Boolean(disabledModalMessage)}
+        message={disabledModalMessage}
+        onClose={() => setDisabledModalMessage("")}
+      />
+      {showFirebasePhoneOtpModal && (
+        <VerifyFirebasePhoneOtp
+          phone={firebasePhoneTarget || identifier}
+          onClose={({ verified } = {}) => {
+            setShowFirebasePhoneOtpModal(false);
+            setFirebaseConfirmation(null);
+            setFirebasePhoneTarget("");
+            if (!verified) {
+              setIsResetMode(false);
+              setPhoneIdToken("");
+            }
+          }}
+          onVerify={verifyFirebasePhoneReset}
+          onResend={() => sendFirebasePhoneResetOtp(firebasePhoneTarget || identifier)}
+        />
+      )}
       {showOtpModal && (
         <VerifyOtp
-          email={identifier}
-          onClose={() => setShowOtpModal(false)}
+          identifier={identifier}
+          identifierType="email"
+          onClose={() => {
+            setShowOtpModal(false);
+            if (!isStaffResetView) {
+              setIsResetMode(false);
+              setVerifiedOtp("");
+            }
+          }}
           onSuccess={(otpCode) => {
             setVerifiedOtp(otpCode.toString().trim());
             if (isResetMode) {
@@ -212,6 +391,12 @@ const Login = () => {
           }}
           backendUrl={backendUrl}
           isResetMode={isResetMode}
+          onResend={async () => {
+            const endpoint = "/api/user/request-reset";
+            const payload = { email: identifier };
+            const { data } = await axios.post(`${backendUrl}${endpoint}`, payload);
+            return data;
+          }}
         />
       )}
       
@@ -275,6 +460,7 @@ const Login = () => {
                               setIdentifier(value);
                               return;
                             }
+                            setPhoneIdToken("");
                             const looksLikeEmail = value.includes("@") || /[a-zA-Z]/.test(value);
                             if (looksLikeEmail) {
                               setIdentifier(value);
@@ -325,6 +511,12 @@ const Login = () => {
                         type="button"
                         onClick={() => {
                           setShowForgotEmailField(false);
+                          setIsResetMode(false);
+                          setVerifiedOtp("");
+                          setPhoneIdToken("");
+                          setShowFirebasePhoneOtpModal(false);
+                          setFirebaseConfirmation(null);
+                          setFirebasePhoneTarget("");
                           setResetError("");
                           setResetSuccess("");
                         }}
@@ -389,23 +581,12 @@ const Login = () => {
                     </div>
                 )}
 {/* --- ERROR MESSAGE (Invalid Credentials) --- */}
-                {error && !isDisabled && !isStaffResetView && (
+                {error && !isStaffResetView && (
                     <div className="text-red-500 text-sm font-medium ml-1">
                         ⚠️ {error}
                     </div>
                 )}
 
-                {/* --- DISABLED WARNING BOX --- */}
-                {isDisabled && !isStaffResetView && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl">
-                        <div className="flex">
-                            <div className="ml-3">
-                                <p className="text-sm font-bold text-red-800">Account Disabled</p>
-                                <p className="text-xs text-red-600 mt-0.5">Please contact the administrator for assistance.</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
                 {!showForgotEmailField && (
                 <div className="flex justify-center pt-2">
                     <button 
@@ -425,13 +606,3 @@ const Login = () => {
 };
 
 export default Login;
-
-
-
-
-
-
-
-
-
-

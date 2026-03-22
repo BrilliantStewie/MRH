@@ -3,10 +3,12 @@ import authStaff from "../middlewares/authStaff.js";
 import upload from "../middlewares/multer.js";
 import {
   staffLogin,
+  verifyStaffSession,
   getStaffProfile,
   updateStaffProfile,
   getStaffBookings,
   verifyStaffPhoneFirebase,
+  checkStaffPhoneAvailability,
 } from "../controllers/staffController.js";
 
 // ✅ Import Admin controllers to reuse the logic for staff
@@ -22,6 +24,7 @@ const router = express.Router();
    STAFF LOGIN
 ========================= */
 router.post("/login", staffLogin);
+router.get("/session", authStaff, verifyStaffSession);
 
 /* =========================
    STAFF PROFILE
@@ -39,6 +42,7 @@ router.post(
 );
 
 router.post("/verify-phone-firebase", authStaff, verifyStaffPhoneFirebase);
+router.post("/check-phone", authStaff, checkStaffPhoneAvailability);
 
 /* =========================
    STAFF VIEW ALL GUEST BOOKINGS

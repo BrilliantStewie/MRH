@@ -228,17 +228,17 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                          <label className="text-xs font-semibold text-slate-600">First Name <span className="text-red-500">*</span></label>
-                         <input name="firstName" value={firstName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="John" />
+                         <input name="firstName" value={firstName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="First Name" />
                       </div>
                       <div className="space-y-1">
                          <label className="text-xs font-semibold text-slate-600">Last Name <span className="text-red-500">*</span></label>
-                         <input name="lastName" value={lastName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Doe" />
+                         <input name="lastName" value={lastName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Last Name" />
                       </div>
                    </div>
                    <div className="grid grid-cols-4 gap-4">
                       <div className="col-span-3 space-y-1">
-                         <label className="text-xs font-semibold text-slate-600">Middle Name</label>
-                         <input name="middleName" value={middleName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Optional" />
+                         <label className="text-xs font-semibold text-slate-600">Middle Name (Optional)</label>
+                         <input name="middleName" value={middleName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Middle Name" />
                       </div>
                       <div className="col-span-1 space-y-1 relative">
                          <label className="text-xs font-semibold text-slate-600">Suffix</label>
@@ -253,7 +253,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                                 ? "border-emerald-500 bg-emerald-50/10 focus:ring-1 focus:ring-emerald-500" 
                                 : "border-slate-200 bg-slate-50 focus:border-indigo-500"
                             }`} 
-                            placeholder="Jr." 
                          />
                          {suffix && (TEXT_SUFFIXES.includes(suffix) || ROMAN_REGEX.test(suffix)) && (
                             <CheckCircle2 size={12} className="absolute right-2 top-9 text-emerald-500" />
@@ -266,7 +265,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Contact Info</h3>
                    <div className="space-y-1">
                       <label className="text-xs font-semibold text-slate-600">Mobile Number <span className="text-red-500">*</span></label>
-                      <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="09XXXXXXXXX" />
+                      <input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Phone Number" />
                    </div>
                 </div>
 
@@ -276,24 +275,28 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                    </div>
                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                         <label className="text-xs font-semibold text-slate-600">New Password {!isEdit && <span className="text-red-500">*</span>}</label>
+                         <label className="text-xs font-semibold text-slate-600">Create Password {!isEdit && <span className="text-red-500">*</span>}</label>
                          <div className="relative">
-                            <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all pr-10" placeholder="••••••" />
+                            <input type={showPassword ? "text" : "password"} value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all pr-10" placeholder="Enter Password" />
                             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                          </div>
                       </div>
                       <div className="space-y-1">
-                         <label className="text-xs font-semibold text-slate-600 flex justify-between">
-                            <span>Confirm {!isEdit && <span className="text-red-500">*</span>}</span>
-                            {formData.confirmPassword && (<span className={`text-[10px] uppercase font-bold flex items-center gap-1 ${formData.password === formData.confirmPassword ? "text-emerald-500" : "text-rose-500"}`}>{formData.password === formData.confirmPassword ? <>Match <CheckCircle2 size={10} /></> : <>Mismatch <AlertCircle size={10} /></>}</span>)}
+                         <label className="text-xs font-semibold text-slate-600">
+                            <span>Re-enter Password {!isEdit && <span className="text-red-500">*</span>}</span>
                          </label>
                          <div className="relative">
-                            <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm outline-none transition-all pr-10 ${!formData.confirmPassword ? "border-slate-200" : formData.password === formData.confirmPassword ? "border-emerald-500 bg-emerald-50/30" : "border-rose-500 bg-rose-50/30"}`} placeholder="••••••" />
-                            <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">{showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                         </div>
-                      </div>
-                   </div>
-                </div>
+                             <input type={showConfirmPassword ? "text" : "password"} value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm outline-none transition-all pr-10 ${!formData.confirmPassword ? "border-slate-200" : formData.password === formData.confirmPassword ? "border-emerald-500 bg-emerald-50/30" : "border-rose-500 bg-rose-50/30"}`} placeholder="Confirm Password" />
+                             <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">{showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                          </div>
+                          {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                            <p className="text-[10px] font-bold text-rose-500 flex items-center gap-1 pt-1">
+                              <AlertCircle size={10} /> Passwords do not match
+                            </p>
+                          )}
+                       </div>
+                    </div>
+                 </div>
              </form>
           </div>
 

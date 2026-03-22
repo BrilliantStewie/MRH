@@ -17,7 +17,7 @@ import {
   CalendarX,
   Sun,
   CheckCircle,
-  CircleDashed,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   Trash2,
@@ -25,6 +25,7 @@ import {
 
 const ROOMS_PER_PAGE = 8;
 const FILTER_OPTION_PREVIEW_COUNT = 4;
+const MODAL_AMENITIES_PREVIEW_COUNT = 4;
 
 const Rooms = () => {
   const {
@@ -48,7 +49,7 @@ const Rooms = () => {
   const [rangeBookedReasons, setRangeBookedReasons] = useState({});
   const [viewingRoom, setViewingRoom] = useState(null);
 
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState(() => (token ? "available" : "all"));
   const [roomType, setRoomType] = useState(() => location.state?.selectedRoomType || "all");
   const [building, setBuilding] = useState("all");
   const [search] = useState("");
@@ -181,8 +182,22 @@ const Rooms = () => {
     building,
     showAllBuildings
   );
+  const hasFilterOption = (options, value) =>
+    value === "all" || options.some((option) => normalize(option) === normalize(value));
 
   const isSelected = (id) => selectedRooms.some((room) => String(room._id) === String(id));
+
+  useEffect(() => {
+    if (!hasFilterOption(roomTypeOptions, roomType)) {
+      setRoomType("all");
+    }
+  }, [roomType, roomTypeOptions]);
+
+  useEffect(() => {
+    if (!hasFilterOption(buildingOptions, building)) {
+      setBuilding("all");
+    }
+  }, [building, buildingOptions]);
 
   useEffect(() => {
     const statusFilter = isLoggedIn ? filterStatus : "all";
@@ -198,16 +213,39 @@ const Rooms = () => {
 
     if (statusFilter === "available") {
       data = data.filter((room) => {
-        const isBooked = occupiedRooms.some((id) => String(id) === String(room._id));
+        const roomId = String(room._id);
+        const isAdminUnavailable = room.available === false;
+        const isBooked = occupiedRooms.some((id) => String(id) === roomId);
+        const rangeReason = rangeBookedReasons[roomId] || "";
+        const isCleaning =
+          cleaningRooms.some((id) => String(id) === roomId) || rangeReason === "cleaning";
         const isBookedForRange =
-          rangeBookedRooms.some((id) => String(id) === String(room._id)) ||
-          Boolean(rangeBookedReasons[String(room._id)]);
-        return !isBooked && !isBookedForRange && room.available !== false;
+          rangeBookedRooms.some((id) => String(id) === roomId) || Boolean(rangeReason);
+        return (
+          !isAdminUnavailable &&
+          !isBooked &&
+          !isCleaning &&
+          !isBookedForRange &&
+          room.status !== "maintenance"
+        );
       });
+    } else if (statusFilter === "unavailable") {
+      data = data.filter((room) => room.available === false);
     } else if (statusFilter === "occupied") {
-      data = data.filter((room) =>
-        occupiedRooms.some((id) => String(id) === String(room._id))
+      data = data.filter(
+        (room) =>
+          room.available !== false &&
+          occupiedRooms.some((id) => String(id) === String(room._id))
       );
+    } else if (statusFilter === "cleaning") {
+      data = data.filter((room) => {
+        const roomId = String(room._id);
+        return (
+          room.available !== false &&
+          (cleaningRooms.some((id) => String(id) === roomId) ||
+            rangeBookedReasons[roomId] === "cleaning")
+        );
+      });
     }
 
     if (search) {
@@ -254,6 +292,7 @@ const Rooms = () => {
     search,
     filterStatus,
     occupiedRooms,
+    cleaningRooms,
     rangeBookedRooms,
     rangeBookedReasons,
     isLoggedIn,
@@ -315,160 +354,278 @@ const Rooms = () => {
   };
 
   const getFilterButtonClass = (isActive) =>
-    `group mb-1 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[9px] font-bold uppercase leading-[1.35] transition-all duration-300 ${
+    `group mb-1 flex w-full items-center text-left font-bold uppercase transition-all duration-300 ${
+      "gap-1.5 rounded-md px-2 py-1.5 text-[9px] leading-[1.35]"
+    } ${
       isActive
-        ? "bg-slate-900 text-white shadow-md"
-        : "text-slate-500 hover:bg-slate-100 hover:pl-3 hover:text-slate-900"
-    }`;
+        ? isLoggedIn
+          ? "bg-slate-900 text-white shadow-md"
+          : "bg-slate-900 text-white shadow-lg shadow-slate-200"
+        : isLoggedIn
+          ? "text-slate-500 hover:bg-slate-100 hover:pl-3 hover:text-slate-900"
+          : "text-slate-600 hover:bg-slate-100 hover:pl-4 hover:text-slate-900"
+     }`;
+  const filterIconSize = 10;
+  const filterLabelIconSize = 8;
+  const pageRootClassName = isLoggedIn
+    ? "relative flex h-screen flex-col overflow-hidden bg-slate-50 pt-3"
+    : "relative bg-slate-50 pt-3";
+  const pageShellClassName = isLoggedIn
+    ? "mx-auto flex h-full w-full max-w-[1750px] flex-col gap-5 overflow-hidden px-[14px] pb-[14px] lg:flex-row lg:gap-5 lg:px-[14px]"
+    : "mx-auto flex w-full max-w-[1750px] flex-col gap-5 px-[14px] pb-[14px] lg:flex-row lg:gap-5 lg:px-[14px]";
+  const sidebarClassName = isLoggedIn
+    ? "h-full w-full overflow-y-auto pb-6 pr-2 lg:w-56"
+    : "w-full pb-6 pr-2 lg:w-56";
+  const filterPanelClassName = isLoggedIn
+    ? "rounded-lg border bg-white p-3 shadow-sm"
+    : "rounded-lg border bg-white p-3 shadow-sm";
+  const roomContentClassName = "flex min-h-full flex-col gap-5";
+  const roomGridClassName = isLoggedIn
+    ? "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4"
+    : "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4";
+  const directoryBarClassName = isLoggedIn
+    ? "sticky bottom-20 z-20 mt-auto bg-gradient-to-t from-slate-50 via-slate-50 pt-1"
+    : "pt-1";
+  const roomMainClassName = isLoggedIn
+    ? "flex-1 h-full overflow-y-auto pt-1 pb-6 pr-1 pl-1"
+    : "flex-1 pt-1 pb-6 pr-1 pl-1";
+
+  const getRoomAvailabilityState = (room) => {
+    const roomId = String(room?._id || "");
+    const isAdminUnavailable = room?.available === false;
+    const isUnderMaintenance = isLoggedIn && room?.status === "maintenance";
+    const isCleaningDay = isLoggedIn && cleaningRooms.some((id) => String(id) === roomId);
+    const isBookedToday = isLoggedIn && occupiedRooms.some((id) => String(id) === roomId);
+    const rangeReason = isLoggedIn
+      ? rangeBookedReasons[roomId] ||
+        (rangeBookedRooms.some((id) => String(id) === roomId) ? "booked" : "")
+      : "";
+    const isBookedForRange = Boolean(rangeReason);
+    const isUnavailable =
+      isAdminUnavailable ||
+      isUnderMaintenance ||
+      isCleaningDay ||
+      isBookedToday ||
+      isBookedForRange;
+    const unavailableLabel = isAdminUnavailable
+      ? "Unavailable"
+      : isUnderMaintenance
+        ? "Maintenance"
+        : isCleaningDay
+          ? "Cleaning"
+          : isBookedToday
+            ? "Occupied"
+            : isBookedForRange
+              ? rangeReason === "cleaning"
+                ? "Cleaning Day"
+                : "Booked"
+              : "";
+
+    return {
+      isAdminUnavailable,
+      isUnderMaintenance,
+      isCleaningDay,
+      isBookedToday,
+      rangeReason,
+      isBookedForRange,
+      isUnavailable,
+      unavailableLabel,
+    };
+  };
 
   const RoomDetailsModal = ({ room, onClose }) => {
     if (!room) return null;
 
     const [activeImgIndex, setActiveImgIndex] = useState(0);
+    const [showAllAmenities, setShowAllAmenities] = useState(false);
     const images =
       Array.isArray(room.images) && room.images.length > 0
         ? room.images
         : room.cover_image
           ? [room.cover_image]
           : [];
+    const slides = images.length > 0 ? images : [null];
+    const amenities =
+      Array.isArray(room.amenities) && room.amenities.length > 0
+        ? room.amenities.filter(Boolean)
+        : [];
+    const visibleAmenities = showAllAmenities
+      ? amenities
+      : amenities.slice(0, MODAL_AMENITIES_PREVIEW_COUNT);
 
     useEffect(() => {
       setActiveImgIndex(0);
+      setShowAllAmenities(false);
     }, [room._id]);
 
-    if (images.length === 0) {
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60">
-          <div className="rounded-xl bg-white p-8 text-slate-500">
-            No images available for this room.
-          </div>
-        </div>
-      );
-    }
-
     const isRoomSelected = isSelected(room._id);
-    const isRoomUnderMaintenance = isLoggedIn && room.status === "maintenance";
-    const isRoomCleaningDay =
-      isLoggedIn && cleaningRooms.some((id) => String(id) === String(room._id));
-    const isRoomBookedToday =
-      isLoggedIn && occupiedRooms.some((id) => String(id) === String(room._id));
-    const roomRangeReason =
-      isLoggedIn
-        ? rangeBookedReasons[String(room._id)] ||
-          (rangeBookedRooms.some((id) => String(id) === String(room._id))
-            ? "booked"
-            : "")
-        : "";
-    const isRoomBookedForRange = Boolean(roomRangeReason);
-    const isRoomUnavailable =
-      isLoggedIn &&
-      (isRoomUnderMaintenance || isRoomCleaningDay || isRoomBookedToday || isRoomBookedForRange);
+    const roomTypeLabel = (room.room_type || room.type || "").replace(/_/g, " ");
+    const {
+      isAdminUnavailable: isRoomAdminUnavailable,
+      isUnavailable: isRoomUnavailable,
+      unavailableLabel: roomUnavailableLabel,
+    } = getRoomAvailabilityState(room);
 
     return (
-      <div className="animate-in fade-in fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm duration-200">
-        <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl md:flex-row">
-          <div className="group relative w-full bg-slate-100 md:w-1/2">
-            <img
-              src={getImageUrl(images[activeImgIndex])}
-              alt={room.name}
-              className="h-64 w-full object-cover md:h-full"
-            />
-            {images.length > 1 && (
-              <>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setActiveImgIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-                  }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 transition hover:bg-white"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setActiveImgIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 transition hover:bg-white"
-                >
-                  <ChevronRight size={20} />
-                </button>
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2">
-                  {images.map((_, index) => (
-                    <div
-                      key={index}
-                      className={`h-2 w-2 rounded-full ${
-                        index === activeImgIndex ? "bg-white" : "bg-white/50"
-                      }`}
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4 backdrop-blur-md animate-in fade-in duration-500">
+        <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3rem] border border-white/20 bg-white shadow-2xl md:flex-row">
+          <div className="flex w-full flex-col bg-white p-5 md:w-[52%]">
+            <div className="group/slider relative flex-1 overflow-hidden rounded-[2.5rem] bg-slate-100 shadow-inner min-h-[400px]">
+              <div
+                className="flex h-full transition-transform duration-[1200ms] will-change-transform cubic-bezier(0.23, 1, 0.32, 1)"
+                style={{ transform: `translateX(-${activeImgIndex * 100}%)` }}
+              >
+                {slides.map((img, index) => (
+                  <div key={index} className="min-w-full h-full select-none">
+                    <img
+                      src={img ? getImageUrl(img) : "https://via.placeholder.com/1200x900?text=No+Image"}
+                      alt={room.name}
+                      className="h-full w-full object-cover pointer-events-none"
                     />
-                  ))}
+                  </div>
+                ))}
+              </div>
+
+              {images.length > 1 && (
+                <div className="absolute top-1/2 flex w-full -translate-y-1/2 justify-between px-4 opacity-0 transition-all duration-300 group-hover/slider:opacity-100">
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setActiveImgIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+                    }}
+                    className="rounded-full bg-white/90 p-3 shadow-xl transition-transform hover:bg-white active:scale-90"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setActiveImgIndex((prev) => (prev + 1) % images.length);
+                    }}
+                    className="rounded-full bg-white/90 p-3 shadow-xl transition-transform hover:bg-white active:scale-90"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
                 </div>
-              </>
-            )}
+              )}
+
+              {images.length > 1 && (
+                <div className="absolute bottom-6 left-0 right-0 px-6">
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {images.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveImgIndex(idx)}
+                        className={`relative h-11 w-11 overflow-hidden rounded-xl transition-all duration-500 ${
+                          idx === activeImgIndex
+                            ? "z-10 scale-110 ring-2 ring-white ring-offset-2 ring-offset-black/20 shadow-lg"
+                            : "opacity-40 grayscale-[0.5] hover:opacity-100 hover:grayscale-0"
+                        }`}
+                      >
+                        <img src={getImageUrl(img)} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="flex h-full w-full flex-col overflow-y-auto p-8 md:w-1/2">
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-800">{room.name}</h2>
+          <div className="flex w-full flex-col p-8 md:w-[48%]">
+            <div className="mb-6 flex flex-col">
+              <div className="mb-4 flex w-full items-center justify-between">
+                <h2 className="text-xl font-extrabold leading-none tracking-tight text-slate-800">
+                  {room.name}
+                </h2>
+                <div className="flex items-center gap-3">
+                  {room.building && (
+                    <span className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600">
+                      {room.building}
+                    </span>
+                  )}
+                  {isRoomAdminUnavailable && (
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-slate-600">
+                      <Ban size={10} />
+                      Unavailable
+                    </span>
+                  )}
+                  <button
+                    onClick={onClose}
+                    className="shrink-0 rounded-full bg-slate-50 p-2.5 transition-all hover:bg-red-50 hover:text-red-500 group"
+                  >
+                    <X size={20} className="text-slate-400 group-hover:text-red-500" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {room.building && (
-                  <span className="inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-blue-600">
-                    {room.building}
-                  </span>
+
+              <div className="flex w-full items-center justify-between pr-[52px] text-[11px] font-semibold text-slate-600">
+                {roomTypeLabel && (
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                    <BedDouble size={14} className="text-slate-400" />
+                    <span className="capitalize">{roomTypeLabel}</span>
+                  </div>
                 )}
-                <button onClick={onClose} className="rounded-full p-2 transition hover:bg-slate-100">
-                  <X size={24} className="text-slate-400" />
-                </button>
+
+                <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
+                  <User size={14} className="text-slate-400" />
+                  <span>
+                    {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="mb-6 flex w-full items-center justify-between pr-[52px] text-xs font-semibold text-slate-600">
-              <span className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                <BedDouble size={14} className="text-slate-400" />
-                <span className="capitalize">
-                  {(room.room_type || room.type || "Room").replace(/_/g, " ")}
-                </span>
-              </span>
-              <span className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                <User size={14} className="text-slate-400" />
-                <span>
-                  {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
-                </span>
-              </span>
-            </div>
+            <div className="mt-2 flex-1 space-y-8 overflow-y-auto border-t border-slate-50 pt-6 pr-2 custom-scrollbar">
+              <section>
+                <h3 className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Description
+                </h3>
+                <p className="text-sm leading-relaxed text-justify text-slate-600">
+                  {room.description ||
+                    "No specific description available for this room. It features standard amenities for a comfortable stay."}
+                </p>
+              </section>
 
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-              Description
-            </h3>
-            <p className="mb-6 text-sm leading-relaxed text-slate-600">
-              {room.description ||
-                "No specific description available for this room. It features standard amenities for a comfortable stay."}
-            </p>
-
-            <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-400">
-              Amenities
-            </h3>
-            <div className="mb-8 flex flex-wrap gap-2">
-                  {room.amenities && Array.isArray(room.amenities) ? (
-                    room.amenities.map((amenity, index) => (
-                      <span
-                        key={index}
-                        className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs capitalize text-slate-600"
+              <section>
+                <h3 className="mb-4 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                  Included Amenities
+                </h3>
+                {amenities.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      {visibleAmenities.map((amenity, index) => (
+                        <div
+                          key={`${amenity}-${index}`}
+                          className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 p-2"
+                        >
+                          <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-slate-700">
+                            {String(amenity || "").replace(/_/g, " ").toUpperCase()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    {amenities.length > MODAL_AMENITIES_PREVIEW_COUNT && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllAmenities((value) => !value)}
+                        className="mt-3 text-[9px] font-black uppercase tracking-[0.18em] text-slate-400 transition hover:text-slate-700"
                       >
-                        {String(amenity || "").replace(/_/g, " ")}
-                      </span>
-                    ))
-                  ) : (
-                <span className="text-xs italic text-slate-400">
-                  No specific amenities listed.
-                </span>
-              )}
+                        {showAllAmenities
+                          ? "Show Less"
+                          : `+${amenities.length - MODAL_AMENITIES_PREVIEW_COUNT} More`}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-slate-100 bg-slate-50 px-3 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    No Amenities Listed
+                  </div>
+                )}
+              </section>
             </div>
 
             {isLoggedIn && (
-              <div className="mt-auto border-t border-slate-100 pt-4">
+              <div className="mt-8">
                 <button
                   disabled={isRoomUnavailable}
                   onClick={() => {
@@ -477,28 +634,16 @@ const Rooms = () => {
                     else addRoom(room);
                     onClose();
                   }}
-                  className={`flex w-full items-center justify-center gap-2 rounded-xl py-4 font-bold uppercase tracking-wide transition-all ${
+                  className={`flex w-full items-center justify-center gap-2 rounded-2xl py-4 font-bold uppercase tracking-wide transition-all ${
                     isRoomUnavailable
                       ? "cursor-not-allowed bg-slate-100 text-slate-400"
                       : isRoomSelected
                         ? "bg-red-50 text-red-600 hover:bg-red-100"
-                        : "bg-slate-900 text-white shadow-xl hover:bg-slate-800"
+                        : "bg-slate-900 text-white shadow-xl hover:bg-slate-800 hover:shadow-2xl"
                   }`}
                 >
                   {isRoomUnavailable ? (
-                    <>
-                      {isRoomUnderMaintenance
-                        ? "Maintenance"
-                        : isRoomCleaningDay
-                          ? "Cleaning"
-                          : isRoomBookedToday
-                            ? "Occupied"
-                            : isRoomBookedForRange
-                              ? roomRangeReason === "cleaning"
-                                ? "Cleaning Day"
-                                : "Booked"
-                              : "Unavailable"}
-                    </>
+                    roomUnavailableLabel
                   ) : isRoomSelected ? (
                     <>
                       Remove from Booking <X size={18} />
@@ -518,23 +663,35 @@ const Rooms = () => {
   };
 
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-slate-50 pt-3">
+    <div className={pageRootClassName}>
       {viewingRoom && <RoomDetailsModal room={viewingRoom} onClose={() => setViewingRoom(null)} />}
 
-      <div className="mx-auto flex h-full w-full max-w-[1750px] flex-col gap-5 overflow-hidden px-[14px] pb-[14px] lg:flex-row lg:gap-5 lg:px-[14px]">
-        <aside className="h-full w-full overflow-y-auto pb-6 pr-2 lg:w-56">
+      <div className={pageShellClassName}>
+        <aside className={sidebarClassName}>
           <div className="flex min-h-full flex-col gap-4">
-            <div className="rounded-lg border bg-white p-3 shadow-sm">
-              <h2 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider leading-none text-slate-900">
+            <div className={filterPanelClassName}>
+              <h2
+                className={`flex items-center font-bold uppercase leading-none text-slate-900 ${
+                  isLoggedIn
+                    ? "mb-3 gap-1.5 text-[10px] tracking-wider"
+                    : "mb-3 gap-1.5 text-[10px] tracking-wider"
+                }`}
+              >
                 <Filter size={11} className="text-slate-400" /> Room Filter
               </h2>
 
               <div className="mb-3">
-                <p className="mb-1.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest leading-[1.25] text-slate-400">
-                  <BedDouble size={8} /> Room Type
+                <p
+                  className={`flex items-center font-bold uppercase leading-[1.25] text-slate-400 ${
+                    isLoggedIn
+                      ? "mb-1.5 gap-1 text-[8px] tracking-widest"
+                      : "mb-1.5 gap-1 text-[8px] tracking-widest"
+                  }`}
+                >
+                  <BedDouble size={filterLabelIconSize} /> Room Type
                 </p>
                 {visibleRoomTypeOptions.map((type) => {
-                  const active = roomType === type;
+                  const active = normalize(roomType) === normalize(type);
                   const Icon =
                     type === "all" ? Layers : normalize(type).includes("dorm") ? Users : User;
 
@@ -545,7 +702,7 @@ const Rooms = () => {
                       className={getFilterButtonClass(active)}
                     >
                       <Icon
-                        size={10}
+                        size={filterIconSize}
                         className={active ? "text-blue-400" : "text-slate-400 group-hover:text-slate-600"}
                       />
                       {type === "all" ? "All Types" : type}
@@ -556,7 +713,9 @@ const Rooms = () => {
                   <button
                     type="button"
                     onClick={() => setShowAllRoomTypes((value) => !value)}
-                    className="mt-1 block w-full text-center text-[8px] font-bold uppercase tracking-[0.14em] leading-[1.25] text-slate-400 transition hover:text-slate-700"
+                    className={`mt-1 block w-full text-center font-bold uppercase leading-[1.25] text-slate-400 transition hover:text-slate-700 ${
+                      isLoggedIn ? "text-[8px] tracking-[0.14em]" : "text-[8px] tracking-[0.14em]"
+                    }`}
                   >
                     {showAllRoomTypes
                       ? "Show Less"
@@ -566,8 +725,14 @@ const Rooms = () => {
               </div>
 
               <div className="mb-3">
-                <p className="mb-1.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest leading-[1.25] text-slate-400">
-                  <Building2 size={8} /> Building
+                <p
+                  className={`flex items-center font-bold uppercase leading-[1.25] text-slate-400 ${
+                    isLoggedIn
+                      ? "mb-1.5 gap-1 text-[8px] tracking-widest"
+                      : "mb-1.5 gap-1 text-[8px] tracking-widest"
+                  }`}
+                >
+                  <Building2 size={filterLabelIconSize} /> Building
                 </p>
                 {visibleBuildingOptions.map((option) => {
                   const active = building === option;
@@ -580,7 +745,7 @@ const Rooms = () => {
                       className={getFilterButtonClass(active)}
                     >
                       <Icon
-                        size={10}
+                        size={filterIconSize}
                         className={active ? "text-blue-400" : "text-slate-400 group-hover:text-slate-600"}
                       />
                       {option === "all" ? "All Buildings" : option}
@@ -591,7 +756,9 @@ const Rooms = () => {
                   <button
                     type="button"
                     onClick={() => setShowAllBuildings((value) => !value)}
-                    className="mt-1 block w-full text-center text-[8px] font-bold uppercase tracking-[0.14em] leading-[1.25] text-slate-400 transition hover:text-slate-700"
+                    className={`mt-1 block w-full text-center font-bold uppercase leading-[1.25] text-slate-400 transition hover:text-slate-700 ${
+                      isLoggedIn ? "text-[8px] tracking-[0.14em]" : "text-[8px] tracking-[0.14em]"
+                    }`}
                   >
                     {showAllBuildings
                       ? "Show Less"
@@ -607,8 +774,10 @@ const Rooms = () => {
                   </p>
                   {[
                     { val: "all", label: "Show All", icon: Layers },
-                    { val: "available", label: "Available", icon: CircleDashed },
+                    { val: "available", label: "Available", icon: CheckCircle },
+                    { val: "unavailable", label: "Unavailable", icon: Ban },
                     { val: "occupied", label: "Occupied", icon: CalendarX },
+                    { val: "cleaning", label: "Cleaning", icon: Sparkles },
                   ].map((status) => (
                     <button
                       key={status.val}
@@ -692,53 +861,55 @@ const Rooms = () => {
           </div>
         </aside>
 
-        <main className="flex-1 h-full overflow-y-auto pt-1 pb-6 pr-1 pl-1">
+        <main className={roomMainClassName}>
           {filteredRooms.length === 0 ? (
             <div className="mt-20 flex flex-col items-center justify-center text-slate-400">
               <Wind size={48} className="mb-4 opacity-20" />
               <p className="font-medium">No rooms match your filter</p>
             </div>
           ) : (
-            <div className="space-y-[20px]">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div className={roomContentClassName}>
+              <div className={roomGridClassName}>
                 {paginatedRooms.map((room) => {
-                  const isUnderMaintenance = isLoggedIn && room.status === "maintenance";
-                  const isCleaningDay =
-                    isLoggedIn && cleaningRooms.some((id) => String(id) === String(room._id));
-                  const isBookedToday =
-                    isLoggedIn && occupiedRooms.some((id) => String(id) === String(room._id));
-                  const rangeReason = isLoggedIn
-                    ? rangeBookedReasons[String(room._id)] ||
-                      (rangeBookedRooms.some((id) => String(id) === String(room._id))
-                        ? "booked"
-                        : "")
-                    : "";
-                  const isBookedForRange = Boolean(rangeReason);
-                  const isUnavailable =
-                    isLoggedIn &&
-                    (isUnderMaintenance || isCleaningDay || isBookedToday || isBookedForRange);
+                  const {
+                    isAdminUnavailable,
+                    isUnderMaintenance,
+                    isCleaningDay,
+                    isBookedToday,
+                    rangeReason,
+                    isBookedForRange,
+                    isUnavailable,
+                    unavailableLabel,
+                  } = getRoomAvailabilityState(room);
                   const selected = isLoggedIn && isSelected(room._id);
                   const canSelectRoom = isLoggedIn && !isUnavailable;
+                  const roomTypeLabel = (room.room_type || room.type || "").replace(/_/g, " ");
 
                   return (
                     <div
                       key={room._id}
                       onClick={() => {
+                        if (!isLoggedIn) {
+                          setViewingRoom(room);
+                          return;
+                        }
                         if (!canSelectRoom) return;
                         selected ? removeRoom(room._id) : addRoom(room);
                       }}
-                      className={`relative overflow-hidden rounded-xl border-2 bg-white transition-all duration-300 ${
+                      className={`relative overflow-hidden border-2 bg-white transition-all duration-300 ${
                         !isLoggedIn
-                          ? "border-slate-100 shadow-none"
+                          ? "cursor-pointer rounded-xl border-transparent hover:border-slate-200 hover:shadow-lg"
                           : isUnavailable
-                            ? "border-slate-100 shadow-none"
+                            ? "rounded-xl border-slate-100 shadow-none"
                             : selected
-                              ? "cursor-pointer border-slate-900 shadow-xl ring-4 ring-blue-600/10"
-                              : "cursor-pointer border-transparent hover:border-slate-200 hover:shadow-lg"
+                              ? "cursor-pointer rounded-xl border-slate-900 shadow-xl ring-4 ring-blue-600/10"
+                              : "cursor-pointer rounded-xl border-transparent hover:border-slate-200 hover:shadow-lg"
                       }`}
                     >
                       <div
-                        className="group relative h-[146px] cursor-zoom-in overflow-hidden bg-slate-200"
+                        className={`group relative cursor-zoom-in overflow-hidden bg-slate-200 ${
+                          isLoggedIn ? "h-[146px]" : "h-[146px]"
+                        }`}
                         onClick={(event) => {
                           event.stopPropagation();
                           setViewingRoom(room);
@@ -755,7 +926,15 @@ const Rooms = () => {
                           }}
                         />
 
-                        {isBookedToday && !isUnderMaintenance && (
+                        {isAdminUnavailable && (
+                          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100/85">
+                            <Ban size={22} className="mb-1 text-slate-700" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-700">
+                              Unavailable
+                            </span>
+                          </div>
+                        )}
+                        {isBookedToday && !isAdminUnavailable && !isUnderMaintenance && !isCleaningDay && (
                           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/50">
                             <CalendarX size={22} className="mb-1 text-slate-500" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
@@ -763,7 +942,19 @@ const Rooms = () => {
                             </span>
                           </div>
                         )}
-                        {isBookedForRange && !isUnderMaintenance && !isCleaningDay && !isBookedToday && (
+                        {isCleaningDay && !isAdminUnavailable && !isUnderMaintenance && !isBookedToday && (
+                          <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100/80">
+                            <Sparkles size={22} className="mb-1 text-slate-700" />
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-700">
+                              Cleaning
+                            </span>
+                          </div>
+                        )}
+                        {isBookedForRange &&
+                          !isAdminUnavailable &&
+                          !isUnderMaintenance &&
+                          !isCleaningDay &&
+                          !isBookedToday && (
                           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-50/80">
                             <CalendarX size={22} className="mb-1 text-slate-600" />
                             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-600">
@@ -771,7 +962,7 @@ const Rooms = () => {
                             </span>
                           </div>
                         )}
-                        {isUnderMaintenance && (
+                        {isUnderMaintenance && !isAdminUnavailable && (
                           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100/80 p-3 text-center text-slate-400">
                             <Ban size={22} className="mb-1" />
                             <span className="text-[9px] font-bold uppercase tracking-widest">
@@ -794,41 +985,65 @@ const Rooms = () => {
                       <div className="p-3">
                         <div className="mb-3">
                           <div className="mb-1 flex items-center justify-between gap-1.5">
-                            <h3 className={`text-[12px] font-bold leading-tight ${isUnavailable ? "text-slate-400" : "text-slate-800"}`}>
+                            <h3
+                              className={`font-bold leading-tight ${
+                                isLoggedIn ? "text-[12px]" : "text-[12px]"
+                              } ${isUnavailable ? "text-slate-400" : "text-slate-800"}`}
+                            >
                               {room.name}
                             </h3>
                             {room.building && (
                               <span
-                                className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-wider ${
+                                className={`inline-flex items-center gap-1 whitespace-nowrap border font-bold uppercase ${
+                                  isLoggedIn
+                                    ? "rounded-md px-1.5 py-0.5 text-[7px] tracking-wider"
+                                    : "rounded-md px-1.5 py-0.5 text-[7px] tracking-wider"
+                                } ${
                                   isUnavailable
                                     ? "border-slate-100 bg-slate-50 text-slate-300"
                                     : "border-slate-200 bg-slate-100 text-slate-500"
                                 }`}
                               >
-                                <Building2 size={8} /> {room.building}
+                                <Building2 size={isLoggedIn ? 8 : 12} /> {room.building}
                               </span>
                             )}
                           </div>
                         </div>
 
-                        <div className={`mb-3 flex flex-wrap gap-2 text-[10px] font-semibold ${isUnavailable ? "text-slate-300" : "text-slate-600"}`}>
-                          <span
-                            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${
-                              isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
-                            }`}
-                          >
-                            <BedDouble size={12} className={isUnavailable ? "text-slate-300" : "text-slate-500"} />
-                            <span className="capitalize">
-                              {(room.room_type || room.type || "Room").replace(/_/g, " ")}
+                        <div
+                          className={`flex items-start justify-between gap-2 font-semibold ${
+                            isLoggedIn ? "mb-3 text-[10px]" : "mb-3 text-[10px]"
+                          } ${isUnavailable ? "text-slate-300" : "text-slate-600"}`}
+                        >
+                          {roomTypeLabel && (
+                            <span
+                              className={`flex min-w-0 flex-1 items-center gap-1.5 border ${
+                                isLoggedIn
+                                  ? "rounded-md px-2 py-1"
+                                  : "rounded-md px-2 py-1"
+                              } ${
+                                isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
+                              }`}
+                            >
+                              <BedDouble
+                                size={12}
+                                className={isUnavailable ? "text-slate-300" : "text-slate-500"}
+                              />
+                              <span className="capitalize">{roomTypeLabel}</span>
                             </span>
-                          </span>
+                          )}
                           <span
-                            className={`flex items-center gap-1.5 rounded-md border px-2 py-1 ${
-                              isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
+                            className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
+                              isUnavailable ? "text-slate-300" : "text-slate-600"
                             }`}
                           >
-                            <Users size={12} className={isUnavailable ? "text-slate-300" : "text-slate-500"} />
-                            {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
+                            <Users
+                              size={12}
+                              className={isUnavailable ? "text-slate-300" : "text-slate-500"}
+                            />
+                            <span className="pr-1.5 text-[9px] text-right">
+                              {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
+                            </span>
                           </span>
                         </div>
 
@@ -849,19 +1064,7 @@ const Rooms = () => {
                                   : "bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 hover:shadow-xl"
                             }`}
                           >
-                            {isUnderMaintenance
-                              ? "Maintenance"
-                              : isCleaningDay
-                                ? "Cleaning"
-                                : isBookedToday
-                                  ? "Occupied"
-                                  : isBookedForRange
-                                    ? rangeReason === "cleaning"
-                                      ? "Cleaning Day"
-                                      : "Booked"
-                                    : selected
-                                      ? "Remove"
-                                      : "Select"}
+                            {isUnavailable ? unavailableLabel : selected ? "Remove" : "Select"}
                           </button>
                         )}
                       </div>
@@ -869,52 +1072,54 @@ const Rooms = () => {
                   );
                 })}
               </div>
-              <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                <div className="w-full text-left sm:w-auto">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
-                    Room Directory
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold text-slate-800">
-                    Showing {visibleRoomStart}-{visibleRoomEnd} of {filteredRooms.length} rooms
-                  </p>
-                </div>
-
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                      disabled={currentPageSafe === 1}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      {visiblePageNumbers.map((page) => (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() => setCurrentPage(page)}
-                          className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[10px] font-bold transition ${
-                            currentPageSafe === page
-                              ? "bg-slate-900 text-white shadow-md"
-                              : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                      disabled={currentPageSafe === totalPages}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
+              <div className={directoryBarClassName}>
+                <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="w-full text-left sm:w-auto">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                      Room Directory
+                    </p>
+                    <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                      Showing {visibleRoomStart}-{visibleRoomEnd} of {filteredRooms.length} rooms
+                    </p>
                   </div>
-                )}
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                        disabled={currentPageSafe === 1}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        {visiblePageNumbers.map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setCurrentPage(page)}
+                            className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[10px] font-bold transition ${
+                              currentPageSafe === page
+                                ? "bg-slate-900 text-white shadow-md"
+                                : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                        disabled={currentPageSafe === totalPages}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AppContext } from "./context/AppContext";
@@ -16,9 +16,16 @@ import ReviewPage from "./pages/ReviewPage";
 import AllReviews from "./pages/AllReviews"; 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-import { ToastContainer, toast } from "react-toastify";
+import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import VerifyOtp from "./pages/VerifyOtp";
+import StyledToastContainer from "./components/StyledToastContainer";
+import {
+  isAccountDisabledMessage,
+  storeDisabledAccountNotice,
+} from "./utils/accountStatusNotice";
+
+const SESSION_REFRESH_INTERVAL_MS = 15000;
 
 // 👈 ADDED: ScrollToTop component
 const ScrollToTop = () => {
@@ -34,47 +41,100 @@ const ScrollToTop = () => {
 const App = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token, setToken, backendUrl } = useContext(AppContext);
+  const { token, setToken, setUserData, backendUrl } = useContext(AppContext);
+  const forcedLogoutRef = useRef(false);
 
   // ================= SECURITY & AUTO-LOGOUT LOGIC =================
   useEffect(() => {
-    // 1. AXIOS INTERCEPTOR: Kicks user if any active request returns 403
+    const handleForcedLogout = ({ disabled = false, message = "" } = {}) => {
+      if (forcedLogoutRef.current || !token) return;
+
+      forcedLogoutRef.current = true;
+      localStorage.removeItem("token");
+      setToken("");
+      setUserData(null);
+
+      if (disabled) {
+        storeDisabledAccountNotice(message);
+      } else {
+        toast.error(message || "Session expired. Please log in again.");
+      }
+
+      navigate("/login", { replace: true });
+    };
+
+    const isDisabledResponse = (error) => {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || "";
+
+      return (
+        status === 403 &&
+        (error.response?.data?.isAccountDisabled === true ||
+          isAccountDisabledMessage(message))
+      );
+    };
+
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
-        if (error.response && error.response.status === 403) {
-          logoutUser();
+        const status = error.response?.status;
+        const message = error.response?.data?.message || "";
+
+        if (isDisabledResponse(error)) {
+          handleForcedLogout({ disabled: true, message });
+        } else if (status === 401 && token) {
+          handleForcedLogout({ message });
         }
+
         return Promise.reject(error);
       }
     );
 
-    // 2. LOGOUT FUNCTION: Clears state and storage
-    const logoutUser = () => {
-      localStorage.removeItem("token");
-      setToken("");
-      toast.error("Account disabled or session expired.");
-      navigate("/login");
+    const checkSession = () => {
+      if (!token) return;
+
+      axios
+        .get(`${backendUrl}/api/user/profile`, { headers: { token } })
+        .catch((err) => {
+          const status = err.response?.status;
+          const message = err.response?.data?.message || "";
+
+          if (isDisabledResponse(err)) {
+            handleForcedLogout({ disabled: true, message });
+          } else if (status === 401) {
+            handleForcedLogout({ message });
+          }
+        });
     };
 
-    // 3. HEARTBEAT: Checks the server every 2 minutes even if user is idle
-    const heartbeat = setInterval(() => {
-      if (token) {
-        axios.get(`${backendUrl}/api/user/profile`, { headers: { token } })
-          .catch((err) => {
-            if (err.response && err.response.status === 403) {
-              logoutUser();
-            }
-          });
+    const runVisibleCheck = () => {
+      if (document.visibilityState === "visible") {
+        checkSession();
       }
-    }, 120000); // 120,000ms = 2 minutes
+    };
 
-    // CLEANUP: Stop the heartbeat and remove interceptor when app closes
+    checkSession();
+
+    const heartbeat = setInterval(runVisibleCheck, SESSION_REFRESH_INTERVAL_MS);
+    const handleFocus = () => checkSession();
+    const handleVisibilityChange = () => runVisibleCheck();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       axios.interceptors.response.eject(interceptor);
       clearInterval(heartbeat);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [token, backendUrl, setToken, navigate]);
+  }, [token, backendUrl, setToken, setUserData, navigate]);
+
+  useEffect(() => {
+    if (!token) {
+      forcedLogoutRef.current = false;
+    }
+  }, [token]);
 
   // Logic to hide Navbar/Footer on specific pages
   const isFullScreenPage = location.pathname === '/reviews';
@@ -82,7 +142,7 @@ const App = () => {
   return (
     <div className="w-full overflow-hidden">
       <ScrollToTop /> {/* 👈 ADDED: Component inserted here */}
-      <ToastContainer position="top-right" autoClose={3000} />
+      <StyledToastContainer />
       
       {!isFullScreenPage && <Navbar />}
 

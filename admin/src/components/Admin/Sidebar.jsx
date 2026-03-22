@@ -54,7 +54,7 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-white border-r min-h-screen p-4 flex flex-col gap-1">
+    <aside className="w-64 bg-[#f8fafc] border-r min-h-screen p-4 flex flex-col gap-1">
       <NavLink to="/admin-dashboard" className={linkClass}>
         <div className="flex items-center gap-3">
           <LayoutDashboard size={18} />

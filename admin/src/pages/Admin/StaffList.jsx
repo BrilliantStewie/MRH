@@ -9,7 +9,9 @@ import {
   Mail, 
   PenBox, 
   Ban,     
-  UserCheck,
+  CircleDot,
+  XCircle,
+  RefreshCcw,
   ChevronDown,
   ChevronUp 
 } from "lucide-react";
@@ -92,13 +94,12 @@ const StaffList = () => {
   const hiddenCount = staffList.length - 5;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto min-h-screen">
+    <div className="max-w-7xl mx-auto min-h-full">
       
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-             <Shield className="text-blue-600" size={24}/> 
              Staff Management
            </h1>
            <p className="text-slate-500 text-sm mt-1">Manage admin access and staff accounts.</p>
@@ -114,7 +115,7 @@ const StaffList = () => {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6">
+      <div className="mb-6">
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input
@@ -142,10 +143,10 @@ const StaffList = () => {
 
             <tbody className="divide-y divide-slate-100">
               {displayedStaff.map((s) => (
-                <tr key={s._id} className={`hover:bg-slate-50 transition-colors group ${s.disabled ? 'bg-slate-50/50' : ''}`}>
+                <tr key={s._id} className={`group transition-colors ${s.disabled ? 'bg-slate-50/80' : 'hover:bg-slate-50/60'}`}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 overflow-hidden relative shadow-inner">
+                      <div className={`w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center border border-slate-200 overflow-hidden relative shadow-inner ${s.disabled ? 'grayscale opacity-70' : ''}`}>
                         {s.image && s.image.trim() !== "" ? (
                            <img 
                              src={s.image} 
@@ -157,28 +158,23 @@ const StaffList = () => {
                            <User size={22} className="text-slate-400" />
                         )}
                         
-                        {s.disabled && (
-                             <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                                 <Ban size={14} className="text-white"/>
-                             </div>
-                        )}
                       </div>
 
                       <div>
-                          <span className={`font-semibold ${s.disabled ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                          <span className={`text-sm font-bold ${s.disabled ? 'text-slate-400' : 'text-slate-900'}`}>
                               {getFullName(s)}
                           </span>
-                          <div className="text-xs text-slate-500 capitalize">{s.role}</div>
+                          <div className={`text-xs capitalize ${s.disabled ? 'text-slate-400' : 'text-slate-500'}`}>{s.role}</div>
                       </div>
                     </div>
                   </td>
                   
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Mail size={14} className="text-slate-400"/> {s.email}
+                      <div className={`flex items-center gap-2 text-sm ${s.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <Mail size={14} className="text-slate-400 opacity-70"/> {s.email}
                       </div>
-                      <div className="flex items-center gap-2 text-slate-600">
+                      <div className={`flex items-center gap-2 text-sm ${s.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
                         <Phone size={14} className="text-slate-400"/> {s.phone || "—"}
                       </div>
                     </div>
@@ -186,12 +182,12 @@ const StaffList = () => {
 
                   <td className="px-6 py-4 text-center">
                     {s.disabled ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100">
-                            Disabled
+                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-slate-100 text-slate-500 border border-slate-200">
+                            <XCircle size={12} /> Disabled
                         </span>
                     ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            Active
+                        <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100">
+                            <CircleDot size={12} className="animate-pulse" /> Active
                         </span>
                     )}
                   </td>
@@ -201,13 +197,13 @@ const StaffList = () => {
                       
                       <button 
                         onClick={() => toggleStatus(s._id)}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all
+                        className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all
                           ${s.disabled 
-                            ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white' 
-                            : 'bg-white border border-slate-200 text-slate-400 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100'}`}
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100' 
+                            : 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100'}`}
                         title={s.disabled ? "Enable Account" : "Disable Account"}
                       >
-                        {s.disabled ? <UserCheck size={16} /> : <Ban size={16} />}
+                        {s.disabled ? <RefreshCcw size={14} /> : <Ban size={14} />}
                         <span className="hidden lg:inline">{s.disabled ? "Enable" : "Disable"}</span>
                       </button>
 

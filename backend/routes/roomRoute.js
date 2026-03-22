@@ -3,6 +3,7 @@ import {
   addRoom,
   updateRoom,
   getAllRooms,
+  getRoomTypes,
   changeAvailability,
   deleteRoom
 } from "../controllers/adminController.js"; // Pointing to your adminController as per previous code
@@ -14,6 +15,7 @@ const router = express.Router();
 
 // 🟢 PUBLIC ROUTES
 router.get("/list", getAllRooms);
+router.get("/types", getRoomTypes);
 
 // 🔴 ADMIN PROTECTED ROUTES
 router.post("/add-room", authAdmin, upload.array("images", 6), addRoom);
