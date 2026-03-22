@@ -3,13 +3,14 @@ import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { StaffContext } from "../../context/StaffContext";
 import {
-  Search, User, RotateCcw, CalendarDays, ArrowRight,
-  Home, Layers, Phone, CheckCircle2,
+  ArrowUpDown, Search, User, RotateCcw, CalendarDays, ArrowRight,
+  Home, Layers, Phone, CheckCircle2, Building2,
   Clock, BarChart3, ChevronDown, 
   AlertCircle, XCircle, Mail, Users, ChevronUp, Tag,
   Package, Info, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { toast } from "react-toastify";
+import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const BOOKINGS_PER_PAGE = 8;
 
@@ -292,6 +293,27 @@ const StaffBookings = () => {
   const paginatedBookings = filteredBookings.slice(pageStartIndex, pageStartIndex + BOOKINGS_PER_PAGE);
   const pageStart = filteredBookings.length === 0 ? 0 : pageStartIndex + 1;
   const pageEnd = Math.min(pageStartIndex + BOOKINGS_PER_PAGE, filteredBookings.length);
+  const sortOptions = [
+    { value: "Newest First", label: "Newest First" },
+    { value: "Oldest First", label: "Oldest First" },
+  ];
+  const buildingOptions = [
+    { value: "All Buildings", label: "All Buildings" },
+    { value: "Margarita", label: "Margarita" },
+    { value: "Nolasco", label: "Nolasco" },
+  ];
+  const roomTypeOptions = [
+    { value: "All Room Types", label: "All Room Types" },
+    { value: "Individual", label: "Individual" },
+    { value: "Individual with Pullout", label: "Individual with Pullout" },
+    { value: "Dormitory", label: "Dormitory" },
+  ];
+  const statusOptions = [
+    { value: "All Status", label: "All Status" },
+    { value: "pending", label: "Pending" },
+    { value: "approved", label: "Approved" },
+    { value: "cancelled", label: "Cancelled" },
+  ];
 
   /* =======================================
      FETCH LOGIC
@@ -587,27 +609,46 @@ const StaffBookings = () => {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 outline-none cursor-pointer" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)}>
-              <option value="Newest First">Newest First</option>
-              <option value="Oldest First">Oldest First</option>
-            </select>
-            <select className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 outline-none cursor-pointer" value={buildingFilter} onChange={(e) => setBuildingFilter(e.target.value)}>
-              <option>All Buildings</option>
-              <option value="Margarita">Margarita</option>
-              <option value="Nolasco">Nolasco</option>
-            </select>
-            <select className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 outline-none cursor-pointer" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-              <option>All Room Types</option>
-              <option value="Individual">Individual</option>
-              <option value="Individual with Pullout">Individual with Pullout</option>
-              <option value="Dormitory">Dormitory</option>
-            </select>
-            <select className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 outline-none cursor-pointer" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="All Status">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <FilterDropdown
+              label="Sort"
+              options={sortOptions}
+              value={sortOrder}
+              onChange={setSortOrder}
+              icon={ArrowUpDown}
+              neutralValue="Newest First"
+              triggerClassName="min-w-[148px] justify-between bg-white text-[13px] font-bold"
+              menuClassName="w-52"
+            />
+            <FilterDropdown
+              label="Building"
+              options={buildingOptions}
+              value={buildingFilter}
+              onChange={setBuildingFilter}
+              icon={Building2}
+              neutralValue="All Buildings"
+              triggerClassName="min-w-[156px] justify-between bg-white text-[13px] font-bold"
+              menuClassName="w-56"
+            />
+            <FilterDropdown
+              label="Room Type"
+              options={roomTypeOptions}
+              value={typeFilter}
+              onChange={setTypeFilter}
+              icon={Home}
+              neutralValue="All Room Types"
+              triggerClassName="min-w-[190px] justify-between bg-white text-[13px] font-bold"
+              menuClassName="w-64"
+            />
+            <FilterDropdown
+              label="Status"
+              options={statusOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              icon={AlertCircle}
+              neutralValue="All Status"
+              triggerClassName="min-w-[145px] justify-between bg-white text-[13px] font-bold"
+              menuClassName="w-48"
+            />
             <button onClick={resetFilters} className="p-2.5 bg-white border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-100 transition-all">
               <RotateCcw size={18} />
             </button>

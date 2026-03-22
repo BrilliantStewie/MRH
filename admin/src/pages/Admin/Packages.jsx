@@ -1,6 +1,14 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import { toast } from "react-toastify";
+import {
+  BedSingle,
+  Building2,
+  Package,
+  RefreshCcw,
+  Search,
+} from "lucide-react";
+import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const PACKAGES_PER_PAGE = 8;
 
@@ -16,11 +24,7 @@ const Packages = () => {
   } = useContext(AdminContext);
 
   const [filterPackageType, setFilterPackageType] = useState("All");
-const [filterRoomType, setFilterRoomType] = useState("All");
-const [isPackageFilterOpen, setIsPackageFilterOpen] = useState(false);
-const [isRoomFilterOpen, setIsRoomFilterOpen] = useState(false);
-const packageFilterRef = useRef(null);
-const roomFilterRef = useRef(null);
+  const [filterRoomType, setFilterRoomType] = useState("All");
   /* =========================================
   UI & FEEDBACK STATES
   ========================================= */
@@ -86,16 +90,6 @@ const roomFilterRef = useRef(null);
 
     if (roomDropdownRef.current && !roomDropdownRef.current.contains(event.target)) {
       setIsRoomDropdownOpen(false);
-    }
-
-    // NEW: Package filter
-    if (packageFilterRef.current && !packageFilterRef.current.contains(event.target)) {
-      setIsPackageFilterOpen(false);
-    }
-
-    // NEW: Room filter
-    if (roomFilterRef.current && !roomFilterRef.current.contains(event.target)) {
-      setIsRoomFilterOpen(false);
     }
 
   };
@@ -360,7 +354,6 @@ const roomFilterRef = useRef(null);
   useEffect(() => {
     if (!showRoomTypeFilter) {
       setFilterRoomType("All");
-      setIsRoomFilterOpen(false);
     }
   }, [showRoomTypeFilter]);
 
@@ -414,6 +407,31 @@ const roomFilterRef = useRef(null);
   const inputClass =
     "w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-2.5 text-sm text-gray-900 transition-all placeholder:text-gray-400 hover:bg-gray-50 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50";
   const labelClass = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500";
+  const getPackageTypeIcon = (type) => {
+    const normalized = String(type || "").toLowerCase();
+
+    if (normalized === "room package") return BedSingle;
+    if (normalized === "venue package") return Building2;
+    return Package;
+  };
+
+  const packageFilterOptions = [
+    { value: "All", label: "All Package Types", icon: Package },
+    ...packageTypes.map((type) => ({
+      value: type,
+      label: type,
+      icon: getPackageTypeIcon(type),
+    })),
+  ];
+
+  const roomTypeFilterOptions = [
+    { value: "All", label: "All Room Types", icon: BedSingle },
+    ...roomTypes.map((roomType) => ({
+      value: roomType._id,
+      label: roomType.name,
+      icon: BedSingle,
+    })),
+  ];
 
   return (
     <div className="flex flex-col bg-slate-50 font-sans text-slate-900">
@@ -445,116 +463,46 @@ const roomFilterRef = useRef(null);
  <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:justify-between">
 
   {/* SEARCH */}
-<div className="w-full rounded-xl border border-slate-200 bg-white px-4 shadow-sm lg:flex lg:h-[46px] lg:max-w-[294px] lg:items-center">
+<div className="relative w-full lg:max-w-[320px]">
+  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
   <input
     type="text"
     placeholder="Search packages..."
     value={searchTerm}
     onChange={(e) => setSearchTerm(e.target.value)}
-    className="w-full bg-transparent py-2.5 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400"
+    className="h-[46px] w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-medium text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-500/10"
   />
 </div>
 
   <div className="flex flex-wrap items-center gap-3 lg:ml-auto lg:justify-end">
 
   {/* PACKAGE TYPE FILTER */}
-<div ref={packageFilterRef} className="relative">
-  <button
-    onClick={() => setIsPackageFilterOpen(!isPackageFilterOpen)}
-    className="flex h-[46px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100"
-  >
-    {filterPackageType === "All" ? "Package Types" : filterPackageType}
-    <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-    </svg>
-  </button>
-
-  {isPackageFilterOpen && (
-    <div className="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-      <div
-        onClick={() => {
-          setFilterPackageType("All");
-          setIsPackageFilterOpen(false);
-        }}
-        className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-bold text-slate-400 cursor-pointer hover:bg-slate-100"
-      >
-        <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7h16M4 12h16M4 17h16" />
-        </svg>
-        All Package Types
-      </div>
-
-      <div className="mx-1 my-1.5 h-px bg-slate-100" />
-
-      {packageTypes.map(t => (
-        <div
-          key={t}
-          onClick={() => {
-            setFilterPackageType(t);
-            setIsPackageFilterOpen(false);
-          }}
-          className="cursor-pointer rounded-lg px-4 py-3.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
-        >
-          {t}
-        </div>
-      ))}
-    </div>
-  )}
-</div>
+  <FilterDropdown
+    label="Package Type"
+    options={packageFilterOptions}
+    value={filterPackageType}
+    onChange={setFilterPackageType}
+    icon={Package}
+    neutralValue="All"
+    align="left"
+    triggerClassName="min-w-[192px] justify-between bg-slate-50 font-bold"
+    menuClassName="w-60"
+  />
 
 
   {/* ROOM FILTER */}
   {showRoomTypeFilter && (
-  <div ref={roomFilterRef} className="relative">
-    <button
-      onClick={() => setIsRoomFilterOpen(!isRoomFilterOpen)}
-      className="flex h-[46px] min-w-[190px] items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 text-sm font-bold text-slate-700 transition-all hover:bg-slate-100"
-    >
-      <span className="truncate">
-        {filterRoomType === "All"
-          ? "Room Types"
-          : roomTypes.find((r) => String(r._id) === String(filterRoomType))?.name}
-      </span>
-
-      <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"/>
-      </svg>
-    </button>
-
-    {isRoomFilterOpen && (
-      <div className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-xl animate-in fade-in zoom-in-95 duration-200">
-
-        <div
-          onClick={() => {
-            setFilterRoomType("All");
-            setIsRoomFilterOpen(false);
-          }}
-          className="flex items-center gap-3 rounded-lg px-4 py-3 text-xs font-bold text-slate-400 cursor-pointer hover:bg-slate-100"
-        >
-          <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M5 19h14a1 1 0 001-1V8a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1z" />
-          </svg>
-          All Room Types
-        </div>
-
-        <div className="mx-1 my-1.5 h-px bg-slate-100" />
-
-        {roomTypes.map(rt => (
-          <div
-            key={rt._id}
-            onClick={() => {
-              setFilterRoomType(rt._id);
-              setIsRoomFilterOpen(false);
-            }}
-            className="cursor-pointer rounded-lg px-4 py-3.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100"
-          >
-            {rt.name}
-          </div>
-        ))}
-
-      </div>
-    )}
-  </div>
+    <FilterDropdown
+      label="Room Type"
+      options={roomTypeFilterOptions}
+      value={filterRoomType}
+      onChange={setFilterRoomType}
+      icon={BedSingle}
+      neutralValue="All"
+      align="left"
+      triggerClassName="min-w-[198px] justify-between bg-slate-50 font-bold"
+      menuClassName="w-64"
+    />
   )}
 
 
@@ -568,14 +516,9 @@ const roomFilterRef = useRef(null);
     type="button"
     title="Reset filters"
     aria-label="Reset filters"
-    className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-red-500"
+    className="inline-flex h-[46px] w-[46px] items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-rose-500"
   >
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h5" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 20v-5h-5" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.6 13.2A7 7 0 0017 17.4L20 15" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.4 10.8A7 7 0 007 6.6L4 9" />
-    </svg>
+    <RefreshCcw className="h-4 w-4" />
   </button>
 
 </div>

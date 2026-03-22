@@ -610,7 +610,7 @@ const MyBookings = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-600 transition-colors" size={18} />
             <input
               type="text"
-              placeholder="Search rooms or booking ID..."
+              placeholder="Search rooms..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-11 pr-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-semibold shadow-sm outline-none focus:ring-4 focus:ring-slate-100 focus:border-slate-300 transition-all"

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useMemo, useState, useRef } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import { 
   Search, 
@@ -7,9 +7,7 @@ import {
   Shield,
   CircleDot,
   XCircle,
-  ChevronDown,
   ChevronUp,
-  Check,
   RefreshCcw,
   PenBox, 
   Ban,     
@@ -19,69 +17,7 @@ import {
   X
 } from "lucide-react";
 import { toast } from "react-toastify";
-
-// --- CustomDropdown Component ---
-const CustomDropdown = ({ label, options, value, onChange, icon: Icon }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const selectedLabel = options.find((opt) => opt.value === value)?.label || label;
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-4 py-2.5 rounded-full border text-sm font-bold transition-all ${
-          isOpen 
-            ? "bg-indigo-50 border-indigo-200 text-indigo-700 ring-2 ring-indigo-500/20" 
-            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white hover:border-slate-300 hover:shadow-sm"
-        }`}
-      >
-        {Icon && <Icon size={14} className={value !== 'all' ? "text-indigo-500" : "text-slate-400"} />}
-        <span>
-          <span className="text-slate-400 font-medium mr-1 hidden sm:inline">{label}:</span>
-          {selectedLabel}
-        </span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-100 rounded-xl shadow-xl z-50 p-1.5 animate-in fade-in zoom-in-95 duration-100">
-          {options.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => {
-                onChange(opt.value);
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-bold rounded-lg transition-colors ${
-                value === opt.value
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {opt.icon && <opt.icon size={14} className={value === opt.value ? "text-indigo-500" : "text-slate-400"} />}
-                {opt.label}
-              </div>
-              {value === opt.value && <Check size={14} className="text-indigo-600" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const Users = () => {
   const { aToken, allUsers, getAllUsers, changeUserStatus, addGuestUser, updateStaff } = useContext(AdminContext);
@@ -232,8 +168,26 @@ const Users = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end z-10">
-            <CustomDropdown label="Role" options={roleOptions} value={roleFilter} onChange={setRoleFilter} icon={Shield} />
-            <CustomDropdown label="Status" options={statusOptions} value={statusFilter} onChange={setStatusFilter} icon={CircleDot} />
+            <FilterDropdown
+              label="Role"
+              options={roleOptions}
+              value={roleFilter}
+              onChange={setRoleFilter}
+              icon={Shield}
+              showLabelPrefix
+              neutralValue="all"
+              menuClassName="w-52"
+            />
+            <FilterDropdown
+              label="Status"
+              options={statusOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              icon={CircleDot}
+              showLabelPrefix
+              neutralValue="all"
+              menuClassName="w-52"
+            />
             {(roleFilter !== "all" || statusFilter !== "all" || search) && (
               <button 
                 onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}

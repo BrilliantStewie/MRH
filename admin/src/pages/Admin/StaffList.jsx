@@ -99,15 +99,15 @@ const StaffList = () => {
       {/* Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+           <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
              Staff Management
-           </h1>
-           <p className="text-slate-500 text-sm mt-1">Manage admin access and staff accounts.</p>
+            </h1>
+           <p className="text-slate-500 text-sm font-medium mt-1">Manage admin access and staff accounts.</p>
         </div>
         
         <button 
           onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+          className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
         >
           <UserPlus size={18} />
           Add Staff
@@ -117,22 +117,22 @@ const StaffList = () => {
       {/* Search Bar */}
       <div className="mb-6">
         <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
             placeholder="Search by name, email, or suffix..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all text-sm"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/10"
           />
         </div>
       </div>
 
       {/* Data Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200 uppercase text-xs text-slate-500 tracking-wider">
+            <thead className="bg-slate-50 border-b border-slate-200 uppercase text-[10px] text-slate-500 tracking-wider">
               <tr>
                 <th className="px-6 py-4 font-semibold">Staff Member</th>
                 <th className="px-6 py-4 font-semibold">Contact Info</th>

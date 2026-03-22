@@ -10,6 +10,7 @@ import { auth, googleProvider } from "../config/firebase";
 import VerifyOtp from './VerifyOtp'; 
 import VerifyFirebasePhoneOtp from './VerifyFirebasePhoneOtp';
 import AccountStatusModal from '../components/AccountStatusModal';
+import loginVisual from "../assets/mrh_about.jpg";
 import {
   consumeDisabledAccountNotice,
   DEFAULT_DISABLED_ACCOUNT_MESSAGE,
@@ -901,8 +902,16 @@ const Login = () => {
         </div>
 
         <div className='hidden lg:block lg:w-[50%] p-6'>
-          <div className='w-full h-full rounded-[35px] bg-cover bg-center shadow-inner relative overflow-hidden' style={{ backgroundImage: `url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1968&auto=format&fit=crop')` }}>
-             <div className='absolute inset-0 bg-black/5'></div>
+          <div className='relative h-full w-full overflow-hidden rounded-[35px] shadow-inner'>
+             <img src={loginVisual} alt="Mercedarian Retreat House" className='absolute inset-0 h-full w-full object-cover' />
+             <div className='absolute inset-0 bg-gradient-to-br from-slate-950/45 via-slate-900/15 to-transparent'></div>
+             <div className='absolute inset-x-0 bottom-0 p-8'>
+               <div className='max-w-sm rounded-[28px] border border-white/20 bg-white/12 p-6 text-white backdrop-blur-md'>
+                 <p className='text-[11px] font-bold uppercase tracking-[0.35em] text-white/70'>Mercedarian Retreat House</p>
+                 <h3 className='mt-3 text-2xl font-bold leading-tight'>A calm, intentional stay experience from booking to arrival.</h3>
+                 <p className='mt-3 text-sm leading-6 text-white/80'>Secure access, clearer verification, and a more cohesive guest journey.</p>
+               </div>
+             </div>
           </div>
         </div>
       </div>
