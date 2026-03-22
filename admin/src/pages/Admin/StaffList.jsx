@@ -175,7 +175,7 @@ const StaffList = () => {
                         <Mail size={14} className="text-slate-400 opacity-70"/> {s.email}
                       </div>
                       <div className={`flex items-center gap-2 text-sm ${s.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
-                        <Phone size={14} className="text-slate-400"/> {s.phone || "—"}
+                        <Phone size={14} className="text-slate-400 opacity-70"/> {s.phone || "-"}
                       </div>
                     </div>
                   </td>
@@ -266,3 +266,4 @@ const StaffList = () => {
 };
 
 export default StaffList;
+
