@@ -28,9 +28,9 @@ const authAdmin = async (req, res, next) => {
     }
 
     // ==============================
-    // 3️⃣ Allow Only Admin or Staff
+    // 3️⃣ Allow Only Admin
     // ==============================
-    const allowedRoles = ["admin", "staff"];
+    const allowedRoles = ["admin"];
 
     if (!allowedRoles.includes(decoded.role)) {
       return res.status(403).json({
@@ -52,6 +52,13 @@ const authAdmin = async (req, res, next) => {
         return res.status(401).json({
           success: false,
           message: "User account no longer exists."
+        });
+      }
+
+      if ((user.tokenVersion || 0) !== (decoded.tokenVersion ?? 0)) {
+        return res.status(401).json({
+          success: false,
+          message: "Session expired due to security changes. Please login again."
         });
       }
 

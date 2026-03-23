@@ -1,9 +1,9 @@
-// controllers/notificationController.js
 import Notification from "../models/notificationModel.js";
+import {
+  buildNotificationMatchFilter,
+  dedupeNotificationsForDisplay,
+} from "../utils/notificationUtils.js";
 
-/* ============================================================
-   1️⃣ GET USER NOTIFICATIONS
-============================================================ */
 export const getUserNotifications = async (req, res) => {
   try {
     const userId = req.userId;
@@ -13,27 +13,27 @@ export const getUserNotifications = async (req, res) => {
       type: { $ne: "account_status" },
     })
       .sort({ createdAt: -1 })
-      .limit(20);
+      .limit(100)
+      .lean();
 
-    res.json({ success: true, notifications });
+    res.json({
+      success: true,
+      notifications: dedupeNotificationsForDisplay(notifications, 20),
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ============================================================
-   2️⃣ MARK NOTIFICATION AS READ
-============================================================ */
 export const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.userId;
 
-    const notification = await Notification.findOneAndUpdate(
-      { _id: id, recipient: userId }, // ✅ MUST MATCH MODEL
-      { isRead: true },               // ✅ MUST MATCH MODEL
-      { new: true }
-    );
+    const notification = await Notification.findOne({
+      _id: id,
+      recipient: userId,
+    });
 
     if (!notification) {
       return res.status(404).json({
@@ -42,15 +42,48 @@ export const markAsRead = async (req, res) => {
       });
     }
 
+    await Notification.updateMany(
+      {
+        recipient: userId,
+        ...buildNotificationMatchFilter(notification),
+      },
+      { isRead: true }
+    );
+
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-/* ============================================================
-   3) MARK ALL NOTIFICATIONS AS READ
-============================================================ */
+export const deleteNotification = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.userId;
+
+    const notification = await Notification.findOne({
+      _id: id,
+      recipient: userId,
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found or unauthorized",
+      });
+    }
+
+    const result = await Notification.deleteMany({
+      recipient: userId,
+      ...buildNotificationMatchFilter(notification),
+    });
+
+    res.json({ success: true, deleted: result.deletedCount || 0 });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 export const markAllAsRead = async (req, res) => {
   try {
     const userId = req.userId;
@@ -64,9 +97,6 @@ export const markAllAsRead = async (req, res) => {
   }
 };
 
-/* ============================================================
-   4) CLEAR ALL NOTIFICATIONS FOR USER
-============================================================ */
 export const clearUserNotifications = async (req, res) => {
   try {
     const userId = req.userId;

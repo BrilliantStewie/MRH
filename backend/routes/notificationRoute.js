@@ -1,5 +1,5 @@
 import express from "express";
-import { getUserNotifications, markAsRead, markAllAsRead, clearUserNotifications } from "../controllers/notificationController.js";
+import { getUserNotifications, markAsRead, deleteNotification, markAllAsRead, clearUserNotifications } from "../controllers/notificationController.js";
 import authUser from "../middlewares/authUser.js";
 
 const notificationRouter = express.Router();
@@ -15,5 +15,8 @@ notificationRouter.put("/read-all", authUser, markAllAsRead);
 
 // Clear all notifications for the logged-in user
 notificationRouter.delete("/clear", authUser, clearUserNotifications);
+
+// Delete a specific notification for the logged-in user
+notificationRouter.delete("/:id", authUser, deleteNotification);
 
 export default notificationRouter;

@@ -270,7 +270,7 @@ const Dashboard = () => {
   const roomUtilization = useMemo(() => {
     const rooms = allRooms || [];
     const total = rooms.length || 1;
-    const dormitoryCount = rooms.filter((room) => (room.room_type || "").toLowerCase().includes("dorm")).length;
+    const dormitoryCount = rooms.filter((room) => (room.roomType || room.room_type || "").toLowerCase().includes("dorm")).length;
     const nolascoCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("nolasco")).length;
     const margaritaCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("margarita")).length;
     const toPercent = (count) => Math.round((count / total) * 100);

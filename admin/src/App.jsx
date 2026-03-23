@@ -1,6 +1,5 @@
-import React, { useContext } from "react"; // Removed useEffect, axios
-import { Routes, Route, Navigate, useLocation } from "react-router-dom"; // Removed useNavigate
-import "react-toastify/dist/ReactToastify.css";
+import React, { useContext, useEffect, useState } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 // Contexts
 import { AdminContext } from "./context/AdminContext";
@@ -35,53 +34,67 @@ const App = () => {
   const { aToken } = useContext(AdminContext);
   const { sToken } = useContext(StaffContext);
   const location = useLocation();
+  const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false);
+  const [isStaffSidebarOpen, setIsStaffSidebarOpen] = useState(false);
   const isBookingsRoute =
     location.pathname === "/all-bookings" || location.pathname === "/staff-bookings";
   const isAdminDashboardRoute = location.pathname === "/admin-dashboard";
   const isAdminAnalyticsRoute = location.pathname === "/admin-analytics";
   const isAdminRoomsRoute = location.pathname === "/rooms-list";
   const isAdminPackagesRoute = location.pathname === "/admin-packages";
+  const isAdminUsersRoute = location.pathname === "/admin-users";
+  const isAdminStaffListRoute = location.pathname === "/admin-staff-list";
 
-  // NOTE: The Security Interceptor is now handled inside AdminContext.jsx
-  // This makes the App.jsx much cleaner and prevents duplicate logic.
+  useEffect(() => {
+    setIsAdminSidebarOpen(false);
+    setIsStaffSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#f8fafc] font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">
-      <div className="print:hidden">
-        <StyledToastContainer />
-      </div>
-
+      <StyledToastContainer />
       {/* ================= ADMIN LAYOUT ================= */}
       {aToken ? (
         <>
           <div className="print:hidden">
-            <Navbar />
+            <Navbar onMenuToggle={() => setIsAdminSidebarOpen((open) => !open)} />
           </div>
           <div className="flex flex-1 overflow-hidden bg-[#f8fafc] print:block print:overflow-visible">
             <div className="print:hidden">
-              <Sidebar />
+              <Sidebar
+                isOpen={isAdminSidebarOpen}
+                onClose={() => setIsAdminSidebarOpen(false)}
+              />
             </div>
-            <main
-              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
-                isAdminRoomsRoute
-                  ? "overflow-hidden p-0"
-                  : isBookingsRoute
-                    ? "overflow-y-auto p-0"
-                    : "overflow-y-auto p-4 lg:p-8"
-              }`}
-            >
+              <main
+                className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
+                  isAdminRoomsRoute
+                    ? "overflow-hidden p-0"
+                  : isAdminPackagesRoute
+                      ? "overflow-hidden p-4 lg:p-8"
+                    : isAdminUsersRoute || isAdminStaffListRoute
+                      ? "overflow-hidden p-4 lg:p-8"
+                    : isBookingsRoute
+                      ? "overflow-hidden p-0"
+                      : "overflow-y-auto p-4 lg:p-8"
+                }`}
+              >
               <div
                 className={`w-full print:mx-0 print:max-w-none print:pb-0 ${
                   isAdminRoomsRoute
                     ? "h-full max-w-none pb-0"
-                    : isAdminDashboardRoute
+                  : isAdminDashboardRoute
                       ? "mx-auto max-w-7xl pb-0"
                     : isAdminAnalyticsRoute
                       ? "mx-auto max-w-7xl pb-0"
-                    : isAdminPackagesRoute
-                      ? "mx-auto max-w-7xl pb-0"
+                  : isAdminPackagesRoute
+                      ? "h-full mx-auto max-w-7xl pb-0"
+                    : isAdminUsersRoute
+                      ? "h-full max-w-none pb-0"
+                    : isAdminStaffListRoute
+                      ? "h-full mx-auto max-w-7xl pb-0"
                     : isBookingsRoute
-                      ? "max-w-none pb-0"
+                      ? "h-full max-w-none pb-0"
                       : "mx-auto max-w-7xl pb-20"
                 }`}
               >
@@ -105,14 +118,25 @@ const App = () => {
         /* ================= STAFF LAYOUT ================= */
         <>
           <div className="print:hidden">
-            <StaffNavbar />
+            <StaffNavbar onMenuToggle={() => setIsStaffSidebarOpen((open) => !open)} />
           </div>
           <div className="flex flex-1 overflow-hidden bg-[#f8fafc] print:block print:overflow-visible">
             <div className="print:hidden">
-              <StaffSidebar />
+              <StaffSidebar
+                isOpen={isStaffSidebarOpen}
+                onClose={() => setIsStaffSidebarOpen(false)}
+              />
             </div>
-            <main className="flex-1 overflow-y-auto bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0">
-              <div className={`w-full print:mx-0 print:max-w-none ${isBookingsRoute ? "max-w-none" : "mx-auto max-w-7xl"}`}>
+            <main
+              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
+                isBookingsRoute ? "overflow-hidden p-0" : "overflow-y-auto"
+              }`}
+            >
+              <div
+                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${
+                  isBookingsRoute ? "h-full max-w-none pb-0" : "mx-auto max-w-7xl"
+                }`}
+              >
                 <Routes>
                   <Route
                     path="/staff-dashboard"

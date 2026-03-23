@@ -184,7 +184,6 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
       const success = isEdit ? await updateStaff(editData._id, data) : await createStaff(data);
       if (success) {
         await getAllUsers();
-        toast.success(isEdit ? "Staff details updated" : "Staff created successfully");
         onClose();
       }
     } catch (error) {
@@ -196,23 +195,23 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity">
-      <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row animate-scale-up max-h-[90vh]">
+      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl animate-scale-up md:flex-row">
         
         {/* LEFT COLUMN */}
-        <div className="w-full md:w-[320px] bg-slate-900 text-white p-8 flex flex-col items-center justify-center text-center relative shrink-0">
+        <div className="relative flex w-full shrink-0 flex-col items-center justify-center bg-slate-900 p-6 text-center text-white md:w-[320px] md:p-8">
           <button onClick={onClose} className="absolute top-4 left-4 md:hidden p-2 bg-white/10 rounded-full"><X size={20} /></button>
           <div className="mb-6">
             <h2 className="text-2xl font-bold tracking-tight">{isEdit ? "Edit Profile" : "New Account"}</h2>
             <p className="text-slate-400 text-sm mt-1">Staff Access Control</p>
           </div>
-          <div className="mb-6 relative group">
-            <label className="cursor-pointer block w-40 h-40 rounded-full border-4 border-slate-700 bg-slate-800 overflow-hidden shadow-2xl hover:border-slate-500 transition-colors relative">
+          <div className="relative mb-6 group">
+            <label className="relative block h-32 w-32 cursor-pointer overflow-hidden rounded-full border-4 border-slate-700 bg-slate-800 shadow-2xl transition-colors hover:border-slate-500 sm:h-40 sm:w-40">
                 {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" alt="Profile" /> : <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 group-hover:text-slate-400 transition-colors"><User size={48} className="mb-2" /><span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Upload</span></div>}
                 <input type="file" hidden accept="image/*" onChange={handleImageChange} />
             </label>
             {previewUrl && <button onClick={handleRemoveImage} className="absolute top-0 right-0 translate-x-1 -translate-y-1 bg-red-500 text-white p-2.5 rounded-full shadow-lg hover:bg-red-600 hover:scale-105 transition-all z-10 border-2 border-slate-900"><Trash2 size={16} /></button>}
           </div>
-          <div className="bg-slate-800/50 px-4 py-3 rounded-xl w-full border border-slate-700">
+          <div className="w-full rounded-xl border border-slate-700 bg-slate-800/50 px-4 py-3">
              <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase tracking-wider mb-1"><Mail size={12} /> Email Address</div>
              <p className="text-sm font-mono text-indigo-300 truncate">{formData.email || "waiting for names..."}</p>
           </div>
@@ -221,11 +220,11 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
         {/* RIGHT COLUMN */}
         <div className="flex-1 bg-white flex flex-col relative">
           <button onClick={onClose} className="absolute top-5 right-5 text-slate-300 hover:text-slate-600 transition-colors hidden md:block"><X size={24} /></button>
-          <div className="p-8 md:p-10 overflow-y-auto scrollbar-hide flex-1">
+          <div className="flex-1 overflow-y-auto p-5 scrollbar-hide sm:p-6 md:p-10">
              <form id="split-form" onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-4">
                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2">Personal Details</h3>
-                   <div className="grid grid-cols-2 gap-4">
+                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1">
                          <label className="text-xs font-semibold text-slate-600">First Name <span className="text-red-500">*</span></label>
                          <input name="firstName" value={firstName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="First Name" />
@@ -235,12 +234,12 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                          <input name="lastName" value={lastName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Last Name" />
                       </div>
                    </div>
-                   <div className="grid grid-cols-4 gap-4">
-                      <div className="col-span-3 space-y-1">
+                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+                      <div className="space-y-1 sm:col-span-3">
                          <label className="text-xs font-semibold text-slate-600">Middle Name (Optional)</label>
                          <input name="middleName" value={middleName} onChange={handleNameChange} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none transition-all" placeholder="Middle Name" />
                       </div>
-                      <div className="col-span-1 space-y-1 relative">
+                      <div className="relative space-y-1 sm:col-span-1">
                          <label className="text-xs font-semibold text-slate-600">Suffix</label>
                          {/* ✅ RE-ADDED: Validation visual feedback for Suffix */}
                          <input 
@@ -273,7 +272,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
                    <div className="flex justify-between items-center border-b pb-2">
                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Security</h3>
                    </div>
-                   <div className="grid grid-cols-2 gap-4">
+                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-1">
                          <label className="text-xs font-semibold text-slate-600">Create Password {!isEdit && <span className="text-red-500">*</span>}</label>
                          <div className="relative">
@@ -300,9 +299,9 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
              </form>
           </div>
 
-          <div className="p-6 border-t bg-slate-50 flex justify-end gap-3">
-             <button onClick={onClose} className="px-5 py-2 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors">Cancel</button>
-             <button type="submit" form="split-form" disabled={loading} className={`px-8 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg active:scale-95 transition-all flex items-center gap-2 ${isEdit ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-900 hover:bg-slate-800'}`}>
+          <div className="flex flex-col-reverse gap-3 border-t bg-slate-50 p-5 sm:flex-row sm:justify-end sm:p-6">
+             <button onClick={onClose} className="px-5 py-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800">Cancel</button>
+             <button type="submit" form="split-form" disabled={loading} className={`flex items-center justify-center gap-2 rounded-xl px-8 py-2.5 text-sm font-bold text-white shadow-lg transition-all active:scale-95 ${isEdit ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-900 hover:bg-slate-800'}`}>
                 {loading ? "Processing..." : (isEdit ? "Update Staff" : "Create Account")}
              </button>
           </div>

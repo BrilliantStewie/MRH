@@ -4,11 +4,22 @@ import validator from "validator";
 import axios from "axios"; 
 import userModel from "../models/userModel.js";
 import bookingModel from "../models/bookingModel.js";
-import Notification from "../models/notificationModel.js";
+import Review from "../models/reviewModel.js";
 import cloudinary from "../config/cloudinary.js"; 
 import { admin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
 import sendEmail from "../utils/sendEmail.js";
 import sendSMS from "../utils/sendSMS.js";
+import {
+    createOrRefreshNotification,
+    createOrRefreshNotifications,
+} from "../utils/notificationUtils.js";
+import {
+    attachReviewDataToBookings,
+    buildBookingPopulate,
+    packageReferencePopulate,
+    roomReferencePopulate,
+    serializeReview,
+} from "../utils/dataConsistency.js";
 
 // --- HELPERS ---
 const parseGoogleDisplayName = (value, fallbackFirst = "") => {
@@ -27,9 +38,9 @@ const parseGoogleDisplayName = (value, fallbackFirst = "") => {
     };
 };
 
-const createToken = (id, name, role) => {
+const createToken = (id, name, role, tokenVersion = 0) => {
     return jwt.sign(
-        { id, name, role },
+        { id, name, role, tokenVersion },
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
     );
@@ -462,6 +473,7 @@ const resetPassword = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
         user.passwordSet = true;
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
         if (isPhone) {
             user.phoneVerified = true;
         }
@@ -605,7 +617,7 @@ const googleAuth = async (req, res) => {
             );
         }
 
-        const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role);
+        const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, user.tokenVersion || 0);
         res.json({ success: true, token });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -741,7 +753,7 @@ const loginUser = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
-            const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role);
+            const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, user.tokenVersion || 0);
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });
@@ -960,6 +972,7 @@ const updateUserProfile = async (req, res) => {
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(newPassword, salt);
             user.passwordSet = true;
+            user.tokenVersion = (user.tokenVersion || 0) + 1;
         }
 
         if (removeImage === 'true' || removeImage === true) user.image = "";
@@ -980,16 +993,22 @@ const updateUserProfile = async (req, res) => {
 const createBooking = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { roomId, packageId, checkIn, checkOut, participants, totalPrice } = req.body;
+        const { roomId, packageId, checkIn, checkOut, participants, totalPrice, bookingName } = req.body;
         
         const bookingData = {
-            user_id: userId,
-            room_ids: roomId ? [roomId] : [],
-            package_id: packageId || null,
-            check_in: new Date(checkIn),
-            check_out: new Date(checkOut),
-            participants,
-            total_price: totalPrice,
+            userId,
+            bookingName: bookingName || "Room Booking",
+            bookingItems: roomId && packageId ? [{
+                roomId,
+                packageId,
+                participants: Number(participants) || 1,
+                subtotal: Number(totalPrice) || 0
+            }] : [],
+            extraPackages: [],
+            venueParticipants: 0,
+            checkIn: new Date(checkIn),
+            checkOut: new Date(checkOut),
+            totalPrice,
             payment: false,
             paymentStatus: 'unpaid'
         };
@@ -1024,12 +1043,15 @@ const createBooking = async (req, res) => {
 const getUserBookings = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const bookings = await bookingModel.find({ user_id: userId })
-            .populate("bookingItems.room_id")
-            .populate("bookingItems.package_id", "name")
-            .populate("extra_packages", "name")
-            .sort({ createdAt: -1 });
-        res.json({ success: true, bookings });
+        let bookingsQuery = bookingModel.find({ userId }).sort({ createdAt: -1 });
+
+        for (const populateConfig of buildBookingPopulate()) {
+            bookingsQuery = bookingsQuery.populate(populateConfig);
+        }
+
+        const bookings = await bookingsQuery;
+        const normalizedBookings = await attachReviewDataToBookings(bookings);
+        res.json({ success: true, bookings: normalizedBookings });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -1038,9 +1060,13 @@ const getUserBookings = async (req, res) => {
 const cancelBooking = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findById(bookingId).populate("user_id");
+        const booking = await bookingModel.findById(bookingId).populate("userId");
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        if (String(booking.userId?._id || booking.userId) !== String(req.userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
 
         const isApproved = booking.status === 'approved';
         const isPaid = booking.payment === true || booking.paymentStatus === 'paid';
@@ -1051,20 +1077,20 @@ const cancelBooking = async (req, res) => {
                 type: "booking_update",
                 message: `Cancellation request received: ${booking.bookingName || "Booking"}`,
                 link: `/admin/bookings?bookingId=${booking._id}`,
-                sender: booking.user_id?._id || booking.user_id
+                sender: booking.userId?._id || booking.userId
             });
             res.json({ success: true, message: "Cancellation request sent for approval" });
         } else {
             await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
             
             await sendEmail(
-                booking.user_id.email,
+                booking.userId.email,
                 "Booking cancelled - Mercedarian Retreat House",
                 `
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                        <p>Hello ${booking.user_id.firstName || "Guest"},</p>
+                        <p>Hello ${booking.userId.firstName || "Guest"},</p>
                         <p>Your booking was cancelled.</p>
-                        <p>Check-in: ${new Date(booking.check_in).toLocaleDateString()}</p>
+                        <p>Check-in: ${new Date(booking.checkIn).toLocaleDateString()}</p>
                         <p>Mercedarian Retreat House</p>
                     </div>
                 `
@@ -1087,19 +1113,27 @@ const createCheckoutSession = async (req, res) => {
         const { bookingId } = req.body;
         const booking = await bookingModel
             .findById(bookingId)
-            .populate("bookingItems.room_id")
-            .populate("bookingItems.package_id")
-            .populate("extra_packages")
-            .populate("user_id", "firstName middleName lastName suffix email");
+            .populate("bookingItems.roomId")
+            .populate("bookingItems.packageId")
+            .populate("extraPackages")
+            .populate("userId", "firstName middleName lastName suffix email");
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        const roomName = booking.bookingItems?.[0]?.room_id?.name;
+        if (String(booking.userId?._id || booking.userId) !== String(req.userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        if (booking.paymentStatus === "paid") {
+            return res.json({ success: false, message: "Booking is already marked as paid." });
+        }
+
+        const roomName = booking.bookingItems?.[0]?.roomId?.name;
         const packageName =
-            booking.bookingItems?.[0]?.package_id?.name ||
-            booking.extra_packages?.[0]?.name;
+            booking.bookingItems?.[0]?.packageId?.name ||
+            booking.extraPackages?.[0]?.name;
         const itemName = roomName || packageName || booking.bookingName || "Reservation";
 
-        const user = booking.user_id;
+        const user = booking.userId;
         const customerName = user
             ? [user.firstName, user.middleName, user.lastName, user.suffix].filter(Boolean).join(" ")
             : "Guest";
@@ -1118,7 +1152,7 @@ const createCheckoutSession = async (req, res) => {
                     description: "Your receipt from Mercedarian Retreat House",
                     line_items: [{
                         currency: 'PHP',
-                        amount: booking.total_price * 100,
+                        amount: booking.totalPrice * 100,
                         description: `Booking for ${itemName}`,
                         name: "Mercedarian Retreat House",
                         quantity: 1
@@ -1176,7 +1210,7 @@ const notifyAdminsAndStaff = async ({ type, message, link, sender }) => {
             isRead: false
         }));
 
-        await Notification.insertMany(notifications);
+        await createOrRefreshNotifications(notifications);
     } catch (error) {
         console.error("Notification create error:", error.message);
     }
@@ -1185,7 +1219,7 @@ const notifyAdminsAndStaff = async ({ type, message, link, sender }) => {
 const notifyUser = async ({ recipient, type, message, link, sender }) => {
     if (!recipient) return;
     try {
-        await Notification.create({
+        await createOrRefreshNotification({
             recipient,
             sender,
             type,
@@ -1201,42 +1235,39 @@ const notifyUser = async ({ recipient, type, message, link, sender }) => {
 const verifyPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
-            payment: true, 
-            paymentStatus: 'paid', 
-            paymentMethod: 'gcash' 
-        }, { new: true }).populate("user_id");
+        const booking = await bookingModel.findById(bookingId).populate("userId");
 
-        if (booking) {
-            await sendEmail(
-                booking.user_id.email,
-                "Payment received - Mercedarian Retreat House",
-                `
-                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                        <p>Hello ${booking.user_id.firstName},</p>
-                        <p>Your payment was received and verified.</p>
-                        <p>Booking: ${booking.bookingName || "Reservation"}</p>
-                        <p>Mercedarian Retreat House</p>
-                    </div>
-                `
-            );
-
-            await notifyAdminsAndStaff({
-                type: "payment_update",
-                message: `Payment received: ${booking.bookingName || "Booking"}`,
-                link: `/admin/bookings?bookingId=${booking._id}`,
-                sender: booking.user_id?._id || booking.user_id
-            });
-
-            await notifyUser({
-                recipient: booking.user_id?._id || booking.user_id,
-                type: "payment_update",
-                message: "Payment sent successfully. Your booking is now marked as paid.",
-                link: `/my-bookings?bookingId=${booking._id}`
-            });
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
         }
 
-        res.json({ success: true, message: "Payment Verified" });
+        if (String(booking.userId?._id || booking.userId) !== String(req.userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        if (booking.paymentStatus === "paid") {
+            return res.json({ success: true, message: "Payment already confirmed." });
+        }
+
+        if (booking.paymentMethod !== "gcash" || booking.paymentStatus !== "pending") {
+            return res.json({ success: false, message: "GCash checkout is not in a verifiable state." });
+        }
+
+        await notifyAdminsAndStaff({
+            type: "payment_update",
+            message: `GCash payment submitted: ${booking.bookingName || "Booking"}`,
+            link: `/admin/bookings?bookingId=${booking._id}`,
+            sender: booking.userId?._id || booking.userId
+        });
+
+        await notifyUser({
+            recipient: booking.userId?._id || booking.userId,
+            type: "payment_update",
+            message: "Payment submitted successfully. Awaiting admin confirmation.",
+            link: `/my-bookings?bookingId=${booking._id}`
+        });
+
+        res.json({ success: true, message: "Payment submitted. Awaiting admin confirmation." });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -1245,27 +1276,39 @@ const verifyPayment = async (req, res) => {
 const markCashPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
+        const booking = await bookingModel.findById(bookingId).populate("userId");
+
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
+        }
+
+        if (String(booking.userId?._id || booking.userId) !== String(req.userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        if (booking.paymentStatus === "paid") {
+            return res.json({ success: false, message: "Booking is already marked as paid." });
+        }
+
         await bookingModel.findByIdAndUpdate(bookingId, { 
             paymentMethod: 'cash',
             paymentStatus: 'pending'
         });
 
-        const booking = await bookingModel.findById(bookingId).populate("user_id");
-        if (booking) {
-            await notifyAdminsAndStaff({
-                type: "payment_update",
-                message: `Cash payment selected: ${booking.bookingName || "Booking"}`,
-                link: `/admin/bookings?bookingId=${booking._id}`,
-                sender: booking.user_id?._id || booking.user_id
-            });
+        await notifyAdminsAndStaff({
+            type: "payment_update",
+            message: `Cash payment selected: ${booking.bookingName || "Booking"}`,
+            link: `/admin/bookings?bookingId=${booking._id}`,
+            sender: booking.userId?._id || booking.userId
+        });
 
-            await notifyUser({
-                recipient: booking.user_id?._id || booking.user_id,
-                type: "payment_update",
-                message: "Cash payment selected. Please pay at the counter.",
-                link: `/my-bookings?bookingId=${booking._id}`
-            });
-        }
+        await notifyUser({
+            recipient: booking.userId?._id || booking.userId,
+            type: "payment_update",
+            message: "Cash payment selected. Please pay at the counter.",
+            link: `/my-bookings?bookingId=${booking._id}`
+        });
+
         res.json({ success: true, message: "Marked as Pay Now (Cash)" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -1278,15 +1321,15 @@ const confirmCashPayment = async (req, res) => {
         const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
             payment: true,
             paymentStatus: 'paid' 
-        }, { new: true }).populate("user_id");
+        }, { new: true }).populate("userId");
 
         if (booking) {
             await sendEmail(
-                booking.user_id.email,
+                booking.userId.email,
                 "Payment confirmed - Mercedarian Retreat House",
                 `
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                        <p>Hello ${booking.user_id.firstName},</p>
+                        <p>Hello ${booking.userId.firstName},</p>
                         <p>Your cash payment was confirmed.</p>
                         <p>Your booking is now secured.</p>
                         <p>Mercedarian Retreat House</p>
@@ -1295,7 +1338,7 @@ const confirmCashPayment = async (req, res) => {
             );
 
             await notifyUser({
-                recipient: booking.user_id?._id || booking.user_id,
+                recipient: booking.userId?._id || booking.userId,
                 type: "payment_update",
                 message: "Cash payment confirmed. Your reservation is secured.",
                 link: `/my-bookings?bookingId=${booking._id}`
@@ -1314,22 +1357,67 @@ const rateBooking = async (req, res) => {
     try {
         const { bookingId, rating, review } = req.body;
         const userId = req.userId;
+        const booking = await bookingModel.findById(bookingId);
+        const normalizedRating = Number(rating);
+        const normalizedComment = String(review || "").trim();
 
-        const user = await userModel.findById(userId);
-        const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
+        }
 
-        await bookingModel.findByIdAndUpdate(bookingId, { 
-            rating, 
-            review,
-            $push: { 
-                reviewChat: {
-                    senderName: userName,
-                    senderRole: 'guest',
-                    message: review,
-                    createdAt: new Date()
-                }
+        if (String(booking.userId) !== String(userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        if (!normalizedRating || normalizedRating < 1 || normalizedRating > 5) {
+            return res.json({ success: false, message: "Please provide a rating between 1 and 5" });
+        }
+
+        const existingReview = await Review.findOne({ bookingId });
+
+        if (existingReview) {
+            if (
+                existingReview.rating !== normalizedRating ||
+                existingReview.comment !== normalizedComment
+            ) {
+                existingReview.editHistory.push({
+                    rating: existingReview.rating,
+                    comment: existingReview.comment,
+                    editedAt: new Date()
+                });
+                existingReview.rating = normalizedRating;
+                existingReview.comment = normalizedComment;
+                existingReview.isEdited = true;
+                existingReview.isHidden = false;
+                await existingReview.save();
             }
+
+            return res.json({ success: true, message: "Thank you for your feedback!", review: serializeReview(existingReview) });
+        }
+
+        const createdReview = await Review.create({
+            bookingId,
+            userId,
+            rating: normalizedRating,
+            comment: normalizedComment,
+            images: [],
+            isHidden: false
         });
+
+        const recipients = await userModel.find({ role: { $in: ["admin", "staff"] } }).select("_id");
+        if (recipients.length > 0) {
+            await createOrRefreshNotifications(
+                recipients.map((recipient) => ({
+                    recipient: recipient._id,
+                    sender: userId,
+                    type: "new_review",
+                    message: `New ${normalizedRating}-star review received.`,
+                    link: `/admin/reviews?reviewId=${createdReview._id}`,
+                    isRead: false
+                }))
+            );
+        }
+
         res.json({ success: true, message: "Thank you for your feedback!" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -1340,20 +1428,29 @@ const addReviewChat = async (req, res) => {
     try {
         const { bookingId, message } = req.body;
         const userId = req.userId;
+        const normalizedMessage = String(message || "").trim();
 
-        const user = await userModel.findById(userId);
-        const userName = user ? `${user.firstName} ${user.lastName}` : "Guest";
+        if (!normalizedMessage) {
+            return res.json({ success: false, message: "Reply cannot be empty" });
+        }
 
-        await bookingModel.findByIdAndUpdate(bookingId, {
-            $push: {
-                reviewChat: {
-                    senderName: userName,
-                    senderRole: 'guest',
-                    message: message,
-                    createdAt: new Date()
-                }
-            }
+        const review = await Review.findOne({ bookingId });
+
+        if (!review) {
+            return res.json({ success: false, message: "Review not found" });
+        }
+
+        if (String(review.userId) !== String(userId)) {
+            return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        review.reviewChat.push({
+            senderId: userId,
+            senderRole: 'guest',
+            message: normalizedMessage,
+            createdAt: new Date()
         });
+        await review.save();
 
         res.json({ success: true, message: "Reply added" });
     } catch (error) {
@@ -1366,14 +1463,18 @@ const deleteReviewReply = async (req, res) => {
         const { bookingId, chatId } = req.body;
         const userId = req.userId;
 
-        await bookingModel.findOneAndUpdate(
-            { _id: bookingId, user_id: userId },
-            { 
-                $pull: { 
-                    reviewChat: { _id: chatId, senderRole: 'guest' } 
-                } 
-            }
-        );
+        const review = await Review.findOne({ bookingId, userId });
+        if (!review) {
+            return res.json({ success: false, message: "Review not found" });
+        }
+
+        const reply = review.reviewChat.id(chatId);
+        if (!reply || reply.senderRole !== "guest" || String(reply.senderId || "") !== String(userId)) {
+            return res.json({ success: false, message: "Reply not found or unauthorized" });
+        }
+
+        review.reviewChat.pull(chatId);
+        await review.save();
 
         res.json({ success: true, message: "Reply deleted successfully" });
     } catch (error) {
@@ -1383,16 +1484,33 @@ const deleteReviewReply = async (req, res) => {
 
 const getAllPublicReviews = async (req, res) => {
     try {
-        const reviews = await bookingModel.find({ 
-            rating: { $gt: 0 } 
-        })
-        .populate("user_id", "firstName lastName image")
-        .populate("bookingItems.room_id", "name")
-        .populate("bookingItems.package_id", "name")
-        .populate("extra_packages", "name")
-        .sort({ createdAt: -1 });
-
-        res.json({ success: true, reviews });
+        const reviews = await Review.find({ isHidden: false })
+            .populate("userId", "firstName middleName lastName image")
+            .populate({
+                path: "reviewChat.senderId",
+                select: "firstName middleName lastName image",
+                options: { strictPopulate: false }
+            })
+            .populate({
+                path: "bookingId",
+                select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
+                populate: [
+                    {
+                        path: "bookingItems.roomId",
+                        populate: roomReferencePopulate
+                    },
+                    {
+                        path: "bookingItems.packageId",
+                        populate: packageReferencePopulate
+                    },
+                    {
+                        path: "extraPackages",
+                        populate: packageReferencePopulate
+                    }
+                ]
+            })
+            .sort({ createdAt: -1 });
+        res.json({ success: true, reviews: reviews.map((item) => serializeReview(item)) });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

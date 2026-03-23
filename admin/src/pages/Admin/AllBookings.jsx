@@ -10,6 +10,11 @@ import {
 import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const BOOKINGS_PER_PAGE = 8;
+const getBookingRoomType = (item) =>
+  String(item?.room_id?.roomType || item?.room_id?.room_type || item?.roomType || item?.room_type || "").trim();
+
+const getBookingBuilding = (item) =>
+  String(item?.room_id?.building || item?.building || "").trim();
 
 // --- HELPER COMPONENT: Status Badge ---
 const StatusBadge = ({ status }) => {
@@ -165,7 +170,7 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
                         <p className="text-[9px] text-slate-400 font-bold uppercase">{room.room_id?.building}</p>
                       </div>
                       <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[10px] text-slate-500 font-medium">{room.room_id?.room_type}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{room.room_id?.roomType || room.room_id?.room_type}</p>
                         <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.room_id?.capacity}</p>
                       </div>
                     </div>
@@ -335,7 +340,7 @@ const AllBookings = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("All Buildings");
   const [statusFilter, setStatusFilter] = useState("All Status");
-  const [roomTypeFilter, setRoomTypeFilter] = useState("All Types");
+  const [roomTypeFilter, setRoomTypeFilter] = useState("All Room Types");
   const [sortOrder, setSortOrder] = useState("Newest First");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -346,7 +351,22 @@ const AllBookings = () => {
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
   const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE));
-  const pageStartIndex = (currentPage - 1) * BOOKINGS_PER_PAGE;
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const visiblePageCount = Math.min(3, totalPages);
+  const halfVisiblePageCount = Math.floor(visiblePageCount / 2);
+  let visiblePageStart = Math.max(1, currentPageSafe - halfVisiblePageCount);
+  let visiblePageEnd = visiblePageStart + visiblePageCount - 1;
+
+  if (visiblePageEnd > totalPages) {
+    visiblePageEnd = totalPages;
+    visiblePageStart = Math.max(1, visiblePageEnd - visiblePageCount + 1);
+  }
+
+  const visiblePageNumbers = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, index) => visiblePageStart + index
+  );
+  const pageStartIndex = (currentPageSafe - 1) * BOOKINGS_PER_PAGE;
   const paginatedBookings = filteredBookings.slice(pageStartIndex, pageStartIndex + BOOKINGS_PER_PAGE);
   const pageStart = filteredBookings.length === 0 ? 0 : pageStartIndex + 1;
   const pageEnd = Math.min(pageStartIndex + BOOKINGS_PER_PAGE, filteredBookings.length);
@@ -356,14 +376,29 @@ const AllBookings = () => {
   ];
   const buildingOptions = [
     { value: "All Buildings", label: "All Buildings" },
-    { value: "Margarita", label: "Margarita" },
-    { value: "Nolasco", label: "Nolasco" },
+    ...Array.from(
+      new Set(
+        (bookings || [])
+          .flatMap((booking) => booking.bookingItems || [])
+          .map((item) => getBookingBuilding(item))
+          .filter(Boolean)
+      )
+    )
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+      .map((value) => ({ value, label: value })),
   ];
   const roomTypeOptions = [
-    { value: "All Types", label: "All Room Types" },
-    { value: "Individual", label: "Individual" },
-    { value: "Individual with Pullout", label: "Individual with Pullout" },
-    { value: "Dormitory", label: "Dormitory" },
+    { value: "All Room Types", label: "All Room Types" },
+    ...Array.from(
+      new Set(
+        (bookings || [])
+          .flatMap((booking) => booking.bookingItems || [])
+          .map((item) => getBookingRoomType(item))
+          .filter(Boolean)
+      )
+    )
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+      .map((value) => ({ value, label: value })),
   ];
   const statusOptions = [
     { value: "All Status", label: "All Status" },
@@ -435,7 +470,7 @@ const AllBookings = () => {
     setSearchTerm("");
     setBuildingFilter("All Buildings");
     setStatusFilter("All Status");
-    setRoomTypeFilter("All Types");
+    setRoomTypeFilter("All Room Types");
     setSortOrder("Newest First");
     setStartDate("");
     setEndDate("");
@@ -487,14 +522,14 @@ const AllBookings = () => {
       filtered = filtered.filter(b => `${b.user_id?.firstName} ${b.user_id?.lastName}`.toLowerCase().includes(term) || b._id.toLowerCase().includes(term));
     }
     
-    if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => r.building === buildingFilter));
+    if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingBuilding(r) === buildingFilter));
     
     if (statusFilter !== "All Status") {
       filtered = filtered.filter(b => b.status?.toLowerCase() === statusFilter.toLowerCase());
     }
 
-    if (roomTypeFilter !== "All Types") {
-      filtered = filtered.filter(b => b.bookingItems?.some(r => r.room_type?.toLowerCase() === roomTypeFilter.toLowerCase()));
+    if (roomTypeFilter !== "All Room Types") {
+      filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingRoomType(r).toLowerCase() === roomTypeFilter.toLowerCase()));
     }
 
     if (startDate || endDate) {
@@ -558,7 +593,7 @@ const AllBookings = () => {
   };
 
   return (
-    <div className="w-full bg-[#f8fafc] px-3 pt-4 pb-0 font-sans md:px-5 md:pt-8 md:pb-0">
+    <div className="flex h-full min-h-0 w-full flex-col bg-[#f8fafc] px-3 pt-4 pb-0 font-sans md:px-5 md:pt-8 md:pb-0">
       <style>{`
         @keyframes bookingFlashRow {
           0%, 100% { background-color: transparent; }
@@ -687,7 +722,7 @@ const AllBookings = () => {
               value={roomTypeFilter}
               onChange={setRoomTypeFilter}
               icon={Home}
-              neutralValue="All Types"
+              neutralValue="All Room Types"
               triggerClassName="min-w-[190px] justify-between bg-slate-50 text-[13px] font-bold"
               menuClassName="w-64"
             />
@@ -701,7 +736,7 @@ const AllBookings = () => {
               triggerClassName="min-w-[150px] justify-between bg-slate-50 text-[13px] font-bold"
               menuClassName="w-52"
             />
-            <button onClick={() => { setSearchTerm(""); setBuildingFilter("All Buildings"); setRoomTypeFilter("All Types"); setStatusFilter("All Status"); setSortOrder("Newest First"); setStartDate(""); setEndDate(""); setMonthFilter("All Months"); setYearFilter("All Years"); }} className="p-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
+            <button onClick={() => { setSearchTerm(""); setBuildingFilter("All Buildings"); setRoomTypeFilter("All Room Types"); setStatusFilter("All Status"); setSortOrder("Newest First"); setStartDate(""); setEndDate(""); setMonthFilter("All Months"); setYearFilter("All Years"); }} className="p-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-200 transition-all">
               <RotateCcw size={18} />
             </button>
           </div>
@@ -709,8 +744,8 @@ const AllBookings = () => {
       </div>
 
       {/* TABLE */}
-      <div className="mb-12 w-full overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
+      <div className="mb-12 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+        <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr>
@@ -875,42 +910,52 @@ const AllBookings = () => {
           </table>
         </div>
         {filteredBookings.length > 0 && (
-          <div className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs font-bold text-slate-500">
-              Showing {pageStart}-{pageEnd} of {filteredBookings.length} bookings
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                <button
-                  key={page}
-                  type="button"
-                  onClick={() => setCurrentPage(page)}
-                  className={`inline-flex h-9 min-w-9 items-center justify-center rounded-xl border px-3 text-xs font-black transition-all ${
-                    currentPage === page
-                      ? "border-slate-900 bg-slate-900 text-white"
-                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-all hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronRight size={16} />
-              </button>
+          <div className="mt-auto flex flex-col gap-2 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="w-full text-left sm:w-auto">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                Booking Directory
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
+                Showing {pageStart}-{pageEnd} of {filteredBookings.length} bookings
+              </p>
             </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                  disabled={currentPageSafe === 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {visiblePageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold transition ${
+                        currentPageSafe === page
+                          ? "bg-slate-900 text-white shadow-md"
+                          : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                  disabled={currentPageSafe === totalPages}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -107,7 +107,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     if (editRoom) {
       setName(editRoom.name);
       setPassword(editRoom.password || ""); // Initialize password if editing
-      setRoomType(editRoom.room_type);
+      setRoomType(editRoom.roomType || editRoom.room_type || "");
       setBuilding(editRoom.building);
       setCapacity(editRoom.capacity);
       setDescription(editRoom.description);
@@ -134,16 +134,19 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   // ==============================
   const handleSaveBuilding = async () => {
     if (!tempBuildingName.trim()) return toast.warn("Name cannot be empty");
+    const nextBuildingName = tempBuildingName.trim();
     try {
       let response;
       if (editingBuildingId) {
-        response = await axios.post(`${backendUrl}/api/admin/update-building`, { id: editingBuildingId, name: tempBuildingName }, { headers: { token: aToken } });
+        response = await axios.post(`${backendUrl}/api/admin/update-building`, { id: editingBuildingId, name: nextBuildingName }, { headers: { token: aToken } });
       } else {
-        response = await axios.post(`${backendUrl}/api/admin/add-building`, { name: tempBuildingName }, { headers: { token: aToken } });
+        response = await axios.post(`${backendUrl}/api/admin/add-building`, { name: nextBuildingName }, { headers: { token: aToken } });
       }
       if (response.data.success) {
-        toast.success("Building updated");
+        toast.success(editingBuildingId ? "Building updated" : "Building added");
         await getBuildings();
+        setBuilding(nextBuildingName);
+        setShowBuildingDropdown(false);
         resetBuildingStates();
       }
     } catch (error) { toast.error("Building operation failed"); }
@@ -186,16 +189,19 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   // ==============================
   const handleSaveType = async () => {
     if (!tempTypeName.trim()) return toast.warn("Type name required");
+    const nextTypeName = tempTypeName.trim();
     try {
       let response;
       if (editingTypeId) {
-        response = await axios.post(`${backendUrl}/api/admin/update-room-type`, { id: editingTypeId, name: tempTypeName }, { headers: { token: aToken } });
+        response = await axios.post(`${backendUrl}/api/admin/update-room-type`, { id: editingTypeId, name: nextTypeName }, { headers: { token: aToken } });
       } else {
-        response = await axios.post(`${backendUrl}/api/admin/add-room-type`, { name: tempTypeName }, { headers: { token: aToken } });
+        response = await axios.post(`${backendUrl}/api/admin/add-room-type`, { name: nextTypeName }, { headers: { token: aToken } });
       }
       if (response.data.success) {
-        toast.success("Category updated");
+        toast.success(editingTypeId ? "Room type updated" : "Room type added");
         await getRoomTypes();
+        setRoomType(nextTypeName);
+        setShowTypeDropdown(false);
         resetTypeStates();
       }
     } catch (error) { toast.error("Operation failed"); }
@@ -301,7 +307,7 @@ if (roomType === "Individual" && capacity !== 1) {
   return toast.error("Individual rooms must have exactly 1 guest capacity.");
 }
 
-if (roomType === "With Pullout" && capacity !== 2) {
+if (roomType === "Individual with Pullout" && capacity !== 2) {
   return toast.error("Rooms with pullout must have exactly 2 guest capacity.");
 }
 
@@ -314,7 +320,7 @@ if (roomType === "Dormitory" && capacity < 3) {
       const formData = new FormData();
       formData.append("name", name);
       formData.append("password", password); // Added Password to submission
-      formData.append("room_type", roomType);
+      formData.append("roomType", roomType);
       formData.append("building", building);
       formData.append("capacity", capacity);
       formData.append("description", description);

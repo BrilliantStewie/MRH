@@ -71,7 +71,7 @@ const RoomsList = () => {
 
   const filteredRooms = useMemo(() => {
     const data = (allRooms || []).filter((room) => {
-      const rType = room.room_type || room.type || "";
+      const rType = room.roomType || room.room_type || room.type || "";
       const matchesType = filterType
         ? rType.toLowerCase().trim() === filterType.toLowerCase().trim()
         : true;
@@ -217,8 +217,12 @@ const RoomsList = () => {
         <div className="w-full md:w-[52%] p-5 flex flex-col bg-white">
           <div className="relative flex-1 overflow-hidden rounded-[2.5rem] group/slider bg-slate-100 shadow-inner min-h-[400px]">
             <div 
-              className="flex h-full will-change-transform transition-transform duration-[1200ms] cubic-bezier(0.23, 1, 0.32, 1)" 
-              style={{ transform: `translateX(-${activeImgIndex * 100}%)` }}
+              className="flex h-full will-change-transform transition-transform"
+              style={{
+                transform: `translateX(-${activeImgIndex * 100}%)`,
+                transitionDuration: "1200ms",
+                transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+              }}
             >
               {images.map((img, index) => (
                 <div key={index} className="min-w-full h-full select-none">
@@ -288,7 +292,7 @@ const RoomsList = () => {
             <div className="flex items-center justify-between w-full pr-[52px] text-[11px] font-bold">
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl">
                 <BedSingle size={16} className="text-slate-400" />
-                <span>{room.room_type}</span>
+                <span>{room.roomType || room.room_type}</span>
               </div>
               
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl">
@@ -469,9 +473,9 @@ const RoomsList = () => {
              </button>
              {activeDropdown === 'type' && (
                  <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                      <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
-                       <BedSingle size={14} /> All Types
-                     </div>
+                       <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
+                        <BedSingle size={14} /> All Room Types
+                      </div>
                      <div className="h-px bg-slate-100 my-1 mx-2" />
                      {roomTypes.slice(0, showMoreTypes ? roomTypes.length : 3).map((t) => (
                           <div key={t._id} onClick={() => { setFilterType(t.name); setActiveDropdown(null); }} className="rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
@@ -592,7 +596,7 @@ const RoomsList = () => {
                   <p className={`min-w-0 flex-1 text-[9px] font-bold uppercase tracking-wide ${
                     room.available ? "text-slate-400" : "text-slate-300"
                   }`}>
-                    {room.room_type || room.type}
+                    {room.roomType || room.room_type || room.type}
                   </p>
                   <span className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
                     !room.available ? "text-slate-300" : "text-slate-500"

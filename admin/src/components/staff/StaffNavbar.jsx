@@ -2,10 +2,10 @@ import React, { useContext, useState, useEffect } from "react";
 import { assets } from "../../assets/assets"; 
 import { useNavigate, useLocation } from "react-router-dom";
 import { StaffContext } from "../../context/StaffContext";
-import { User, LogOut, UserCircle, Bell, BellOff, MessageSquare, MoreHorizontal, Check, Trash2, AlertTriangle, Calendar, ChevronDown, ChevronUp, Star, Shield, CreditCard } from "lucide-react";
+import { User, LogOut, UserCircle, Bell, BellOff, MessageSquare, MoreHorizontal, Check, Trash2, AlertTriangle, Calendar, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
 import axios from "axios";
 
-const StaffNavbar = () => {
+const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -19,6 +19,7 @@ const StaffNavbar = () => {
   const [imgError, setImgError] = useState(false); 
   const [notifications, setNotifications] = useState([]);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState(null);
 
   // Close dropdowns automatically when changing pages
   useEffect(() => {
@@ -27,6 +28,7 @@ const StaffNavbar = () => {
     setShowAllNotifications(false);
     setShowClearConfirm(false);
     setShowNotificationMenu(false);
+    setNotificationToDelete(null);
   }, [location.pathname]);
 
   // Reset image error state when staffData changes
@@ -57,6 +59,23 @@ const StaffNavbar = () => {
       await axios.put(`${backendUrl}/api/notifications/read/${id}`, {}, {
         headers: { token: sToken }
       });
+      fetchNotifications();
+    } catch (error) {
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        staffLogout();
+        navigate("/");
+      }
+      console.error(error);
+    }
+  };
+
+  const deleteNotification = async () => {
+    if (!notificationToDelete) return;
+    try {
+      await axios.delete(`${backendUrl}/api/notifications/${notificationToDelete}`, {
+        headers: { token: sToken }
+      });
+      setNotificationToDelete(null);
       fetchNotifications();
     } catch (error) {
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -262,31 +281,41 @@ const StaffNavbar = () => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full bg-[#f8fafc] border-b border-slate-200 py-3 shadow-sm">
-      <div className="flex items-center justify-between px-4 sm:px-8">
+      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-[#f8fafc] py-3 shadow-sm">
+      <div className="flex items-center justify-between gap-3 px-3 sm:px-8">
         
         {/* --- LEFT: BRANDING --- */}
-        <div 
-          className="flex items-center gap-3 cursor-pointer group select-none" 
-          onClick={() => navigate('/Staff-dashboard')}
-        >
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onMenuToggle}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+          <div 
+            className="group flex cursor-pointer items-center gap-3 select-none" 
+            onClick={() => navigate('/Staff-dashboard')}
+          >
           <img 
             src={assets.logo} 
             alt="Logo" 
-            className="w-11 h-11 object-contain transition-transform group-hover:scale-105" 
+            className="h-10 w-10 object-contain transition-transform group-hover:scale-105 sm:h-11 sm:w-11" 
           />
           <div className="flex flex-col justify-center">
             <h1 className="text-[15px] font-black text-slate-800 tracking-tight leading-none">
               MRH
             </h1>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md w-fit bg-emerald-50 text-emerald-700 border border-emerald-100 uppercase tracking-widest mt-1">
+            <span className="mt-1 hidden w-fit rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-700 sm:inline-flex">
               Staff Panel
             </span>
+          </div>
           </div>
         </div>
 
         {/* --- RIGHT: NOTIFICATIONS + PROFILE SECTION --- */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <div className="relative">
             <button
               type="button"
@@ -324,7 +353,7 @@ const StaffNavbar = () => {
                     setShowNotificationMenu(false);
                   }}
                 ></div>
-                <div className="absolute right-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
                   <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                     <div className="flex items-center gap-2 text-slate-700">
                       <Bell size={11} className="text-slate-400" />
@@ -486,23 +515,32 @@ const StaffNavbar = () => {
                                 </div>
                               </div>
                               <div className="ml-2 flex-shrink-0">
-                                {!n.isRead ? (
+                                <div className="flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                  {!n.isRead && (
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        markAsRead(n._id);
+                                      }}
+                                      className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                                    >
+                                      <Check size={9} />
+                                      Mark read
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      markAsRead(n._id);
+                                      setNotificationToDelete(n._id);
                                     }}
-                                    className="pointer-events-none flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 hover:border-slate-300 hover:text-slate-700"
+                                    className="flex items-center gap-1 rounded-full border border-rose-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
                                   >
-                                    <Check size={9} />
-                                    Mark read
+                                    <Trash2 size={9} />
+                                    Delete
                                   </button>
-                                ) : (
-                                  <div className="mt-0.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100">
-                                    <Check size={10} />
-                                  </div>
-                                )}
+                                </div>
                               </div>
                             </div>
                           );
@@ -556,7 +594,7 @@ const StaffNavbar = () => {
     {/* Click-away backdrop */}
     <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
     
-    <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
+    <div className="absolute right-0 mt-3 w-[min(224px,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
       
       {/* "SIGNED IN AS" Header */}
       <div className="px-5 py-3 border-b border-slate-50 mb-1 bg-slate-50/50 rounded-t-2xl">
@@ -625,6 +663,40 @@ const StaffNavbar = () => {
                 className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
               >
                 Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <Trash2 size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-slate-900">Delete notification?</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  This will remove the selected notification from your staff list.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNotificationToDelete(null)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteNotification}
+                className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
+              >
+                Delete
               </button>
             </div>
           </div>

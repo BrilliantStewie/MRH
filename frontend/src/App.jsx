@@ -12,14 +12,12 @@ import MyBookings from "./pages/MyBookings";
 import RoomBooking from "./pages/RoomBooking";
 import RetreatBooking from "./pages/RetreatBooking";
 import Payment from "./pages/Payment";
-import ReviewPage from "./pages/ReviewPage"; 
-import AllReviews from "./pages/AllReviews"; 
+import ReviewPage from "./pages/ReviewPage";
+import AllReviews from "./pages/AllReviews";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import { toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import VerifyOtp from "./pages/VerifyOtp";
-import StyledToastContainer from "./components/StyledToastContainer";
 import {
   isAccountDisabledMessage,
   storeDisabledAccountNotice,
@@ -37,6 +35,8 @@ const ScrollToTop = () => {
 
   return null;
 };
+
+import StyledToastContainer from "./components/StyledToastContainer";
 
 const App = () => {
   const location = useLocation();
@@ -137,13 +137,13 @@ const App = () => {
   }, [token]);
 
   // Logic to hide Navbar/Footer on specific pages
-  const isFullScreenPage = location.pathname === '/reviews';
+  const isFullScreenPage = location.pathname === "/reviews";
 
   return (
     <div className="w-full overflow-hidden">
-      <ScrollToTop /> {/* 👈 ADDED: Component inserted here */}
       <StyledToastContainer />
-      
+      <ScrollToTop />
+
       {!isFullScreenPage && <Navbar />}
 
       <main className={isFullScreenPage ? "" : "min-h-screen pt-20"}>
@@ -151,23 +151,26 @@ const App = () => {
           <Route path="/" element={<Home />} />
           <Route path="/reviews" element={<AllReviews />} />
 
-          <Route path="/*" element={
-            <div className="mx-auto max-w-[1750px] px-3 sm:px-4 lg:px-6 xl:px-[100px]">
-              <Routes>
-                <Route path="/rooms" element={<Rooms />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/retreat-booking" element={<RetreatBooking />} />
-                <Route path="/my-profile" element={<MyProfile />} />
-                <Route path="/my-bookings" element={<MyBookings />} />
-                <Route path="/rooms/:roomId" element={<RoomBooking />} />
-                <Route path="/payment/:id" element={<Payment />} />
-                <Route path="/review/:bookingId" element={<ReviewPage />} />
-                <Route path="/verify-otp" element={<VerifyOtp />} />
-              </Routes>
-            </div>
-          } />
+          <Route
+            path="/*"
+            element={
+              <div className="mx-auto max-w-[1750px] px-3 sm:px-4 lg:px-6 xl:px-[100px]">
+                <Routes>
+                  <Route path="/rooms" element={<Rooms />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/contact" element={<Contact />} />
+                  <Route path="/retreat-booking" element={<RetreatBooking />} />
+                  <Route path="/my-profile" element={<MyProfile />} />
+                  <Route path="/my-bookings" element={<MyBookings />} />
+                  <Route path="/rooms/:roomId" element={<RoomBooking />} />
+                  <Route path="/payment/:id" element={<Payment />} />
+                  <Route path="/review/:bookingId" element={<ReviewPage />} />
+                  <Route path="/verify-otp" element={<VerifyOtp />} />
+                </Routes>
+              </div>
+            }
+          />
         </Routes>
       </main>
 

@@ -1,0 +1,235 @@
+Project MRH {
+  database_type: "MongoDB"
+  Note: '''
+  Canonical camelCase ERD for the current Mongoose schema.
+  bookingItems, reviewChats, reviewEditHistory, and reviewReplyEditHistory
+  are embedded arrays in MongoDB, shown here as child tables for ERD clarity.
+  '''
+}
+
+Enum userRole {
+  guest
+  staff
+  admin
+}
+
+Enum authProvider {
+  local
+  google
+}
+
+Enum bookingStatus {
+  pending
+  approved
+  declined
+  cancelled
+  cancellation_pending
+}
+
+Enum paymentStatus {
+  unpaid
+  pending
+  paid
+}
+
+Enum paymentMethod {
+  cash
+  gcash
+}
+
+Enum reviewSenderRole {
+  guest
+  staff
+  admin
+}
+
+Enum notificationType {
+  new_review
+  new_reply
+  review_hidden
+  booking_update
+  payment_update
+  account_status
+}
+
+Table users {
+  id varchar [pk, note: "Mongo ObjectId"]
+  firstName varchar [not null]
+  middleName varchar [not null, default: ""]
+  lastName varchar [note: "Required unless authProvider = google"]
+  suffix varchar [not null, default: ""]
+  email varchar [not null, unique]
+  password varchar [not null]
+  passwordSet boolean [not null, default: false]
+  role userRole [not null, default: 'guest']
+  disabled boolean [not null, default: false]
+  isVerified boolean [not null, default: false]
+  phone varchar
+  image text [not null, default: ""]
+  tokenVersion int [not null, default: 0]
+  otp varchar
+  otpExpires datetime
+  authProvider authProvider [not null, default: 'local']
+  pendingPhone varchar [not null, default: ""]
+  pendingEmail varchar [not null, default: ""]
+  phoneVerified boolean [not null, default: false]
+  createdAt datetime [not null]
+  updatedAt datetime [not null]
+
+  Indexes {
+    (email) [unique]
+  }
+}
+
+Table buildings {
+  id varchar [pk, note: "Mongo ObjectId"]
+  name varchar [not null, unique]
+
+  Indexes {
+    (name) [unique]
+  }
+}
+
+Table roomTypes {
+  id varchar [pk, note: "Mongo ObjectId"]
+  name varchar [not null, unique]
+
+  Indexes {
+    (name) [unique]
+  }
+}
+
+Table rooms {
+  id varchar [pk, note: "Mongo ObjectId"]
+  name varchar [not null]
+  buildingId varchar [not null]
+  roomTypeId varchar [not null]
+  capacity int [not null]
+  description text [not null, default: ""]
+  amenities text[] [note: "Stored as string array"]
+  images text[] [note: "Stored as string array"]
+  coverImage text [not null, default: ""]
+  available boolean [not null, default: true]
+  createdAt datetime [not null]
+  updatedAt datetime [not null]
+}
+
+Table packages {
+  id varchar [pk, note: "Mongo ObjectId"]
+  name varchar [not null]
+  packageType varchar [not null, note: "App uses values like Room Package, Venue Package, Amenity"]
+  roomTypeId varchar [note: "Nullable unless packageType is Room Package"]
+  amenities text[] [note: "Stored as string array"]
+  price decimal(12,2) [not null]
+  description text [not null, default: ""]
+  createdAt datetime [not null]
+  updatedAt datetime [not null]
+
+  Indexes {
+    (name, packageType, roomTypeId) [unique]
+  }
+}
+
+Table bookings {
+  id varchar [pk, note: "Mongo ObjectId"]
+  userId varchar [not null]
+  bookingName varchar [not null]
+  venueParticipants int [not null, default: 0]
+  checkIn datetime [not null]
+  checkOut datetime [not null]
+  totalPrice decimal(12,2) [not null]
+  status bookingStatus [not null, default: 'pending']
+  paymentStatus paymentStatus [not null, default: 'unpaid']
+  paymentMethod paymentMethod
+  payment boolean [not null, default: false]
+  createdAt datetime [not null]
+  updatedAt datetime [not null]
+}
+
+Table bookingItems {
+  bookingId varchar [not null]
+  roomId varchar [not null]
+  packageId varchar [not null]
+  participants int [not null]
+  subtotal decimal(12,2) [not null]
+
+  Note: "Embedded bookingItems[] subdocuments inside bookings."
+}
+
+Table reviews {
+  id varchar [pk, note: "Mongo ObjectId"]
+  userId varchar [not null]
+  bookingId varchar [not null, unique]
+  rating int [not null]
+  comment text [not null]
+  images text[] [note: "Stored as string array"]
+  isHidden boolean [not null, default: false]
+  isEdited boolean [not null, default: false]
+  createdAt datetime [not null]
+  updatedAt datetime [not null]
+
+  Indexes {
+    (bookingId) [unique]
+    (userId, createdAt)
+  }
+}
+
+Table reviewChats {
+  id varchar [pk, note: "Embedded reviewChat subdocument id"]
+  reviewId varchar [not null]
+  senderId varchar [note: "Nullable for migrated legacy replies"]
+  senderRole reviewSenderRole [not null]
+  message text [not null]
+  parentReplyId varchar
+  isEdited boolean [not null, default: false]
+  createdAt datetime [not null]
+
+  Note: "Embedded reviewChat[] subdocuments inside reviews."
+}
+
+Table reviewEditHistory {
+  id varchar [pk, note: "Embedded editHistory subdocument id"]
+  reviewId varchar [not null]
+  rating int
+  comment text
+  editedAt datetime [not null]
+
+  Note: "Embedded review editHistory[] subdocuments inside reviews."
+}
+
+Table reviewReplyEditHistory {
+  id varchar [pk, note: "Embedded reply editHistory subdocument id"]
+  reviewChatId varchar [not null]
+  message text
+  editedAt datetime [not null]
+
+  Note: "Embedded reply editHistory[] subdocuments inside reviewChats."
+}
+
+Table notifications {
+  id varchar [pk, note: "Mongo ObjectId"]
+  recipient varchar [not null]
+  type notificationType [not null]
+  message text [not null]
+  sender varchar
+  link text
+  isRead boolean [not null, default: false]
+  createdAt datetime [not null]
+}
+
+Ref: rooms.buildingId > buildings.id
+Ref: rooms.roomTypeId > roomTypes.id
+Ref: packages.roomTypeId > roomTypes.id
+Ref: bookings.userId > users.id
+Ref: bookingItems.bookingId > bookings.id
+Ref: bookingItems.roomId > rooms.id
+Ref: bookingItems.packageId > packages.id
+Ref: reviews.userId > users.id
+Ref: reviews.bookingId > bookings.id
+Ref: reviewChats.reviewId > reviews.id
+Ref: reviewChats.senderId > users.id
+Ref: reviewChats.parentReplyId > reviewChats.id
+Ref: reviewEditHistory.reviewId > reviews.id
+Ref: reviewReplyEditHistory.reviewChatId > reviewChats.id
+Ref: notifications.recipient > users.id
+Ref: notifications.sender > users.id

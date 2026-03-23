@@ -24,7 +24,8 @@ const About = () => {
             <img 
               src={mrh_about} 
               alt="Mercedarian Retreat House and Sisters" 
-              className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-110" 
+              className="w-full h-full object-cover transition-transform group-hover:scale-110"
+              style={{ transitionDuration: "3s" }}
               onError={(e) => {
                 console.error("Image failed to load at path:", mrh_about);
                 e.target.src = "https://via.placeholder.com/800x1200?text=Check+File+Extension";

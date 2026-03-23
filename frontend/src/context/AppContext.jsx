@@ -5,6 +5,14 @@ import { toast } from "react-toastify";
 export const AppContext = createContext();
 
 const ROOM_REFRESH_INTERVAL_MS = 15000;
+const normalizeRoomRecord = (room) =>
+  room
+    ? {
+        ...room,
+        roomType: room.roomType || room.room_type || "",
+        coverImage: room.coverImage || room.cover_image || room.images?.[0] || "",
+      }
+    : room;
 
 const AppContextProvider = (props) => {
   const currencySymbol = "₱";
@@ -16,7 +24,7 @@ const AppContextProvider = (props) => {
 
   const [selectedRooms, setSelectedRooms] = useState(() => {
     const savedRooms = localStorage.getItem("selectedRooms");
-    return savedRooms ? JSON.parse(savedRooms) : [];
+    return savedRooms ? JSON.parse(savedRooms).map(normalizeRoomRecord) : [];
   });
 
   useEffect(() => {
@@ -58,7 +66,7 @@ const AppContextProvider = (props) => {
   const getRoomsData = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(backendUrl + "/api/room/list");
-      if (data.success) setRooms(data.rooms);
+      if (data.success) setRooms((data.rooms || []).map(normalizeRoomRecord));
       else if (!silent) toast.error(data.message);
     } catch (error) {
       if (!silent) {
@@ -98,10 +106,11 @@ const AppContextProvider = (props) => {
   }, [backendUrl]);
 
   const addRoom = (room) => {
+    const normalizedRoom = normalizeRoomRecord(room);
     setSelectedRooms((prev) =>
-      prev.some((r) => r._id === room._id) 
+      prev.some((r) => r._id === normalizedRoom._id) 
         ? prev 
-        : [...prev, { ...room, useAircon: false }] // 👈 Updated: Added default AC state
+        : [...prev, { ...normalizedRoom, useAircon: false }] // 👈 Updated: Added default AC state
     );
   };
 

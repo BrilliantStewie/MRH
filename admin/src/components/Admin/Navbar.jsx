@@ -3,11 +3,11 @@ import React, { useContext, useEffect, useState } from "react";
 import { assets } from "../../assets/assets.js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AdminContext } from "../../context/AdminContext.jsx";
-import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard } from "lucide-react";
+import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 
-const Navbar = () => {
+const Navbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,6 +27,7 @@ const Navbar = () => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState(null);
 
   const fetchNotifications = async () => {
     if (!aToken) return;
@@ -51,6 +52,20 @@ const Navbar = () => {
       await axios.put(`${backendUrl}/api/notifications/read/${id}`, {}, {
         headers: { token: aToken }
       });
+      fetchNotifications();
+    } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) logoutAdmin();
+      console.error(err);
+    }
+  };
+
+  const deleteNotification = async () => {
+    if (!notificationToDelete) return;
+    try {
+      await axios.delete(`${backendUrl}/api/notifications/${notificationToDelete}`, {
+        headers: { token: aToken }
+      });
+      setNotificationToDelete(null);
       fetchNotifications();
     } catch (err) {
       if (err.response?.status === 401 || err.response?.status === 403) logoutAdmin();
@@ -98,6 +113,7 @@ const Navbar = () => {
     setShowAllNotifications(false);
     setShowClearConfirm(false);
     setShowNotificationMenu(false);
+    setNotificationToDelete(null);
   }, [location.pathname]);
 
   const unreadCount = (notifications || []).filter((n) => !n.isRead).length;
@@ -236,23 +252,32 @@ const Navbar = () => {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full bg-[#f8fafc] border-b border-gray-200 shadow-sm">
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+      <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-[#f8fafc] shadow-sm">
+      <div className="px-3 sm:px-6 lg:px-8">
+        <div className="flex h-16 items-center justify-between gap-3">
           
           {/* Left Side: Brand Logo & Title */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onMenuToggle}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
+              aria-label="Open menu"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="flex cursor-pointer items-center gap-3" onClick={() => navigate("/")}>
             {/* Using your specific logo asset */}
             <img 
               src={assets.logo} 
               alt="Logo" 
-              className="w-12 h-12 object-contain" 
+              className="h-10 w-10 object-contain sm:h-12 sm:w-12" 
             />
             <div className="flex flex-col justify-center">
-              <h1 className="text-lg font-bold text-gray-800 leading-tight">
+              <h1 className="text-base font-bold leading-tight text-gray-800 sm:text-lg">
                 MRH
               </h1>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-md w-fit mt-0.5 ${
+              <span className={`mt-0.5 hidden w-fit rounded-md px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${
                 isAdmin 
                   ? "bg-indigo-50 text-indigo-700 border border-indigo-100" 
                   : "bg-emerald-50 text-emerald-700 border border-emerald-100"
@@ -260,10 +285,11 @@ const Navbar = () => {
                 {isAdmin ? "Admin Panel" : "Staff Panel"}
               </span>
             </div>
+            </div>
           </div>
 
           {/* Right Side: Notifications + User Profile & Logout */}
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4">
             {isAdmin && (
               <div className="relative">
                 <button
@@ -301,7 +327,7 @@ const Navbar = () => {
                         setShowNotificationMenu(false);
                       }}
                     ></div>
-                    <div className="absolute right-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute right-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Bell size={11} className="text-slate-400" />
@@ -463,23 +489,32 @@ const Navbar = () => {
                                     </div>
                                   </div>
                                   <div className="ml-2 flex-shrink-0">
-                                    {!n.isRead ? (
-                                      <button
-                                        type="button"
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          markAsRead(n._id);
-                                        }}
-                                        className="pointer-events-none flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 hover:border-slate-300 hover:text-slate-700"
-                                      >
-                                        <Check size={9} />
-                                        Mark read
+                                    <div className="flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                      {!n.isRead && (
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            markAsRead(n._id);
+                                          }}
+                                          className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                                        >
+                                          <Check size={9} />
+                                          Mark read
+                                        </button>
+                                      )}
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setNotificationToDelete(n._id);
+                                          }}
+                                          className="flex items-center gap-1 rounded-full border border-rose-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                                        >
+                                        <Trash2 size={9} />
+                                        Delete
                                       </button>
-                                    ) : (
-                                      <div className="mt-0.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100">
-                                        <Check size={10} />
-                                      </div>
-                                    )}
+                                    </div>
                                   </div>
                                 </div>
                               );
@@ -505,18 +540,18 @@ const Navbar = () => {
                 )}
               </div>
             )}
-            <div className="hidden sm:block text-right">
+            <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold text-gray-700">{displayName}</p>
               <p className="text-xs text-gray-500">Logged in</p>
             </div>
 
-            <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
+            <div className="hidden h-8 w-px bg-gray-200 sm:block"></div>
 
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition-colors duration-200"
+              className="flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-100 sm:px-4"
             >
-              <span>Logout</span>
+              <span className="hidden sm:inline">Logout</span>
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
                 fill="none" 
@@ -566,6 +601,40 @@ const Navbar = () => {
                 className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
               >
                 Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <Trash2 size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-slate-900">Delete notification?</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  This will remove the selected notification from your admin list.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNotificationToDelete(null)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteNotification}
+                className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-rose-700"
+              >
+                Delete
               </button>
             </div>
           </div>

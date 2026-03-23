@@ -9,10 +9,11 @@ import {
   Users,
   User,
   TrendingUp,
-  MessageSquare
+  MessageSquare,
+  X
 } from "lucide-react";
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
   // ✅ Get the actual notification data from your AdminContext
   // Example: bookings.length where status is 'pending' or a specific unread count
   const { aToken, bookings, reviews } = useContext(AdminContext);
@@ -27,7 +28,7 @@ const Sidebar = () => {
   if (!aToken) return null;
 
   const linkClass = ({ isActive }) =>
-    `flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+    `flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all ${
       isActive
         ? "bg-blue-50 text-blue-700 shadow-sm"
         : "text-slate-600 hover:bg-slate-100"
@@ -54,22 +55,51 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-[#f8fafc] border-r min-h-screen p-4 flex flex-col gap-1">
-      <NavLink to="/admin-dashboard" className={linkClass}>
+    <>
+      <button
+        type="button"
+        aria-label="Close menu"
+        onClick={onClose}
+        className={`fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-sm transition-opacity md:hidden ${
+          isOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-1 border-r border-slate-200 bg-[#f8fafc] px-4 pb-4 pt-20 shadow-xl transition-transform duration-300 md:static md:z-auto md:h-full md:w-64 md:max-w-none md:translate-x-0 md:px-4 md:py-4 md:shadow-none ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="mb-2 flex items-center justify-between px-1 md:hidden">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">
+              Navigation
+            </p>
+            <p className="mt-1 text-sm font-bold text-slate-800">Admin Menu</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:bg-slate-50"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+      <NavLink to="/admin-dashboard" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <LayoutDashboard size={18} />
           Dashboard
         </div>
       </NavLink>
 
-      <NavLink to="/admin-analytics" className={linkClass}>
+      <NavLink to="/admin-analytics" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <TrendingUp size={18} />
           Analytics
         </div>
       </NavLink>
 
-      <NavLink to="/all-bookings" className={linkClass}>
+      <NavLink to="/all-bookings" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <CalendarCheck size={18} />
           Bookings
@@ -78,21 +108,21 @@ const Sidebar = () => {
         <NotificationIndicator count={hasNewBookings} variant="dot" />
       </NavLink>
 
-      <NavLink to="/rooms-list" className={linkClass}>
+      <NavLink to="/rooms-list" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <BedDouble size={18} />
           Rooms
         </div>
       </NavLink>
 
-      <NavLink to="/admin-packages" className={linkClass}>
+      <NavLink to="/admin-packages" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <Package size={18} />
           Packages
         </div>
       </NavLink>
 
-      <NavLink to="/admin-reviews" className={linkClass}>
+      <NavLink to="/admin-reviews" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <MessageSquare size={18} />
           Guest Reviews
@@ -101,20 +131,21 @@ const Sidebar = () => {
         <NotificationIndicator count={pendingReviewsCount} variant="number" />
       </NavLink>
 
-      <NavLink to="/admin-staff-list" className={linkClass}>
+      <NavLink to="/admin-staff-list" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <Users size={18} />
           Staff List
         </div>
       </NavLink>
 
-      <NavLink to="/admin-users" className={linkClass}>
+      <NavLink to="/admin-users" className={linkClass} onClick={onClose}>
         <div className="flex items-center gap-3">
           <User size={18} />
           Users
         </div>
       </NavLink>
-    </aside>
+      </aside>
+    </>
   );
 };
 

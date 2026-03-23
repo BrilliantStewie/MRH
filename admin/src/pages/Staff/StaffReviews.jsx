@@ -130,28 +130,6 @@ const StaffReviews = () => {
   };
 
   /* ==========================================
-     CUSTOM TOAST STYLES
-  ========================================== */
-  const customToastOptions = {
-    position: "bottom-right",
-    autoClose: 3000,
-    hideProgressBar: true,
-    closeOnClick: true,
-    pauseOnHover: false,
-    draggable: true,
-    style: {
-      backgroundColor: '#0f172a', // slate-900
-      color: '#f8fafc', // slate-50
-      fontSize: '13px',
-      fontWeight: '600',
-      borderRadius: '12px',
-      padding: '12px 16px',
-      boxShadow: '0 10px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-      border: '1px solid #1e293b'
-    }
-  };
-
-  /* ==========================================
      FETCH REVIEWS
   ========================================== */
   const fetchReviews = async () => {
@@ -165,10 +143,7 @@ const StaffReviews = () => {
       }
     } catch (err) {
       console.error("Error fetching reviews:", err);
-      toast.error("Failed to load reviews", { 
-        ...customToastOptions, 
-        icon: <AlertCircle size={18} className="text-red-400" /> 
-      });
+      toast.error("Failed to load reviews");
     } finally {
       setIsLoading(false);
     }
@@ -272,11 +247,7 @@ const StaffReviews = () => {
     const message = replyText[reviewId];
 
     if (!message || message.trim() === "") {
-      return toast.warning("Please type a response first.", {
-        ...customToastOptions,
-        style: { ...customToastOptions.style, border: '1px solid #f59e0b' },
-        icon: <AlertCircle size={18} className="text-amber-400" />
-      });
+      return toast.warning("Please type a response first.");
     }
 
     try {
@@ -287,10 +258,7 @@ const StaffReviews = () => {
       );
 
       if (data.success) {
-        toast.success("Response sent successfully", { 
-          ...customToastOptions, 
-          icon: <CheckCircle2 size={18} className="text-blue-400" /> 
-        });
+        toast.success("Response sent successfully");
         setReplyText({ ...replyText, [reviewId]: "" });
         setActiveReplyId(null);
         
@@ -303,7 +271,7 @@ const StaffReviews = () => {
         fetchReviews();
       }
     } catch (err) {
-      toast.error("Failed to send response", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to send response");
     }
   };
 
@@ -325,15 +293,12 @@ const StaffReviews = () => {
       );
 
       if (data.success) {
-        toast.success("Reply permanently deleted", { 
-          ...customToastOptions, 
-          icon: <Trash2 size={18} className="text-red-400" /> 
-        });
+        toast.success("Reply permanently deleted");
         setItemToDelete(null);
         fetchReviews();
       }
     } catch (error) {
-      toast.error("Failed to delete reply", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to delete reply");
       setItemToDelete(null);
     }
   };
@@ -350,16 +315,13 @@ const StaffReviews = () => {
       );
 
       if (data.success) {
-        toast.success("Reply updated", { 
-          ...customToastOptions, 
-          icon: <CheckCircle2 size={18} className="text-blue-400" /> 
-        });
+        toast.success("Reply updated");
         setEditingReplyId(null);
         setEditText("");
         fetchReviews();
       }
     } catch (error) {
-      toast.error("Failed to update reply", { ...customToastOptions, icon: <AlertCircle size={18} className="text-red-400" /> });
+      toast.error("Failed to update reply");
     }
   };
 
@@ -486,8 +448,8 @@ const StaffReviews = () => {
 
       <div className="w-full max-w-none mx-auto px-4 lg:px-8 xl:px-10 2xl:px-12 pt-4 pb-20">
       
-      <div className="mb-10 w-full max-w-[1200px] mx-0">
-        <div className="w-full max-w-[1200px] mx-0 pb-0 flex items-start justify-between gap-4">
+      <div className="mb-8 w-full max-w-[1200px] mx-0 sm:mb-10">
+        <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
             <p className="text-slate-500 mt-2 max-w-2xl">
@@ -583,7 +545,7 @@ const StaffReviews = () => {
         )}
       </div>
 
-      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
         {!hasNoReviews && (
           <aside className="h-fit">
             <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -617,7 +579,7 @@ const StaffReviews = () => {
           </aside>
         )}
 
-        <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-4"}`}>
+        <div className={`flex w-full flex-col items-start space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "pl-0 lg:pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (

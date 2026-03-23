@@ -5,6 +5,10 @@ import jwt from "jsonwebtoken";
 import { v2 as cloudinary } from "cloudinary";
 import { admin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
 import validator from "validator";
+import {
+  attachReviewDataToBookings,
+  buildBookingPopulate,
+} from "../utils/dataConsistency.js";
 
 const normalizePHPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -461,21 +465,18 @@ export const checkStaffPhoneAvailability = async (req, res) => {
 export const getStaffBookings = async (req, res) => {
   try {
 
-    const bookings = await bookingModel.find({})
-      .populate("user_id", "name firstName middleName lastName email phone image authProvider")
-      .populate({
-        path: "bookingItems.room_id",
-        model: "Room"
-      })
-      .populate({
-        path: "bookingItems.package_id",
-        model: "Package"
-      })
-      .sort({ createdAt: -1 });
+    let bookingsQuery = bookingModel.find({}).sort({ createdAt: -1 });
+
+    for (const populateConfig of buildBookingPopulate()) {
+      bookingsQuery = bookingsQuery.populate(populateConfig);
+    }
+
+    const bookings = await bookingsQuery;
+    const normalizedBookings = await attachReviewDataToBookings(bookings);
 
     return res.status(200).json({
       success: true,
-      bookings
+      bookings: normalizedBookings
     });
 
   } catch (error) {

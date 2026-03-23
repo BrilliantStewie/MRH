@@ -50,9 +50,11 @@ reviewRouter.post("/reply/:reviewId", replyToReview);
 
 // Edit reply
 reviewRouter.put("/edit-reply/:replyId", editReply);
+reviewRouter.put("/reply/:reviewId/:replyId", editReply);
 
 // Delete reply
 reviewRouter.delete("/delete-reply/:replyId", deleteReply);
+reviewRouter.delete("/reply/:reviewId/:replyId", deleteReply);
 
 
 /* ===========================

@@ -1,8 +1,16 @@
 import Review from "../models/reviewModel.js";
 import Booking from "../models/bookingModel.js";
-import Notification from "../models/notificationModel.js";
 import cloudinary from "../config/cloudinary.js";
 import sendEmail from "../utils/sendEmail.js";
+import {
+  createOrRefreshNotification,
+  createOrRefreshNotifications,
+} from "../utils/notificationUtils.js";
+import {
+  packageReferencePopulate,
+  roomReferencePopulate,
+  serializeReview,
+} from "../utils/dataConsistency.js";
 
 const uploadReviewImage = (fileBuffer, folder = "mrh_reviews") =>
   new Promise((resolve, reject) => {
@@ -47,17 +55,27 @@ export const getAllReviews = async (req, res) => {
       })
       .populate({
         path: "bookingId",
-        select: "check_in check_out bookingName bookingItems venueParticipants",
-        populate: {
-          path: "bookingItems.room_id",
-          select: "name room_type"
-        }
+        select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
+        populate: [
+          {
+            path: "bookingItems.roomId",
+            populate: roomReferencePopulate
+          },
+          {
+            path: "bookingItems.packageId",
+            populate: packageReferencePopulate
+          },
+          {
+            path: "extraPackages",
+            populate: packageReferencePopulate
+          }
+        ]
       })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      reviews
+      reviews: reviews.map((review) => serializeReview(review))
     });
 
   } catch (err) {
@@ -97,7 +115,7 @@ export const createReview = async (req, res) => {
       });
     }
 
-    if (booking.user_id.toString() !== userId.toString()) {
+    if (booking.userId.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: "You can only review your own stay."
@@ -164,22 +182,17 @@ export const createReview = async (req, res) => {
 
         await existingReview.save();
 
-        await Booking.findByIdAndUpdate(bookingId, {
-          rating: Number(rating),
-          review: comment
-        });
-
         return res.status(200).json({
           success: true,
           message: "Review updated with history",
-          data: existingReview
+          data: serializeReview(existingReview)
         });
       }
 
       return res.status(200).json({
         success: true,
         message: "No changes detected",
-        data: existingReview
+        data: serializeReview(existingReview)
       });
     }
 
@@ -194,11 +207,6 @@ export const createReview = async (req, res) => {
 
     await newReview.save();
 
-    await Booking.findByIdAndUpdate(bookingId, {
-      rating: Number(rating),
-      review: comment
-    });
-
     const recipients = await Booking.db.model("User").find({ role: { $in: ["admin", "staff"] } });
 
     const adminNotifications = recipients.map((user) => ({
@@ -211,13 +219,13 @@ export const createReview = async (req, res) => {
     }));
 
     if (adminNotifications.length > 0) {
-      await Notification.insertMany(adminNotifications);
+      await createOrRefreshNotifications(adminNotifications);
     }
 
     res.status(200).json({
       success: true,
       message: "Review created successfully",
-      data: newReview
+      data: serializeReview(newReview)
     });
 
   } catch (err) {
@@ -310,13 +318,6 @@ export const editReview = async (req, res) => {
 
     await review.save();
 
-    if (review.bookingId) {
-      const updateData = { review: comment };
-      if (rating) updateData.rating = Number(rating);
-
-      await Booking.findByIdAndUpdate(review.bookingId, updateData);
-    }
-
     res.status(200).json({
       success: true,
       message: "Review updated successfully."
@@ -357,13 +358,6 @@ export const deleteReview = async (req, res) => {
     }
 
     await Review.findByIdAndDelete(reviewId);
-
-    if (review.bookingId) {
-      await Booking.findByIdAndUpdate(review.bookingId, {
-        review: "",
-        rating: null
-      });
-    }
 
     res.status(200).json({
       success: true,
@@ -436,7 +430,7 @@ if (req.userRole === "guest") {
       const reviewLink = createdReply?._id
         ? `/reviews?reviewId=${reviewId}&replyId=${createdReply._id}`
         : "/reviews";
-      await Notification.create({
+      await createOrRefreshNotification({
         recipient: review.userId._id,
         sender: userId,
         type: "new_reply",
@@ -481,7 +475,7 @@ if (req.userRole === "guest") {
       }));
 
       if (adminNotifications.length > 0) {
-        await Notification.insertMany(adminNotifications);
+        await createOrRefreshNotifications(adminNotifications);
       }
     }
 
@@ -521,7 +515,7 @@ export const editReply = async (req, res) => {
 
     const reply = review.reviewChat.id(replyId);
 
-    if (reply.senderId.toString() !== userId.toString()) {
+    if (!reply.senderId || reply.senderId.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized."
@@ -572,7 +566,7 @@ export const deleteReply = async (req, res) => {
 
     const reply = review.reviewChat.id(replyId);
 
-    if (reply.senderId.toString() !== userId.toString()) {
+    if (!reply.senderId || reply.senderId.toString() !== userId.toString()) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized."
@@ -619,7 +613,7 @@ export const toggleReviewVisibility = async (req, res) => {
     await review.save();
 
     if (review.isHidden) {
-      await Notification.create({
+      await createOrRefreshNotification({
         recipient: review.userId,
         type: "review_hidden",
         message: "Review hidden by moderation.",

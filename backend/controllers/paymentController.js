@@ -9,14 +9,22 @@ export const createCheckoutSession = async (req, res) => {
     // 1. Fetch the booking from the database to get the real price
     const booking = await bookingModel
       .findById(bookingId)
-      .populate("user_id", "firstName middleName lastName suffix email");
+      .populate("userId", "firstName middleName lastName suffix email");
     if (!booking) {
       return res.json({ success: false, message: "Booking not found" });
     }
 
-    const amount = booking.total_price; 
+    if (String(booking.userId?._id || booking.userId) !== String(req.userId)) {
+      return res.json({ success: false, message: "Unauthorized booking access" });
+    }
+
+    if (booking.paymentStatus === "paid") {
+      return res.json({ success: false, message: "Booking is already marked as paid." });
+    }
+
+    const amount = booking.totalPrice; 
     const description = "Your receipt from Mercedarian Retreat House";
-    const user = booking.user_id;
+    const user = booking.userId;
     const customerName = user
       ? [user.firstName, user.middleName, user.lastName, user.suffix].filter(Boolean).join(" ")
       : "Guest";
@@ -77,6 +85,7 @@ export const createCheckoutSession = async (req, res) => {
     res.json({
       success: true,
       checkoutUrl: response.data.data.attributes.checkout_url,
+      session_url: response.data.data.attributes.checkout_url,
     });
   } catch (error) {
     const paymongoDetail = error.response?.data?.errors?.[0]?.detail;

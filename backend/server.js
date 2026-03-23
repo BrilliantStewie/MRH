@@ -32,6 +32,23 @@ import notificationRouter from "./routes/notificationRoute.js";
 // =======================
 const app = express();
 const PORT = process.env.PORT || 4000;
+const parseAllowedOrigins = () => {
+  const configuredOrigins = String(process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const fallbackOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.ADMIN_URL,
+    "http://localhost:5173",
+    "http://localhost:5174",
+  ]
+    .map((origin) => String(origin || "").trim())
+    .filter(Boolean);
+
+  return [...new Set(configuredOrigins.length ? configuredOrigins : fallbackOrigins)];
+};
+const allowedOrigins = parseAllowedOrigins();
 
 // =======================
 // ✅ GLOBAL MIDDLEWARE
@@ -41,7 +58,12 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://localhost:5174"],
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
     credentials: true,
   })
 );

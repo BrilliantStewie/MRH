@@ -185,7 +185,7 @@ const RoomTypeMenu = () => {
     const roomsByType = new Map();
 
     (rooms || []).forEach((room) => {
-      const roomType = String(room.room_type || "").trim();
+      const roomType = String(room.roomType || room.room_type || "").trim();
       if (!roomType) return;
 
       const key = normalize(roomType);
@@ -301,9 +301,10 @@ const RoomTypeMenu = () => {
           <img
             src={room.image}
             alt={room.roomtype}
-            className={`h-full w-full object-cover transition-transform duration-[10s] ease-linear ${
+            className={`h-full w-full object-cover transition-transform ease-linear ${
               index === currentIndex && !isPaused ? "scale-110" : "scale-100"
             }`}
+            style={{ transitionDuration: "10s" }}
           />
           <div className="absolute inset-0 bg-slate-900/40 mix-blend-multiply"></div>
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-slate-900/20 to-transparent"></div>

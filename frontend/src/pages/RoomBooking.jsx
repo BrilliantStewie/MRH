@@ -21,7 +21,7 @@ const RoomBooking = () => {
   useEffect(() => {
     const room = rooms.find((r) => r._id === roomId);
     setRoomInfo(room);
-  }, [rooms, roomId]); // [file:212]
+  }, [rooms, roomId]);
 
   // Calculate total price whenever inputs change
   useEffect(() => {
@@ -34,7 +34,7 @@ const RoomBooking = () => {
 
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
     setTotalPrice(days * roomInfo.price);
-  }, [checkIn, checkOut, roomInfo]); // [file:212]
+  }, [checkIn, checkOut, roomInfo]);
 
   const bookRoom = async () => {
     if (!token) {
@@ -98,7 +98,7 @@ const RoomBooking = () => {
         </h1>
 
         <p className="text-sm text-gray-600">
-          {roomInfo.room_type} • {roomInfo.building}
+          {roomInfo.roomType || roomInfo.room_type} • {roomInfo.building}
         </p>
 
         <p className="text-sm text-gray-600">

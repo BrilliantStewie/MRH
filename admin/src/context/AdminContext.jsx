@@ -9,6 +9,14 @@ import {
 export const AdminContext = createContext();
 
 const SESSION_REFRESH_INTERVAL_MS = 15000;
+const normalizeRoomRecord = (room) =>
+  room
+    ? {
+        ...room,
+        roomType: room.roomType || room.room_type || "",
+        coverImage: room.coverImage || room.cover_image || room.images?.[0] || "",
+      }
+    : room;
 
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -205,6 +213,28 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
+  const addGuestUser = async (guestData) => {
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/add-guest`,
+        guestData,
+        authHeader
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+        getAllUsers();
+        return true;
+      }
+
+      toast.error(data.message);
+      return false;
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+      return false;
+    }
+  };
+
   const createStaff = async (formData) => {
     try {
       const { data } = await axios.post(
@@ -230,10 +260,19 @@ const AdminContextProvider = ({ children }) => {
 
   const updateStaff = async (id, formData) => {
     try {
-      formData.append('id', id); 
+      const payload =
+        formData instanceof FormData
+          ? formData
+          : Object.entries(formData || {}).reduce((acc, [key, value]) => {
+              if (value !== undefined && value !== null) {
+                acc.append(key, value);
+              }
+              return acc;
+            }, new FormData());
+      payload.append('id', id); 
       const { data } = await axios.post(
         `${backendUrl}/api/admin/update-staff`,
-        formData,
+        payload,
         authHeader
       );
 
@@ -289,7 +328,7 @@ const AdminContextProvider = ({ children }) => {
         headers: { token: aToken },
       });
       if (data.success) {
-        setAllRooms(data.rooms);
+        setAllRooms((data.rooms || []).map(normalizeRoomRecord));
       } else {
         toast.error(data.message);
       }
@@ -588,6 +627,7 @@ const AdminContextProvider = ({ children }) => {
     getAllUsers,
     getAllStaff, 
     changeUserStatus,
+    addGuestUser,
     createStaff, 
     updateStaff, 
     allStaff,   

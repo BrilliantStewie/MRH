@@ -1,52 +1,72 @@
 import mongoose from "mongoose";
 
 const packageSchema = new mongoose.Schema(
-{
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-
-  // flexible type (room, day, event, etc.)
-  packageType: {
-    type: String,
-    required: true,
-    trim: true
-  },
-
-  // optional because day retreat packages don't belong to rooms
-  roomType: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "RoomType",
-    default: null
-  },
-
-  // amenities stored as strings
-  amenities: [
-    {
+  {
+    name: {
       type: String,
-      trim: true
-    }
-  ],
+      required: true,
+      trim: true,
+    },
 
-  price: {
-    type: Number,
-    required: true,
-    min: 0
+    packageType: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    roomTypeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "RoomType",
+      default: null,
+      alias: "room_type_id",
+      validate: {
+        validator(value) {
+          const normalizedType = String(this.packageType || "").trim().toLowerCase();
+          if (normalizedType !== "room package") {
+            return true;
+          }
+          return Boolean(value);
+        },
+        message: "Room packages must be linked to a room type.",
+      },
+    },
+
+    amenities: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+
+    price: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+
+    description: {
+      type: String,
+      default: "",
+    },
   },
-
-  description: {
-    type: String,
-    default: ""
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
-
-},
-{ timestamps: true }
 );
 
+packageSchema.index({ name: 1, packageType: 1, roomTypeId: 1 }, { unique: true });
+
+packageSchema.virtual("roomType").get(function () {
+  if (this.roomTypeId?.name) {
+    return this.roomTypeId;
+  }
+  return this.roomTypeId || null;
+});
+
 const Package =
-mongoose.models.Package ||
-mongoose.model("Package", packageSchema);
+  mongoose.models.Package ||
+  mongoose.model("Package", packageSchema);
 
 export default Package;

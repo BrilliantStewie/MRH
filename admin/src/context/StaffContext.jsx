@@ -20,6 +20,18 @@ const StaffContextProvider = ({ children }) => {
   const [staffData, setStaffData] = useState(null);
 
   /* =====================================================
+     STAFF LOGOUT
+  ===================================================== */
+  function staffLogout({ silent = false, disabledMessage = "" } = {}) {
+    localStorage.removeItem("sToken");
+    setSToken(null);
+    setStaffData(null);
+    if (disabledMessage) {
+      storeDisabledAccountNotice(disabledMessage);
+    }
+  }
+
+  /* =====================================================
      🛡️ AUTO LOGOUT INTERCEPTOR
   ===================================================== */
   useEffect(() => {
@@ -220,18 +232,6 @@ const StaffContextProvider = ({ children }) => {
     }
 
     return false;
-  };
-
-  /* =====================================================
-     STAFF LOGOUT
-  ===================================================== */
-  const staffLogout = ({ silent = false, disabledMessage = "" } = {}) => {
-    localStorage.removeItem("sToken");
-    setSToken(null);
-    setStaffData(null); 
-    if (disabledMessage) {
-      storeDisabledAccountNotice(disabledMessage);
-    }
   };
 
   return (

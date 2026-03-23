@@ -18,7 +18,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   const { backendUrl, token } = useContext(AppContext);
 
   // --- 1. DETERMINE MODE (Create vs Edit) ---
-  const isEditMode = booking.rating > 0;
+  const isEditMode = Boolean(booking.reviewId || booking.rating > 0);
 
   // --- 2. INITIALIZE STATE ---
   const [step, setStep] = useState(isEditMode ? 2 : 1); 
@@ -164,18 +164,6 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     setLoading(true);
 
     try {
-        // 1. Update the Private Booking (for My Bookings tab)
-        const bookingReq = axios.post(
-            backendUrl + '/api/user/rate-booking', 
-            {
-                bookingId: booking._id,
-                rating: rating,
-                review: reviewText
-            },
-            { headers: { token } }
-        );
-
-        // 2. Create the Public Review (for All Reviews feed)
         const reviewForm = new FormData();
         reviewForm.append("bookingId", booking._id);
         reviewForm.append("rating", rating);
@@ -184,16 +172,19 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
           reviewForm.append("images", image.file);
         });
 
-        const reviewReq = axios.post(
-            backendUrl + '/api/reviews', 
-            reviewForm,
-            { headers: { token } }
-        );
+        const response = isEditMode && booking.reviewId
+          ? await axios.put(
+              `${backendUrl}/api/reviews/${booking.reviewId}`,
+              reviewForm,
+              { headers: { token } }
+            )
+          : await axios.post(
+              `${backendUrl}/api/reviews`,
+              reviewForm,
+              { headers: { token } }
+            );
 
-        // Wait for both to finish
-        const [res1, res2] = await Promise.all([bookingReq, reviewReq]);
-
-        if (res1.data.success || res2.data.success) {
+        if (response.data.success) {
             toast.success(isEditMode ? "Review updated!" : "Review submitted!");
             setStep(3); 
             if (onSuccess) onSuccess(); 
@@ -293,7 +284,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-slate-900">{room?.name || "Room"}</p>
                               <p className="text-[10px] text-slate-500">
-                                {(room?.room_type || "Room type")
+                                {(room?.roomType || room?.room_type || "Room type")
                                   .toString()
                                   .replace(/_/g, " ")
                                   .toUpperCase()}

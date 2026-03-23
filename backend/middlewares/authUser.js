@@ -26,6 +26,13 @@ const authUser = async (req, res, next) => {
       });
     }
 
+    if ((user.tokenVersion || 0) !== (decoded.tokenVersion ?? 0)) {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired due to security changes. Please login again."
+      });
+    }
+
     /* ===============================
        CHECK IF ACCOUNT IS DISABLED
     =============================== */

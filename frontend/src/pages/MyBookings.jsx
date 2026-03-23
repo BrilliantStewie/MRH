@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import {
   Search, CalendarDays, MapPin, Loader2, CheckCircle2,
-  Filter, ArrowUpDown, Calendar, ChevronDown, Banknote, Star, Home, Clock, CornerDownRight, Tag, Wallet, X, Package, AlertTriangle
+  ArrowUpDown, Calendar, ChevronDown, ChevronRight, Banknote, Star, Home, Clock, CornerDownRight, Tag, Wallet, X, Package, AlertTriangle
 } from "lucide-react"; // 👈 Added Tag and Wallet icons here
 import ReviewPage from "./ReviewPage"; // Ensure this path is correct
 import venueOnlyImage from "../assets/mrh_about.jpg";
@@ -18,44 +18,6 @@ const formatDate = (dateInput) => {
     day: "numeric",
     year: "numeric",
   });
-};
-
-const toastBaseOptions = {
-  className: "rounded-2xl border border-slate-200/70 bg-white/95 shadow-[0_16px_40px_-24px_rgba(15,23,42,0.5)] backdrop-blur",
-  bodyClassName: "p-0",
-  icon: false,
-  closeButton: false
-};
-
-const renderStatusToast = ({ title, message, Icon, tone = "info", badge }) => {
-  const toneStyles = {
-    info: { icon: "bg-blue-50 text-blue-600", bar: "bg-blue-500", badge: "bg-blue-50 text-blue-700" },
-    success: { icon: "bg-emerald-50 text-emerald-600", bar: "bg-emerald-500", badge: "bg-emerald-50 text-emerald-700" },
-    warning: { icon: "bg-amber-50 text-amber-600", bar: "bg-amber-500", badge: "bg-amber-50 text-amber-700" },
-    error: { icon: "bg-rose-50 text-rose-600", bar: "bg-rose-500", badge: "bg-rose-50 text-rose-700" }
-  };
-  const palette = toneStyles[tone] || toneStyles.info;
-  const badgeText = badge || tone;
-
-  return (
-    <div className="relative overflow-hidden rounded-2xl">
-      <div className={`absolute left-0 top-0 h-full w-1 ${palette.bar}`} />
-      <div className="flex items-start gap-3 p-4 pl-5">
-        <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full ${palette.icon}`}>
-          <Icon size={18} />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-bold text-slate-900">{title}</p>
-            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${palette.badge}`}>
-              {badgeText}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-slate-600">{message}</p>
-        </div>
-      </div>
-    </div>
-  );
 };
 
 // --- REUSABLE DROPDOWN COMPONENT ---
@@ -138,11 +100,32 @@ const MyBookings = () => {
 
   // Filters State
   const [activeTab, setActiveTab] = useState('all');
+  const [showStatusTabs, setShowStatusTabs] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
-  const [buildingFilter, setBuildingFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('all');
   const [yearFilter, setYearFilter] = useState('all');
+
+  useEffect(() => {
+    if (activeTab !== "all") {
+      setShowStatusTabs(true);
+    }
+  }, [activeTab]);
+
+  const handleStatusTabChange = (tab) => {
+    if (tab === "all") {
+      if (activeTab === "all") {
+        setShowStatusTabs((current) => !current);
+      } else {
+        setActiveTab("all");
+        setShowStatusTabs(true);
+      }
+      return;
+    }
+
+    setActiveTab(tab);
+    setShowStatusTabs(true);
+  };
 
   // Fetch Data
   const fetchUserBookings = async () => {
@@ -158,70 +141,30 @@ const MyBookings = () => {
     try {
       const { data } = await axios.post(backendUrl + "/api/user/verify-payment", { bookingId }, { headers: { token } });
       if (data.success) {
-        toast.update(toastId, { render: "Payment confirmed!", type: "success", isLoading: false, autoClose: 2000 });
+        toast.update(toastId, { render: data.message || "Payment submitted. Awaiting admin confirmation.", type: "info", isLoading: false, autoClose: 2500 });
         window.history.replaceState({}, document.title, window.location.pathname);
         fetchUserBookings();
       } else {
         toast.update(toastId, { render: data.message, type: "warning", isLoading: false, autoClose: 3000 });
       }
     } catch {
-      toast.dismiss();
-      toast.error("Payment verification failed.");
+      toast.update(toastId, { render: "Payment verification failed.", type: "error", isLoading: false, autoClose: 3000 });
     }
   };
 
   // Action Handlers
   const submitCashPayment = async (bookingId) => {
-    const toastId = toast(
-      renderStatusToast({
-        title: "Cash payment",
-        message: "Marking this booking as pay over the counter.",
-        Icon: Banknote,
-        tone: "info",
-        badge: "Cash"
-      }),
-      { ...toastBaseOptions, autoClose: false }
-    );
+    const toastId = toast.loading("Setting cash payment...");
     try {
       const { data } = await axios.post(backendUrl + '/api/user/mark-cash', { bookingId }, { headers: { token } });
       if (data.success) {
-        toast.update(toastId, {
-          render: renderStatusToast({
-            title: "Cash payment set",
-            message: "Marked as pay over the counter.",
-            Icon: CheckCircle2,
-            tone: "success",
-            badge: "Cash"
-          }),
-          ...toastBaseOptions,
-          autoClose: 2000
-        });
+        toast.update(toastId, { render: "Cash payment set. Proceed to counter.", type: "success", isLoading: false, autoClose: 2200 });
         fetchUserBookings();
       } else {
-        toast.update(toastId, {
-          render: renderStatusToast({
-            title: "Cash payment failed",
-            message: data.message || "Unable to update payment method.",
-            Icon: AlertTriangle,
-            tone: "error",
-            badge: "Cash"
-          }),
-          ...toastBaseOptions,
-          autoClose: 3000
-        });
+        toast.update(toastId, { render: data.message || "Unable to update payment method.", type: "error", isLoading: false, autoClose: 3000 });
       }
-    } catch (error) {
-      toast.update(toastId, {
-        render: renderStatusToast({
-          title: "Cash payment failed",
-          message: "Error updating payment method.",
-          Icon: AlertTriangle,
-          tone: "error",
-          badge: "Cash"
-        }),
-        ...toastBaseOptions,
-        autoClose: 3000
-      });
+    } catch {
+      toast.update(toastId, { render: "Cash payment update failed.", type: "error", isLoading: false, autoClose: 3000 });
     }
   }
 
@@ -232,30 +175,12 @@ const MyBookings = () => {
   const handleOnlinePayment = async (bookingId) => {
     const booking = bookings.find(b => b._id === bookingId);
     if (booking?.paymentStatus === "pending") {
-      toast(
-        renderStatusToast({
-          title: "Payment pending",
-          message: "GCash checkout is already initiated.",
-          Icon: Clock,
-          tone: "warning",
-          badge: "GCash"
-        }),
-        { ...toastBaseOptions, autoClose: 2500 }
-      );
+      toast.warning("GCash checkout is already initiated.");
       return;
     }
 
     try {
-      const toastId = toast(
-        renderStatusToast({
-          title: "Connecting to GCash",
-          message: "Preparing secure checkout.",
-          Icon: Wallet,
-          tone: "info",
-          badge: "GCash"
-        }),
-        { ...toastBaseOptions, autoClose: false }
-      );
+      const toastId = toast.loading("Preparing GCash checkout...");
       const { data } = await axios.post(backendUrl + "/api/user/create-checkout-session", { 
   bookingId: booking._id,
   amount: booking.total_price, 
@@ -263,42 +188,13 @@ const MyBookings = () => {
 }, { headers: { token } });
 
       if (data.success) {
-        toast.update(toastId, {
-          render: renderStatusToast({
-            title: "Redirecting",
-            message: "Opening GCash checkout.",
-            Icon: CheckCircle2,
-            tone: "success",
-            badge: "GCash"
-          }),
-          ...toastBaseOptions,
-          autoClose: 1500
-        });
+        toast.update(toastId, { render: "Opening GCash checkout...", type: "success", isLoading: false, autoClose: 1200 });
         window.location.href = data.checkoutUrl;
       } else {
-        toast.update(toastId, {
-          render: renderStatusToast({
-            title: "GCash failed",
-            message: data.message || "Unable to start checkout.",
-            Icon: AlertTriangle,
-            tone: "error",
-            badge: "GCash"
-          }),
-          ...toastBaseOptions,
-          autoClose: 3000
-        });
+        toast.update(toastId, { render: data.message || "Unable to start GCash checkout.", type: "error", isLoading: false, autoClose: 3000 });
       }
     } catch {
-      toast(
-        renderStatusToast({
-          title: "GCash failed",
-          message: "Payment connection failed.",
-          Icon: AlertTriangle,
-          tone: "error",
-          badge: "GCash"
-        }),
-        { ...toastBaseOptions, autoClose: 3000 }
-      );
+      toast.error("GCash connection failed.");
     }
   };
 
@@ -348,7 +244,6 @@ const MyBookings = () => {
     if (resolvedBookingId) {
       setActiveTab("all");
       setSearchQuery("");
-      setBuildingFilter("all");
       setMonthFilter("all");
       setYearFilter("all");
       triggerBookingFlash(resolvedBookingId);
@@ -370,7 +265,6 @@ const MyBookings = () => {
       if (latestApproved?._id) {
         setActiveTab("all");
         setSearchQuery("");
-        setBuildingFilter("all");
         setMonthFilter("all");
         setYearFilter("all");
         triggerBookingFlash(latestApproved._id);
@@ -427,7 +321,6 @@ const MyBookings = () => {
     const date = new Date(b.check_in || Date.now());
 
     if (activeTab !== 'all' && b.status !== activeTab) return false;
-    if (buildingFilter !== 'all' && mainRoom.building?.toLowerCase() !== buildingFilter.toLowerCase()) return false;
     if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
     if (yearFilter !== 'all' && date.getFullYear().toString() !== yearFilter) return false;
 
@@ -444,8 +337,7 @@ const MyBookings = () => {
       ? getBookingSortTimestamp(b) - getBookingSortTimestamp(a)
       : getBookingSortTimestamp(a) - getBookingSortTimestamp(b)
   );
-}, [bookings, activeTab, searchQuery, buildingFilter, monthFilter, yearFilter, sortOrder]);
-  const buildingOptions = [{ label: "Margarita", value: "Margarita" }, { label: "Nolasco", value: "Nolasco" }];
+}, [bookings, activeTab, searchQuery, monthFilter, yearFilter, sortOrder]);
   
   const uniqueYears = useMemo(() => {
     const years = bookings.map(b => new Date(b.check_in).getFullYear());
@@ -620,27 +512,56 @@ const MyBookings = () => {
 
         {/* FILTERS & TABS */}
         <div className="space-y-6">
-          <div className="flex overflow-x-auto pb-2 gap-2 scrollbar-hide">
-            {['all', 'pending', 'approved', 'cancelled'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all whitespace-nowrap ${activeTab === tab
-                    ? 'bg-slate-900 text-white shadow-md'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          <div className="flex items-center overflow-x-auto pb-2 scrollbar-hide">
+            <button
+              type="button"
+              onClick={() => handleStatusTabChange("all")}
+              aria-expanded={showStatusTabs || activeTab !== "all"}
+              className={`inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                activeTab === "all"
+                  ? "bg-slate-900 text-white shadow-md"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              <span>All</span>
+              <ChevronRight
+                size={14}
+                className={`transition-transform duration-300 ${
+                  showStatusTabs || activeTab !== "all" ? "rotate-90" : ""
+                }`}
+              />
+            </button>
+
+            <div
+              className={`ml-2 flex items-center gap-2 overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                showStatusTabs || activeTab !== "all"
+                  ? "max-w-[520px] translate-x-0 opacity-100"
+                  : "pointer-events-none max-w-0 -translate-x-4 opacity-0"
+              }`}
+            >
+              {["pending", "approved", "cancelled"].map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => handleStatusTabChange(tab)}
+                  className={`rounded-full px-6 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${
+                    activeTab === tab
+                      ? "bg-slate-900 text-white shadow-md"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                   }`}
-              >
-                {tab}
-              </button>
-            ))}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3">
             <CustomDropdown icon={ArrowUpDown} value={sortOrder} onChange={setSortOrder} options={sortOptions} defaultText="Sort By" />
-            <CustomDropdown icon={Filter} value={buildingFilter} onChange={setBuildingFilter} options={buildingOptions} defaultText="Building" />
             <div className="flex gap-3 flex-1">
-              <CustomDropdown icon={Calendar} value={yearFilter} onChange={setYearFilter} options={uniqueYears} defaultText="Year" />
               <CustomDropdown icon={CalendarDays} value={monthFilter} onChange={setMonthFilter} options={months} defaultText="Month" />
+              <CustomDropdown icon={Calendar} value={yearFilter} onChange={setYearFilter} options={uniqueYears} defaultText="Year" />
+              
             </div>
           </div>
         </div>
@@ -982,7 +903,7 @@ const MyBookings = () => {
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-slate-900">{room?.name || "Room"}</p>
                           <p className="text-[10px] text-slate-500">
-                            {(room?.room_type || "Room type")
+                            {(room?.roomType || room?.room_type || "Room type")
                               .toString()
                               .replace(/_/g, " ")
                               .toUpperCase()}

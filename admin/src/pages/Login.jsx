@@ -345,7 +345,7 @@ const Login = () => {
   const submitBusyLabel = isStaffResetView ? "Updating..." : "Verifying...";
 
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-white font-sans">
+    <div className="flex min-h-screen w-full flex-col overflow-auto bg-white font-sans lg:h-screen lg:flex-row lg:overflow-hidden">
       <div id="admin-login-recaptcha-container" className="hidden"></div>
       <AccountStatusModal
         open={Boolean(disabledModalMessage)}
@@ -401,7 +401,7 @@ const Login = () => {
       )}
       
       {/* ---------------- LEFT SIDE: IMAGE (60%) ---------------- */}
-      <div className="hidden lg:flex w-[60%] h-full relative">
+      <div className="relative hidden h-full w-[60%] lg:flex">
         <img src={BannerImage} alt="Retreat House" className="absolute inset-0 w-full h-full object-cover" />
         <div className={`absolute inset-0 transition-all duration-700 ${isAdmin ? 'bg-indigo-900/80' : 'bg-black/80'} mix-blend-multiply`}></div>
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
@@ -428,9 +428,9 @@ const Login = () => {
       </div>
 
       {/* ---------------- RIGHT SIDE: FORM (40%) ---------------- */}
-      <div className="w-full lg:w-[40%] h-full flex flex-col justify-center px-12 xl:px-24 bg-white relative">
-        <div className="relative z-10">
-            <div className="mb-8">
+      <div className="relative flex h-full w-full flex-col justify-center bg-white px-5 py-8 sm:px-8 lg:w-[40%] lg:px-12 xl:px-24">
+        <div className="relative z-10 mx-auto w-full max-w-xl lg:max-w-none">
+            <div className="mb-6 sm:mb-8">
                 <h2 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">
                 {isStaffResetView ? "Set New Password" : "Welcome Back"}
                 </h2>
@@ -441,12 +441,12 @@ const Login = () => {
                 </p>
             </div>
 
-            <form onSubmit={isStaffResetView ? handleResetSubmit : onSubmitHandler} className="space-y-6">
+            <form onSubmit={isStaffResetView ? handleResetSubmit : onSubmitHandler} className="space-y-5 sm:space-y-6">
                 
-                <div className="flex bg-gray-100 p-1.5 rounded-full mb-8 relative">
+                <div className="relative mb-6 flex rounded-full bg-gray-100 p-1.5 sm:mb-8">
                     <div className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-full bg-white shadow-sm transition-all duration-300 ${isAdmin ? 'left-1.5' : 'left-[50%]'}`}></div>
-                    <button type="button" onClick={() => setState("Admin")} className={`flex-1 relative z-10 py-3 text-base font-semibold rounded-full transition-colors ${isAdmin ? 'text-indigo-700' : 'text-gray-500'}`}>Admin</button>
-                    <button type="button" onClick={() => setState("Staff")} className={`flex-1 relative z-10 py-3 text-base font-semibold rounded-full transition-colors ${!isAdmin ? 'text-gray-900' : 'text-gray-500'}`}>Staff</button>
+                    <button type="button" onClick={() => setState("Admin")} className={`relative z-10 flex-1 rounded-full py-3 text-sm font-semibold transition-colors sm:text-base ${isAdmin ? 'text-indigo-700' : 'text-gray-500'}`}>Admin</button>
+                    <button type="button" onClick={() => setState("Staff")} className={`relative z-10 flex-1 rounded-full py-3 text-sm font-semibold transition-colors sm:text-base ${!isAdmin ? 'text-gray-900' : 'text-gray-500'}`}>Staff</button>
                 </div>
                 {!isStaffResetView && (
                   <div className="space-y-1">
@@ -506,7 +506,7 @@ const Login = () => {
                 )}
                 {showForgotEmailField && !isAdmin && !isStaffResetView && (
                   <div className="mt-2 p-5 bg-white border border-gray-100 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <button
                         type="button"
                         onClick={() => {

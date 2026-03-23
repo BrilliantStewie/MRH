@@ -1,16 +1,15 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import { 
+  ChevronLeft,
+  ChevronRight,
   Search, 
   User, 
   Mail, 
   Shield,
   CircleDot,
   XCircle,
-  ChevronUp,
   RefreshCcw,
-  PenBox, 
-  Ban,     
   UserPlus,
   Phone,
   Lock,
@@ -18,6 +17,9 @@ import {
 } from "lucide-react";
 import { toast } from "react-toastify";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
+
+const USERS_PER_PAGE = 5;
+const normalizeUserRole = (role) => (role === "user" ? "guest" : role || "guest");
 
 const Users = () => {
   const { aToken, allUsers, getAllUsers, changeUserStatus, addGuestUser, updateStaff } = useContext(AdminContext);
@@ -31,8 +33,7 @@ const Users = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editData, setEditData] = useState(null);
 
-  // Expandable list state
-  const [expanded, setExpanded] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (aToken) getAllUsers();
@@ -66,6 +67,7 @@ const Users = () => {
     const users = Array.isArray(allUsers) ? allUsers : [];
     const mappedUsers = users.map((u) => ({
       ...u,
+      role: normalizeUserRole(u.role),
       isYou: Boolean(adminInfo.id) && String(u._id) === String(adminInfo.id),
     }));
     const adminUsers = mappedUsers.filter((u) => u.role === "admin");
@@ -76,7 +78,7 @@ const Users = () => {
     ];
     
     // Sort logic mapping
-    const rolePriority = { admin: 1, staff: 2, user: 3 };
+    const rolePriority = { admin: 1, staff: 2, guest: 3 };
 
     const filtered = merged.filter((u) => {
       const fullName = getFullName(u).toLowerCase();
@@ -109,9 +111,40 @@ const Users = () => {
 
   }, [adminInfo.id, allUsers, search, roleFilter, statusFilter]);
 
-  // Limit display
-  const displayedUsers = expanded ? filteredUsers : filteredUsers.slice(0, 5);
-  const hiddenCount = filteredUsers.length - 5;
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const visiblePageCount = Math.min(3, totalPages);
+  const halfVisiblePageCount = Math.floor(visiblePageCount / 2);
+  let visiblePageStart = Math.max(1, currentPageSafe - halfVisiblePageCount);
+  let visiblePageEnd = visiblePageStart + visiblePageCount - 1;
+
+  if (visiblePageEnd > totalPages) {
+    visiblePageEnd = totalPages;
+    visiblePageStart = Math.max(1, visiblePageEnd - visiblePageCount + 1);
+  }
+
+  const visiblePageNumbers = Array.from(
+    { length: visiblePageEnd - visiblePageStart + 1 },
+    (_, index) => visiblePageStart + index
+  );
+  const displayedUsers = filteredUsers.slice(
+    (currentPageSafe - 1) * USERS_PER_PAGE,
+    currentPageSafe * USERS_PER_PAGE
+  );
+  const visibleUserStart =
+    filteredUsers.length === 0 ? 0 : (currentPageSafe - 1) * USERS_PER_PAGE + 1;
+  const visibleUserEnd = Math.min(
+    currentPageSafe * USERS_PER_PAGE,
+    filteredUsers.length
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   const handleEdit = (user) => {
     setEditData(user);
@@ -121,7 +154,7 @@ const Users = () => {
   const roleOptions = [
     { value: "all", label: "All Roles" },
     { value: "staff", label: "Staff", icon: Shield },
-    { value: "user", label: "Guest", icon: User },
+    { value: "guest", label: "Guest", icon: User },
   ];
 
   const statusOptions = [
@@ -131,10 +164,10 @@ const Users = () => {
   ];
 
   return (
-    <div className="min-h-full bg-slate-50 font-sans text-slate-900">
+    <div className="flex h-full min-h-0 flex-col bg-slate-50 font-sans text-slate-900">
       
       {/* TOP BAR */}
-      <div className="max-w-7xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">Users</h1>
@@ -143,6 +176,16 @@ const Users = () => {
         </div>
         
         <div className="flex items-center gap-2">
+            <button
+                onClick={() => {
+                  setEditData(null);
+                  setShowAddModal(true);
+                }}
+                className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-white transition-colors hover:bg-black shadow-sm"
+            >
+                <UserPlus size={16} />
+                <span className="text-sm font-semibold sm:inline hidden">Add Guest</span>
+            </button>
             <button 
                 onClick={() => getAllUsers()} 
                 className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
@@ -154,8 +197,8 @@ const Users = () => {
       </div>
 
       {/* CONTROL BAR */}
-      <div className="max-w-7xl mx-auto mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
+      <div className="mb-6">
+        <div className="flex flex-col items-center justify-between gap-4 lg:flex-row">
           <div className="relative w-full lg:w-96 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
             <input
@@ -201,8 +244,9 @@ const Users = () => {
       </div>
 
       {/* DATA TABLE */}
-      <div className="max-w-7xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[800px]">
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[800px] border-collapse text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Identity</th>
@@ -270,7 +314,7 @@ const Users = () => {
                         u.role === 'staff' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
                         'bg-slate-100 text-slate-600 border-slate-200'
                       }`}>
-                        {u.role === 'user' ? 'Guest' : u.role || 'User'}
+                        {u.role === 'guest' ? 'Guest' : u.role || 'User'}
                       </span>
                     </td>
 
@@ -295,10 +339,10 @@ const Users = () => {
                                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
                                   u.disabled 
                                     ? 'bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100'
-                                    : 'bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100'
+                                    : 'bg-amber-50 border-amber-100 text-amber-700 hover:bg-amber-100'
                                 }`}
                             >
-                                {u.disabled ? <RefreshCcw size={14}/> : <Ban size={14}/>}
+                                {u.disabled ? <RefreshCcw size={14}/> : <Shield size={14}/>}
                                 {u.disabled ? "Enable" : "Disable"}
                             </button>
 
@@ -315,20 +359,55 @@ const Users = () => {
             )}
           </tbody>
         </table>
+        </div>
 
-        {/* Show More / Less Toggle */}
-        {filteredUsers.length > 5 && (
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-center">
-            <button 
-              onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 text-sm font-bold transition-all active:scale-95"
-            >
-              {expanded ? (
-                <>Show Less <ChevronUp size={16} /></>
-              ) : (
-                <>Show More ({hiddenCount}) <ChevronDown size={16} /></>
-              )}
-            </button>
+        {filteredUsers.length > 0 && (
+          <div className="mt-auto flex flex-col gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="w-full text-left sm:w-auto">
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                User Directory
+              </p>
+              <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
+                Showing {visibleUserStart}-{visibleUserEnd} of {filteredUsers.length} users
+              </p>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPageSafe === 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {visiblePageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold transition ${
+                        currentPageSafe === page
+                          ? "bg-slate-900 text-white shadow-md"
+                          : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPageSafe === totalPages}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -365,7 +444,7 @@ const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUse
         try {
             let success = false;
             if (editData) {
-                success = await updateStaff({ userId: editData._id, ...formData });
+                success = await updateStaff(editData._id, formData);
             } else {
                 success = await addGuestUser(formData);
             }
@@ -433,7 +512,8 @@ const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUse
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input 
                                 type="email" 
-                                placeholder="Email (Optional)" 
+                                required={!editData}
+                                placeholder="Email" 
                                 value={formData.email}
                                 onChange={(e) => setFormData({...formData, email: e.target.value})}
                                 className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
@@ -453,7 +533,9 @@ const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUse
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input 
                                 type="password" 
-                                placeholder={editData ? "New Password (Leave blank to keep)" : "Password (Optional)"}
+                                required={!editData}
+                                minLength={editData ? undefined : 8}
+                                placeholder={editData ? "New Password (Leave blank to keep)" : "Password (Minimum 8 characters)"}
                                 value={formData.password}
                                 onChange={(e) => setFormData({...formData, password: e.target.value})}
                                 className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 

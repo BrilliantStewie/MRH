@@ -151,7 +151,8 @@ const RetreatBooking = () => {
             const updated = { ...prev };
             selectedRooms.forEach(room => {
                 if (!updated[room._id]) {
-                    const isDorm = room.room_type?.toLowerCase().includes("dorm");
+                    const roomTypeLabel = getRoomTypeLabel(room);
+                    const isDorm = roomTypeLabel.toLowerCase().includes("dorm");
                     updated[room._id] = isDorm ? 3 : 1;
                 }
             });
@@ -163,8 +164,9 @@ const RetreatBooking = () => {
             let changed = false;
             selectedRooms.forEach(room => {
                 if (!updated[room._id]) {
+                    const roomTypeLabel = getRoomTypeLabel(room);
                     // Find packages that match this room's type
-                    const availablePkgs = dbPackages.filter(pkg => pkg.roomType?.name?.toLowerCase() === room.room_type?.toLowerCase());
+                    const availablePkgs = dbPackages.filter(pkg => pkg.roomType?.name?.toLowerCase() === roomTypeLabel.toLowerCase());
                     if (availablePkgs.length > 0) {
                         updated[room._id] = availablePkgs[0]._id; // Default to the first available package
                         changed = true;
@@ -209,6 +211,7 @@ const RetreatBooking = () => {
     };
 
     const getPrice = (priceVal) => Number(priceVal?.$numberDecimal || priceVal || 0);
+    const getRoomTypeLabel = (room) => String(room?.roomType || room?.room_type || "").trim();
 
     const hasVenuePackageSelected = () => {
         return dbPackages.some((pkg) => {
@@ -267,8 +270,8 @@ const RetreatBooking = () => {
                 if (data.success) {
                     const counts = new Map();
                     (data.bookings || []).forEach((b) => {
-                        const start = toDateObj(b.check_in || b.date || b.createdAt);
-                        const end = toDateObj(b.check_out || b.check_in || b.date || b.createdAt);
+                        const start = toDateObj(b.checkIn || b.check_in || b.date || b.createdAt);
+                        const end = toDateObj(b.checkOut || b.check_out || b.checkIn || b.check_in || b.date || b.createdAt);
                         const guestCountRaw = Number(b.guestCount);
                         const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
 
@@ -336,7 +339,6 @@ const RetreatBooking = () => {
             if (clearRooms) clearRooms();
             setRoomParticipants({});
             setRoomPackages({});
-            toast.info("Rooms removed for same-day events.");
         }
     }, [isSameDayBooking, selectedRooms.length]);
 
@@ -345,7 +347,6 @@ const RetreatBooking = () => {
             removeRoom(roomId);
             setRoomParticipants(prev => { const updated = { ...prev }; delete updated[roomId]; return updated; });
             setRoomPackages(prev => { const updated = { ...prev }; delete updated[roomId]; return updated; }); // Clear package memory
-            toast.info("Room removed");
         }
     };
 
@@ -472,7 +473,7 @@ const RetreatBooking = () => {
                 toast.error(`Please select a package for ${room.name}.`);
                 return;
             }
-            const isDorm = room.room_type?.toLowerCase().includes("dorm");
+            const isDorm = getRoomTypeLabel(room).toLowerCase().includes("dorm");
             const minPax = isDorm ? 3 : 1;
             const assignedPax = Number(roomParticipants[room._id]) || 0;
             if (assignedPax < minPax) {
@@ -484,18 +485,18 @@ const RetreatBooking = () => {
         try {
             const bookingPayload = {
                 bookingName,
-                room_ids: selectedRooms.map(r => r._id),
-                check_in: startDate,
-                check_out: endDate,
+                roomIds: selectedRooms.map(r => r._id),
+                checkIn: startDate,
+                checkOut: endDate,
                 venueParticipants: Number(venueParticipants) || 0,
 
                 bookingItems: selectedRooms.map(room => ({
-                    room_id: room._id,
+                    roomId: room._id,
                     participants: Number(roomParticipants[room._id]) || 1,
-                    package_id: roomPackages[room._id]
+                    packageId: roomPackages[room._id]
                 })),
 
-                extra_packages: Object.values(selectedPackages).flat()
+                extraPackages: Object.values(selectedPackages).flat()
             };
 
             const { data } = await axios.post(backendUrl + "/api/booking/create", bookingPayload, { headers: { token } });
@@ -548,7 +549,7 @@ const RetreatBooking = () => {
                 if (remaining <= 0) break;
                 if (selectedRooms.some(r => r._id === room._id)) continue;
                 const capacity = Number(room.capacity);
-                if (room.room_type?.toLowerCase().includes("dorm") && remaining < 3) continue;
+                if (getRoomTypeLabel(room).toLowerCase().includes("dorm") && remaining < 3) continue;
                 selected.push(room);
                 remaining -= capacity;
             }
@@ -893,7 +894,6 @@ const RetreatBooking = () => {
                                             clearRooms();
                                             setRoomParticipants({});
                                             setRoomPackages({});
-                                            toast.info("All rooms removed");
                                         }}
                                         className="text-[10px] font-bold text-slate-400 hover:text-red-600 uppercase tracking-tight transition-colors"
                                     >
@@ -930,11 +930,12 @@ const RetreatBooking = () => {
                                 {selectedRooms.slice(0, showAllRooms ? selectedRooms.length : 3).map((room) => {
                                     const fullImageUrl = getImageUrl(getRoomImage(room));
                                     const capacity = Number(room.capacity) || 0;
-                                    const isDorm = room.room_type?.toLowerCase().includes("dorm");
+                                    const roomTypeLabel = getRoomTypeLabel(room);
+                                    const isDorm = roomTypeLabel.toLowerCase().includes("dorm");
                                     const minPax = isDorm ? 3 : 1;
 
                                     // Available packages for this specific room
-                                    const availablePkgs = dbPackages.filter(pkg => pkg.roomType?.name?.toLowerCase() === room.room_type?.toLowerCase());
+                                    const availablePkgs = dbPackages.filter(pkg => pkg.roomType?.name?.toLowerCase() === roomTypeLabel.toLowerCase());
 
                                     return (
                                         <div key={room._id} className={`group flex flex-col sm:flex-row gap-4 p-4 bg-white border rounded-xl transition-all duration-300 ${isSameDayBooking ? "border-red-200 opacity-50 grayscale" : "border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300"}`}>
@@ -955,7 +956,7 @@ const RetreatBooking = () => {
                                                         </button>
                                                     </div>
                                                     <p className="text-[10px] uppercase text-slate-500 font-bold tracking-wide mb-2 flex items-center gap-2">
-                                                        {room.room_type} {room.building && <span>• {room.building}</span>}
+                                                        {room.roomType || room.room_type} {room.building && <span>• {room.building}</span>}
                                                     </p>
                                                     <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold border border-slate-200">
                                                         <Users size={10} /> Max {capacity} {capacity === 1 ? "Person" : "People"}

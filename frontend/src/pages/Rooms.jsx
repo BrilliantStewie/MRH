@@ -140,7 +140,7 @@ const Rooms = () => {
   const roomTypeOptions = [
     "all",
     ...Array.from(
-      new Set((rooms || []).map((room) => room.room_type).filter(Boolean))
+      new Set((rooms || []).map((room) => room.roomType || room.room_type).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
   ];
 
@@ -204,7 +204,7 @@ const Rooms = () => {
     let data = [...(rooms || [])];
 
     if (roomType !== "all") {
-      data = data.filter((room) => normalize(room.room_type) === normalize(roomType));
+      data = data.filter((room) => normalize(room.roomType || room.room_type) === normalize(roomType));
     }
 
     if (building !== "all") {
@@ -459,7 +459,7 @@ const Rooms = () => {
     }, [room._id]);
 
     const isRoomSelected = isSelected(room._id);
-    const roomTypeLabel = (room.room_type || room.type || "").replace(/_/g, " ");
+    const roomTypeLabel = (room.roomType || room.room_type || room.type || "").replace(/_/g, " ");
     const {
       isAdminUnavailable: isRoomAdminUnavailable,
       isUnavailable: isRoomUnavailable,
@@ -472,8 +472,12 @@ const Rooms = () => {
           <div className="flex w-full flex-col bg-white p-5 md:w-[52%]">
             <div className="group/slider relative flex-1 overflow-hidden rounded-[2.5rem] bg-slate-100 shadow-inner min-h-[400px]">
               <div
-                className="flex h-full transition-transform duration-[1200ms] will-change-transform cubic-bezier(0.23, 1, 0.32, 1)"
-                style={{ transform: `translateX(-${activeImgIndex * 100}%)` }}
+                className="flex h-full transition-transform will-change-transform"
+                style={{
+                  transform: `translateX(-${activeImgIndex * 100}%)`,
+                  transitionDuration: "1200ms",
+                  transitionTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+                }}
               >
                 {slides.map((img, index) => (
                   <div key={index} className="min-w-full h-full select-none">
@@ -705,7 +709,7 @@ const Rooms = () => {
                         size={filterIconSize}
                         className={active ? "text-blue-400" : "text-slate-400 group-hover:text-slate-600"}
                       />
-                      {type === "all" ? "All Types" : type}
+                      {type === "all" ? "All Room Types" : type}
                     </button>
                   );
                 })}
@@ -883,7 +887,7 @@ const Rooms = () => {
                   } = getRoomAvailabilityState(room);
                   const selected = isLoggedIn && isSelected(room._id);
                   const canSelectRoom = isLoggedIn && !isUnavailable;
-                  const roomTypeLabel = (room.room_type || room.type || "").replace(/_/g, " ");
+                  const roomTypeLabel = (room.roomType || room.room_type || room.type || "").replace(/_/g, " ");
 
                   return (
                     <div

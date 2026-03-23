@@ -50,8 +50,8 @@ const AddUser = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-        <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center justify-between bg-slate-900 p-5 text-white sm:p-6">
           <div className="flex items-center gap-3">
             <UserPlus size={20} className="text-indigo-400" />
             <h2 className="text-xl font-bold">Add Guest Profile</h2>
@@ -61,8 +61,8 @@ const AddUser = ({ onClose }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-5 sm:p-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-black uppercase text-slate-500">First Name *</label>
               <input required type="text" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" 
@@ -103,11 +103,11 @@ const AddUser = ({ onClose }) => {
             </div>
           </div>
 
-          <div className="pt-4 flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all">
+          <div className="flex flex-col gap-3 pt-4 sm:flex-row">
+            <button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition-all hover:bg-slate-50">
               Cancel
             </button>
-            <button disabled={loading} type="submit" className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200">
+            <button disabled={loading} type="submit" className="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-slate-200 transition-all hover:bg-black">
               {loading ? "Creating..." : "Create Account"}
             </button>
           </div>

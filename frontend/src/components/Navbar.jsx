@@ -39,6 +39,7 @@ const Navbar = () => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState(null);
 
   /* ==========================================
      NAVBAR UI LOGIC
@@ -83,6 +84,20 @@ const Navbar = () => {
       await axios.put(`${backendUrl}/api/notifications/read/${id}`, {}, {
         headers: { token }
       });
+      fetchNotifications();
+    } catch (err) {
+      if (err.response?.status === 401 || err.response?.status === 403) logout();
+      console.error(err);
+    }
+  };
+
+  const deleteNotification = async () => {
+    if (!notificationToDelete) return;
+    try {
+      await axios.delete(`${backendUrl}/api/notifications/${notificationToDelete}`, {
+        headers: { token }
+      });
+      setNotificationToDelete(null);
       fetchNotifications();
     } catch (err) {
       if (err.response?.status === 401 || err.response?.status === 403) logout();
@@ -251,6 +266,7 @@ const Navbar = () => {
     setShowClearConfirm(false);
     setShowNotificationMenu(false);
     setShowLogoutConfirm(false);
+    setNotificationToDelete(null);
   }, [location.pathname]);
 
   const navLinks = [
@@ -470,25 +486,34 @@ const Navbar = () => {
                                    </p>
                                  </div>
                                </div>
-                               <div className="ml-2 flex-shrink-0">
-                                 {!n.isRead ? (
-                                   <button
-                                     type="button"
-                                     onClick={(event) => {
-                                       event.stopPropagation();
-                                       markAsRead(n._id);
-                                     }}
-                                     className="pointer-events-none flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 hover:border-slate-300 hover:text-slate-700"
-                                   >
-                                     <Check size={9} />
-                                     Mark read
-                                   </button>
-                                 ) : (
-                                   <div className="mt-0.5 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100">
-                                     <Check size={10} />
-                                   </div>
-                                 )}
-                               </div>
+                                <div className="ml-2 flex-shrink-0">
+                                  <div className="flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                    {!n.isRead && (
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          markAsRead(n._id);
+                                        }}
+                                        className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                                      >
+                                        <Check size={9} />
+                                        Mark read
+                                      </button>
+                                    )}
+                                        <button
+                                          type="button"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            setNotificationToDelete(n._id);
+                                          }}
+                                          className="flex items-center gap-1 rounded-full border border-rose-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.12em] text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                                        >
+                                      <Trash2 size={9} />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
                              </div>
                            )})}
                         </div>
@@ -621,6 +646,40 @@ const Navbar = () => {
                 className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
               >
                 Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notificationToDelete && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <Trash2 size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-base font-bold text-slate-900">Delete notification?</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  This will remove the selected notification from your account list.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setNotificationToDelete(null)}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteNotification}
+                className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"
+              >
+                Delete
               </button>
             </div>
           </div>

@@ -460,8 +460,8 @@ const AdminReviews = () => {
 
       <div className="w-full max-w-none mx-auto pt-0 pb-0">
        
-      <div className="mb-10 w-full max-w-[1200px] mx-0">
-        <div className="w-full max-w-[1200px] mx-0 pb-0 flex items-start justify-between gap-4">
+      <div className="mb-8 w-full max-w-[1200px] mx-0 sm:mb-10">
+        <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
             <p className="text-slate-500 mt-2 max-w-2xl">
@@ -557,7 +557,7 @@ const AdminReviews = () => {
         )}
       </div>
 
-      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
         {!hasNoReviews && (
           <aside className="h-fit">
             <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -591,7 +591,7 @@ const AdminReviews = () => {
           </aside>
         )}
 
-        <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-4"}`}>
+        <div className={`flex w-full flex-col items-start space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "pl-0 lg:pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (

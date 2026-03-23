@@ -73,7 +73,8 @@ const Banner = () => {
               <img 
                   src={assets.appointment_img} 
                   alt="Sanctuary Interiors" 
-                  className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105" 
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  style={{ transitionDuration: "2s" }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent"></div>
            </div>

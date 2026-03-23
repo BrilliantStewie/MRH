@@ -8,12 +8,21 @@ import userModel from "../models/userModel.js";
 import roomModel from "../models/roomModel.js";
 import bookingModel from "../models/bookingModel.js";
 import buildingModel from "../models/buildingModel.js";
-import roomTypeModel from "../models/roomTypeModel.js";
-import Notification from "../models/notificationModel.js";
+import roomTypeModel from "../models/roomtypeModel.js";
+import packageModel from "../models/packageModel.js";
+import { createOrRefreshNotification } from "../utils/notificationUtils.js";
 
 // Utils
 import sendEmail from "../utils/sendEmail.js";
 import sendSMS from "../utils/sendSMS.js";
+import {
+  attachReviewDataToBookings,
+  buildBookingPopulate,
+  normalizeName,
+  resolveNamedReference,
+  roomReferencePopulate,
+  serializeRoom,
+} from "../utils/dataConsistency.js";
 
 // ======================================================================
 // 🛠️ CLOUD HELPER
@@ -40,6 +49,66 @@ const formatPHNumber = (number) => {
 
   return number;
 };
+
+const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
+
+const normalizePHPhone = (value) => {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.startsWith("63") && digits.length === 12) {
+    return `0${digits.slice(2)}`;
+  }
+  if (digits.length === 10 && digits.startsWith("9")) {
+    return `0${digits}`;
+  }
+  return digits;
+};
+
+const isValidPHPhone = (value) => /^09\d{9}$/.test(value);
+
+const buildPhoneCandidates = (value) => {
+  const rawDigits = String(value || "").replace(/\D/g, "");
+  const normalized = normalizePHPhone(value);
+  const candidates = new Set();
+
+  if (rawDigits) candidates.add(rawDigits);
+  if (normalized) candidates.add(normalized);
+
+  if (normalized && normalized.startsWith("0") && normalized.length === 11) {
+    candidates.add(normalized.slice(1));
+    candidates.add(`63${normalized.slice(1)}`);
+  }
+
+  return Array.from(candidates);
+};
+
+const parseAmenities = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed)
+        ? parsed.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+    } catch {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+  }
+
+  return [];
+};
+
+const resolveBuildingDoc = async (value) =>
+  resolveNamedReference(buildingModel, value);
+
+const resolveRoomTypeDoc = async (value) =>
+  resolveNamedReference(roomTypeModel, value);
 
 // ======================================================================
 // 🔐 AUTHENTICATION
@@ -84,7 +153,9 @@ const loginAdmin = async (req, res) => {
     const token = jwt.sign(
       {
         id: admin._id,
-        role: admin.role
+        role: admin.role,
+        name: `${admin.firstName || "Admin"} ${admin.lastName || ""}`.trim(),
+        tokenVersion: admin.tokenVersion || 0
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
@@ -166,13 +237,31 @@ const getAllStaff = async (req, res) => {
 
 const addGuestUser = async (req, res) => {
     try {
-        const { name, email, password, phone } = req.body;
+        const {
+            firstName,
+            middleName = "",
+            lastName,
+            suffix = "",
+            email,
+            password,
+            phone
+        } = req.body;
 
-        if (!name || !email || !password) {
-            return res.json({ success: false, message: "Missing details" });
+        const normalizedFirstName = normalizeName(firstName);
+        const normalizedMiddleName = normalizeName(middleName);
+        const normalizedLastName = normalizeName(lastName);
+        const normalizedSuffix = normalizeName(suffix);
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePHPhone(phone);
+
+        if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !password) {
+            return res.json({
+                success: false,
+                message: "First name, last name, email, and password are required"
+            });
         }
 
-        if (!validator.isEmail(email)) {
+        if (!validator.isEmail(normalizedEmail)) {
             return res.json({ success: false, message: "Invalid email format" });
         }
 
@@ -180,16 +269,41 @@ const addGuestUser = async (req, res) => {
             return res.json({ success: false, message: "Password must be at least 8 characters" });
         }
 
+        if (normalizedPhone && !isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        const existingEmailUser = await userModel.findOne({ email: normalizedEmail });
+        if (existingEmailUser) {
+            return res.json({ success: false, message: "Email already exists" });
+        }
+
+        if (normalizedPhone) {
+            const existingPhoneUser = await userModel.findOne({
+                phone: { $in: buildPhoneCandidates(normalizedPhone) }
+            });
+
+            if (existingPhoneUser) {
+                return res.json({ success: false, message: "Phone number already exists" });
+            }
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = new userModel({
-            name,
-            email,
+            firstName: normalizedFirstName,
+            middleName: normalizedMiddleName,
+            lastName: normalizedLastName,
+            suffix: normalizedSuffix,
+            email: normalizedEmail,
             password: hashedPassword,
-            phone,
+            passwordSet: true,
+            phone: normalizedPhone || null,
             role: 'guest',
-            image: "" 
+            image: "",
+            isVerified: true,
+            phoneVerified: Boolean(normalizedPhone)
         });
 
         await newUser.save();
@@ -354,9 +468,16 @@ const changeUserStatus = async (req, res) => {
 
 const addRoom = async (req, res) => {
     try {
-        const { name, room_type, building, capacity, description, amenities } = req.body;
+        const { name, building, buildingId: providedBuildingId, capacity, description, amenities } = req.body;
+        const roomTypeInput = req.body.roomTypeId || req.body.roomType || req.body.room_type;
+        const normalizedName = normalizeName(name);
 
-        if (!name || !room_type || !building || !capacity || !description) {
+        const [buildingDoc, roomTypeDoc] = await Promise.all([
+            resolveBuildingDoc(providedBuildingId || building),
+            resolveRoomTypeDoc(roomTypeInput),
+        ]);
+
+        if (!normalizedName || !buildingDoc || !roomTypeDoc || !capacity || !description) {
             return res.json({ success: false, message: "All fields are required" });
         }
 
@@ -369,30 +490,28 @@ const addRoom = async (req, res) => {
             imageFiles.map(item => streamUpload(item.buffer, "mrh_rooms"))
         );
 
-        let parsedAmenities = [];
-        try {
-            parsedAmenities = JSON.parse(amenities || "[]");
-        } catch (e) {
-            parsedAmenities = [];
-        }
-
         const roomData = {
-            name,
-            room_type,
-            building,
+            name: normalizedName,
+            roomTypeId: roomTypeDoc._id,
+            buildingId: buildingDoc._id,
             capacity: Number(capacity),
             description,
-            amenities: parsedAmenities,
+            amenities: parseAmenities(amenities),
             images: imagesUrl,
-            cover_image: imagesUrl[0],
-            available: true,
-            date: Date.now()
+            coverImage: imagesUrl[0],
+            available: true
         };
 
-        const newRoom = new roomModel(roomData);
-        await newRoom.save();
+        const newRoom = await roomModel.create(roomData);
+        const populatedRoom = await roomModel
+            .findById(newRoom._id)
+            .populate(roomReferencePopulate);
 
-        res.json({ success: true, message: "Room Added Successfully" });
+        res.json({
+            success: true,
+            message: "Room Added Successfully",
+            room: serializeRoom(populatedRoom)
+        });
 
     } catch (error) {
         console.log("Add Room Error:", error);
@@ -403,29 +522,39 @@ const addRoom = async (req, res) => {
 const updateRoom = async (req, res) => {
     try {
         const roomId = req.body.roomId || req.body.id; 
-        const { name, room_type, building, capacity, description, amenities, existingImages } = req.body;
+        const { name, building, buildingId: providedBuildingId, capacity, description, amenities, existingImages } = req.body;
+        const roomTypeInput = req.body.roomTypeId || req.body.roomType || req.body.room_type;
 
         const room = await roomModel.findById(roomId);
         if (!room) {
             return res.json({ success: false, message: "Room not found" });
         }
 
-        if (name) room.name = name;
-        if (room_type) room.room_type = room_type;
-        if (building) room.building = building;
+        const [buildingDoc, roomTypeDoc] = await Promise.all([
+            providedBuildingId || building ? resolveBuildingDoc(providedBuildingId || building) : Promise.resolve(null),
+            roomTypeInput ? resolveRoomTypeDoc(roomTypeInput) : Promise.resolve(null),
+        ]);
+
+        if ((providedBuildingId || building) && !buildingDoc) {
+            return res.json({ success: false, message: "Selected building does not exist" });
+        }
+
+        if (roomTypeInput && !roomTypeDoc) {
+            return res.json({ success: false, message: "Selected room type does not exist" });
+        }
+
+        if (name) room.name = normalizeName(name);
+        if (roomTypeDoc) room.roomTypeId = roomTypeDoc._id;
+        if (buildingDoc) room.buildingId = buildingDoc._id;
         if (capacity) room.capacity = Number(capacity);
         if (description) room.description = description;
         
-        if (amenities) {
-            try { 
-                room.amenities = JSON.parse(amenities); 
-            } catch (e) { 
-                room.amenities = []; 
-            }
+        if (amenities !== undefined) {
+            room.amenities = parseAmenities(amenities);
         }
 
-        let finalImages = [];
-        if (existingImages) {
+        let finalImages = Array.isArray(room.images) ? [...room.images] : [];
+        if (existingImages !== undefined) {
             try { finalImages = JSON.parse(existingImages); } catch { finalImages = []; }
         }
 
@@ -438,10 +567,17 @@ const updateRoom = async (req, res) => {
         }
 
         room.images = finalImages;
-        if (finalImages.length > 0) room.cover_image = finalImages[0];
+        room.coverImage = finalImages[0] || room.coverImage || "";
 
         await room.save();
-        res.json({ success: true, message: "Room Updated Successfully" });
+        const populatedRoom = await roomModel
+            .findById(room._id)
+            .populate(roomReferencePopulate);
+        res.json({
+            success: true,
+            message: "Room Updated Successfully",
+            room: serializeRoom(populatedRoom)
+        });
 
     } catch (error) {
         console.log("Update Room Error:", error);
@@ -451,40 +587,12 @@ const updateRoom = async (req, res) => {
 
 const getAllRooms = async (req, res) => {
     try {
-        const [rooms, buildings, roomTypes] = await Promise.all([
-            roomModel.find({}).sort({ createdAt: -1 }).lean(),
-            buildingModel.find({}, "name").lean(),
-            roomTypeModel.find({}, "name").lean()
-        ]);
+        const rooms = await roomModel
+            .find({})
+            .populate(roomReferencePopulate)
+            .sort({ createdAt: -1 });
 
-        const validBuildings = new Set(
-            buildings
-                .map((building) => String(building.name || "").trim().toLowerCase())
-                .filter(Boolean)
-        );
-        const validRoomTypes = new Set(
-            roomTypes
-                .map((type) => String(type.name || "").trim().toLowerCase())
-                .filter(Boolean)
-        );
-
-        const sanitizedRooms = rooms.map((room) => {
-            const sanitizedRoom = { ...room };
-            const normalizedBuilding = String(room.building || "").trim().toLowerCase();
-            const normalizedRoomType = String(room.room_type || "").trim().toLowerCase();
-
-            if (!validBuildings.has(normalizedBuilding)) {
-                sanitizedRoom.building = "";
-            }
-
-            if (!validRoomTypes.has(normalizedRoomType)) {
-                sanitizedRoom.room_type = "";
-            }
-
-            return sanitizedRoom;
-        });
-
-        res.json({ success: true, rooms: sanitizedRooms });
+        res.json({ success: true, rooms: rooms.map((room) => serializeRoom(room)) });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -506,8 +614,24 @@ const changeAvailability = async (req, res) => {
 
 const deleteRoom = async (req, res) => {
     try {
-        const { id } = req.body;
-        await roomModel.findByIdAndDelete(id);
+        const id = req.body.id || req.params.id;
+
+        const bookingExists = await bookingModel.exists({
+            "bookingItems.roomId": id
+        });
+
+        if (bookingExists) {
+            return res.json({
+                success: false,
+                message: "Room is linked to existing bookings and cannot be deleted"
+            });
+        }
+
+        const deletedRoom = await roomModel.findByIdAndDelete(id);
+        if (!deletedRoom) {
+            return res.json({ success: false, message: "Room not found" });
+        }
+
         res.json({ success: true, message: "Room Deleted" });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -520,13 +644,15 @@ const deleteRoom = async (req, res) => {
 
 const allBookings = async (req, res) => {
     try {
-        const bookings = await bookingModel.find({})
-            .populate('user_id', 'firstName middleName lastName suffix email image phone authProvider')
-            .populate('bookingItems.room_id')
-            .populate('bookingItems.package_id')
-            .sort({ date: -1 });
+        let bookingsQuery = bookingModel.find({}).sort({ createdAt: -1 });
+        for (const populateConfig of buildBookingPopulate()) {
+            bookingsQuery = bookingsQuery.populate(populateConfig);
+        }
 
-        res.json({ success: true, bookings });
+        const bookings = await bookingsQuery;
+        const normalizedBookings = await attachReviewDataToBookings(bookings);
+
+        res.json({ success: true, bookings: normalizedBookings });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -535,26 +661,26 @@ const allBookings = async (req, res) => {
 const approveBooking = async (req, res) => {
     try {
         const { bookingId } = req.params; // ✅ FIXED: Changed from req.body to req.params to match adminRoute.js
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true }).populate('user_id');
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'approved' }, { new: true }).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
-        await Notification.create({
-            recipient: booking.user_id._id,
+        await createOrRefreshNotification({
+            recipient: booking.userId._id,
             type: "booking_update",
             message: "Booking approved.",
             link: `/my-bookings?bookingId=${booking._id}`
         });
 
         await sendEmail(
-            booking.user_id.email,
+            booking.userId.email,
             "Booking approved - Mercedarian Retreat House",
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Hello ${booking.userId.firstName},</p>
                 <p>Your booking has been approved.</p>
                 <p>Booking: ${booking.bookingName || "Reservation"}</p>
-                <p>Check-in: ${new Date(booking.check_in).toLocaleDateString()}</p>
+                <p>Check-in: ${new Date(booking.checkIn || booking.check_in).toLocaleDateString()}</p>
                 <p>You can view details in your account.</p>
                 <p>Mercedarian Retreat House</p>
             </div>
@@ -570,16 +696,16 @@ const approveBooking = async (req, res) => {
 const declineBooking = async (req, res) => {
     try {
         const { bookingId } = req.params; // ✅ FIXED: Changed from req.body to req.params to match adminRoute.js
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'declined' }, { new: true }).populate('user_id');
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'declined' }, { new: true }).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
         await sendEmail(
-            booking.user_id.email,
+            booking.userId.email,
             "Booking update - Mercedarian Retreat House",
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Hello ${booking.userId.firstName},</p>
                 <p>Your booking request was declined.</p>
                 <p>You can submit a new request or contact us if you need help.</p>
                 <p>Mercedarian Retreat House</p>
@@ -596,26 +722,26 @@ const declineBooking = async (req, res) => {
 const paymentConfirmed = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('user_id').populate('bookingItems.room_id')
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('userId').populate('bookingItems.roomId')
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
         await sendEmail(
-            booking.user_id.email,
+            booking.userId.email,
             "Payment confirmed - Mercedarian Retreat House",
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Hello ${booking.userId.firstName},</p>
                 <p>Your payment is confirmed.</p>
-                <p>Booking: ${booking.bookingName || booking.room_ids[0]?.name || "Reservation"}</p>
+                <p>Booking: ${booking.bookingName || booking.bookingItems?.[0]?.roomId?.name || "Reservation"}</p>
                 <p>Your reservation is secured.</p>
                 <p>Mercedarian Retreat House</p>
             </div>
             `
         );
 
-        await Notification.create({
-            recipient: booking.user_id._id,
+        await createOrRefreshNotification({
+            recipient: booking.userId._id,
             type: "payment_update",
             message: `Payment confirmed for ${booking.bookingName || "your reservation"}.`,
             link: `/my-bookings?bookingId=${booking._id}`,
@@ -635,16 +761,16 @@ const paymentConfirmed = async (req, res) => {
 const approveCancellationRequest = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate('user_id');
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
         await sendEmail(
-            booking.user_id.email,
+            booking.userId.email,
             "Cancellation approved - Mercedarian Retreat House",
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Hello ${booking.userId.firstName},</p>
                 <p>Your cancellation request was approved.</p>
                 <p>Your booking is now cancelled.</p>
                 <p>Mercedarian Retreat House</p>
@@ -663,16 +789,16 @@ const resolveCancellation = async (req, res) => {
         const { bookingId, action } = req.body; 
         const newStatus = action === 'approve' ? 'cancelled' : 'approved';
         
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: newStatus }, { new: true }).populate('user_id');
+        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: newStatus }, { new: true }).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
 
         await sendEmail(
-            booking.user_id.email,
+            booking.userId.email,
             "Cancellation update - Mercedarian Retreat House",
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
-                <p>Hello ${booking.user_id.firstName},</p>
+                <p>Hello ${booking.userId.firstName},</p>
                 <p>Your cancellation request was ${action === 'approve' ? 'approved' : 'declined'}.</p>
                 ${action === 'approve' ? `<p>Your booking is now cancelled.</p>` : `<p>Your reservation remains active.</p>`}
                 <p>Mercedarian Retreat House</p>
@@ -714,7 +840,7 @@ const getBuildings = async (req, res) => {
 
 const addBuilding = async (req, res) => {
     try {
-        const { name } = req.body;
+        const name = normalizeName(req.body.name);
         if (!name) return res.json({ success: false, message: "Name required" });
         
         const exists = await buildingModel.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
@@ -731,6 +857,14 @@ const addBuilding = async (req, res) => {
 const deleteBuilding = async (req, res) => {
     try {
         const { id } = req.body;
+        const roomExists = await roomModel.exists({ buildingId: id });
+        if (roomExists) {
+            return res.json({
+                success: false,
+                message: "Building is linked to existing rooms and cannot be deleted"
+            });
+        }
+
         await buildingModel.findByIdAndDelete(id);
         res.json({ success: true, message: "Building Removed" });
     } catch (error) {
@@ -740,20 +874,31 @@ const deleteBuilding = async (req, res) => {
 
 const updateBuilding = async (req, res) => {
     try {
-        const { id, name } = req.body; 
+        const { id } = req.body; 
+        const name = normalizeName(req.body.name);
+
+        if (!name) {
+            return res.json({ success: false, message: "Name required" });
+        }
+
+        const duplicateBuilding = await buildingModel.findOne({
+            _id: { $ne: id },
+            name: { $regex: new RegExp(`^${name}$`, "i") }
+        });
+
+        if (duplicateBuilding) {
+            return res.json({ success: false, message: "Building already exists" });
+        }
 
         const buildingDoc = await buildingModel.findById(id);
         if (!buildingDoc) {
             return res.json({ success: false, message: "Building not found" });
         }
 
-        const oldName = buildingDoc.name;
         buildingDoc.name = name;
         await buildingDoc.save();
 
-        await roomModel.updateMany({ building: oldName }, { building: name });
-
-        res.json({ success: true, message: "Building Renamed & Rooms Updated" });
+        res.json({ success: true, message: "Building Updated" });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -770,7 +915,7 @@ const getRoomTypes = async (req, res) => {
 
 const addRoomType = async (req, res) => {
     try {
-        const { name } = req.body;
+        const name = normalizeName(req.body.name);
         if (!name) return res.json({ success: false, message: "Name required" });
 
         const exists = await roomTypeModel.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
@@ -787,6 +932,18 @@ const addRoomType = async (req, res) => {
 const deleteRoomType = async (req, res) => {
     try {
         const { id } = req.body;
+        const [roomExists, packageExists] = await Promise.all([
+            roomModel.exists({ roomTypeId: id }),
+            packageModel.exists({ roomTypeId: id })
+        ]);
+
+        if (roomExists || packageExists) {
+            return res.json({
+                success: false,
+                message: "Room type is linked to rooms or packages and cannot be deleted"
+            });
+        }
+
         await roomTypeModel.findByIdAndDelete(id);
         res.json({ success: true, message: "Room Type Removed" });
     } catch (error) {
@@ -796,20 +953,31 @@ const deleteRoomType = async (req, res) => {
 
 const updateRoomType = async (req, res) => {
     try {
-        const { id, name } = req.body;
+        const { id } = req.body;
+        const name = normalizeName(req.body.name);
+
+        if (!name) {
+            return res.json({ success: false, message: "Name required" });
+        }
+
+        const duplicateRoomType = await roomTypeModel.findOne({
+            _id: { $ne: id },
+            name: { $regex: new RegExp(`^${name}$`, "i") }
+        });
+
+        if (duplicateRoomType) {
+            return res.json({ success: false, message: "Room type already exists" });
+        }
 
         const typeDoc = await roomTypeModel.findById(id);
         if (!typeDoc) {
             return res.json({ success: false, message: "Room Type not found" });
         }
 
-        const oldName = typeDoc.name;
         typeDoc.name = name;
         await typeDoc.save();
 
-        await roomModel.updateMany({ room_type: oldName }, { room_type: name });
-
-        res.json({ success: true, message: "Room Type Renamed & Rooms Updated" });
+        res.json({ success: true, message: "Room Type Updated" });
 
     } catch (error) {
         res.json({ success: false, message: error.message });
