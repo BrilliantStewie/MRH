@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { 
   X, Building2, Calendar, Users, 
-  Sparkles, Star, ArrowRight, Check, BedDouble, MapPin, Heart, PenLine, Package, Home
+  Sparkles, Star, ArrowLeft, ArrowRight, Check, BedDouble, MapPin, PenLine, Package, Home
 } from "lucide-react";
 import venueOnlyImage from "../assets/mrh_about.jpg";
 
@@ -131,12 +131,21 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     headerImage: getImageUrl(mainRoom?.cover_image || mainRoom?.images || mainRoom?.image) || venueOnlyImage
   };
 
-  const COLORS = { black: "#1A1A1A", gold: "#C5A059", starYellow: "#FACC15" };
+  const COLORS = { black: "#1A1A1A", starYellow: "#FACC15" };
 
   const openDetails = () => {
     setShowAllRooms(false);
     setShowAllPackages(false);
     setShowDetails(true);
+  };
+
+  const handleBack = () => {
+    if (!isEditMode && step === 2) {
+      setStep(1);
+      return;
+    }
+
+    onClose();
   };
 
   const getStatusBadge = (status) => {
@@ -378,9 +387,14 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
             </button>
 
             <div className="absolute top-4 left-4 flex items-center gap-2">
-                <div className="w-7 h-7 bg-white/10 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center">
-                   <Heart size={14} fill={COLORS.gold} stroke="none" />
-                </div>
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+                  aria-label="Go back"
+                >
+                   <ArrowLeft size={14} />
+                </button>
                 <div>
                     <h3 className="text-[9px] font-bold text-white uppercase tracking-[0.2em] leading-tight">{bookingData.brandName}</h3>
                     <p className="text-[8px] text-white/70 flex items-center gap-1"><MapPin size={8} /> {bookingData.location}</p>
@@ -414,10 +428,9 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                       <button onClick={() => setStep(2)} className="w-full py-3.5 bg-[#1A1A1A] hover:bg-black text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-black/10 transition-all flex items-center justify-center gap-2 group">
                       <Sparkles size={14} className="text-[#FACC15] group-hover:rotate-12 transition-transform" /> Rate Your Experience
                       </button>
-                      <button onClick={onClose} className="w-full mt-4 text-center text-gray-400 text-[10px] font-bold uppercase tracking-widest hover:text-gray-900 transition-colors">Maybe later</button>
                       <NavLink
                         to="/reviews"
-                        className="mt-2 block text-center text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:text-gray-900 transition-colors"
+                        className="mt-4 block text-center text-[10px] font-bold uppercase tracking-widest text-gray-600 hover:text-gray-900 transition-colors"
                       >
                         View all reviews
                       </NavLink>

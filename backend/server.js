@@ -26,6 +26,7 @@ import paymentRouter from "./routes/paymentRoute.js";
 import packageRouter from "./routes/packageRoute.js";
 import reviewRouter from "./routes/reviewRoute.js";
 import notificationRouter from "./routes/notificationRoute.js";
+import reportRouter from "./routes/reportRoute.js";
 
 // =======================
 // 🚀 APP INIT
@@ -82,6 +83,7 @@ app.use("/api/payment", paymentRouter);
 app.use("/api/package", packageRouter);
 app.use("/api/reviews", reviewRouter); 
 app.use("/api/notifications", notificationRouter); // ✅ Registered notification router
+app.use("/api", reportRouter);
 
 // =======================
 // 🕒 CRON JOB

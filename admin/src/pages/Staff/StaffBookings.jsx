@@ -6,7 +6,7 @@ import {
   ArrowUpDown, Search, User, RotateCcw, CalendarDays, ArrowRight,
   Home, Layers, Phone, CheckCircle2, Building2,
   Clock, BarChart3, ChevronDown, 
-  AlertCircle, XCircle, Mail, Users, ChevronUp, Tag,
+  AlertCircle, XCircle, X, Mail, Users, ChevronUp, Tag,
   Package, Info, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { toast } from "react-toastify";
@@ -88,11 +88,22 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
         
         {/* Header */}
         <div className="relative h-28 bg-gradient-to-r from-slate-900 to-black p-6 flex items-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-5 top-5 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20"
+            aria-label="Close booking details"
+          >
+            <X size={18} />
+          </button>
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
               <CalendarDays size={28} />
             </div>
-            <div>
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-300">
+                Booking Details
+              </p>
               <h2 className="text-xl font-black text-white leading-none">{bookingTitle}</h2>
             </div>
           </div>
@@ -249,16 +260,6 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
              )}
           </div>
 
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-          <div>
-           
-          </div>
-          <button onClick={onClose} className="px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-slate-200">
-            Close
-          </button>
         </div>
       </div>
     </div>

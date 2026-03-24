@@ -175,21 +175,23 @@ const StaffDashboard = () => {
         />
 
         <div className="flex h-36 flex-col justify-between rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div className="rounded-[14px] border border-indigo-100 bg-indigo-50 p-2.5 text-indigo-600">
-              <BedDouble size={20} />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="rounded-[14px] border border-indigo-100 bg-indigo-50 p-2.5 text-indigo-600">
+                <BedDouble size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  Live Occupancy
+                </p>
+                <p className="mt-1 truncate text-[10px] font-bold text-slate-500">
+                  {stats.occupancy}/{stats.totalRooms} Units
+                </p>
+              </div>
             </div>
             <span className="text-2xl font-black text-slate-900">{stats.occupancyRate}%</span>
           </div>
           <div className="mt-2">
-            <div className="mb-2 flex items-end justify-between">
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                Live Occupancy
-              </p>
-              <p className="text-[10px] font-bold text-slate-500">
-                {stats.occupancy}/{stats.totalRooms} Units
-              </p>
-            </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-indigo-500 transition-all duration-1000"
@@ -297,11 +299,11 @@ const StatCard = ({ label, value, icon, color, subValue }) => {
 
   return (
     <div className="flex h-40 flex-col justify-between rounded-[32px] border border-slate-100 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className={`rounded-2xl border p-3 ${activeTheme}`}>{icon}</div>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`shrink-0 rounded-2xl border p-3 ${activeTheme}`}>{icon}</div>
+        <p className="truncate text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
       </div>
       <div>
-        <p className="mb-1 text-[9px] font-black uppercase tracking-widest text-slate-400">{label}</p>
         <h3 className="text-2xl font-black tracking-tight text-slate-900">{value}</h3>
         <p className="mt-1 text-[10px] font-bold text-slate-400">{subValue}</p>
       </div>

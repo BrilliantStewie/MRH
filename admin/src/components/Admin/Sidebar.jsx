@@ -10,6 +10,7 @@ import {
   User,
   TrendingUp,
   MessageSquare,
+  FileText,
   X
 } from "lucide-react";
 
@@ -96,6 +97,13 @@ const Sidebar = ({ isOpen = false, onClose = () => {} }) => {
         <div className="flex items-center gap-3">
           <TrendingUp size={18} />
           Analytics
+        </div>
+      </NavLink>
+
+      <NavLink to="/admin-reports" className={linkClass} onClick={onClose}>
+        <div className="flex items-center gap-3">
+          <FileText size={18} />
+          Reports
         </div>
       </NavLink>
 

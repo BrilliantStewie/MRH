@@ -23,6 +23,7 @@ import Users from "./pages/Admin/Users";
 import StaffList from "./pages/Admin/StaffList";
 import Packages from "./pages/Admin/Packages";
 import Analytics from "./pages/Admin/Analytics";
+import Report from "./pages/Admin/Report";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
@@ -40,6 +41,7 @@ const App = () => {
     location.pathname === "/all-bookings" || location.pathname === "/staff-bookings";
   const isAdminDashboardRoute = location.pathname === "/admin-dashboard";
   const isAdminAnalyticsRoute = location.pathname === "/admin-analytics";
+  const isAdminReportRoute = location.pathname === "/admin-reports";
   const isAdminRoomsRoute = location.pathname === "/rooms-list";
   const isAdminPackagesRoute = location.pathname === "/admin-packages";
   const isAdminUsersRoute = location.pathname === "/admin-users";
@@ -87,6 +89,8 @@ const App = () => {
                       ? "mx-auto max-w-7xl pb-0"
                     : isAdminAnalyticsRoute
                       ? "mx-auto max-w-7xl pb-0"
+                    : isAdminReportRoute
+                      ? "mx-auto max-w-7xl pb-0"
                   : isAdminPackagesRoute
                       ? "h-full mx-auto max-w-7xl pb-0"
                     : isAdminUsersRoute
@@ -108,6 +112,7 @@ const App = () => {
                   <Route path="/admin-staff-list" element={<StaffList />} />
                   <Route path="/admin-packages" element={<Packages />} />
                   <Route path="/admin-reviews" element={<AdminReviews />} />
+                  <Route path="/admin-reports" element={<Report />} />
                   <Route path="*" element={<Navigate to="/admin-dashboard" replace />} />
                 </Routes>
               </div>

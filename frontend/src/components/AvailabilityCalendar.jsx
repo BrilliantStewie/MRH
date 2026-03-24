@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   const [viewDate, setViewDate] = useState(new Date());
@@ -126,7 +126,15 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
 
       <div className="bg-white w-full max-w-md rounded-[1.75rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden flex flex-col border border-slate-200">
         
-        <div className="px-7 py-5 border-b border-slate-50 flex justify-between items-center bg-white">
+        <div className="relative px-7 py-5 border-b border-slate-50 flex justify-between items-center bg-white">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-6 top-5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+            aria-label="Close availability calendar"
+          >
+            <X size={16} />
+          </button>
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-slate-50 rounded-full flex items-center justify-center text-slate-900 border border-slate-100">
               <Calendar size={18} strokeWidth={2.5} />
@@ -170,7 +178,7 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
           />
         </div>
 
-        <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
               {/* Added border-slate-300 to make white circle visible */}
@@ -182,13 +190,6 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
               <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide">Reserved</span>
             </div>
           </div>
-
-          <button 
-             onClick={onClose}
-             className="px-6 py-2.5 bg-slate-900 text-white rounded-full font-bold text-[10px] uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-95"
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>
