@@ -111,7 +111,7 @@ const getPeriodWindow = (reportType, periodYear, periodMonth = null) => {
 };
 
 const getBookingReferenceDate = (booking) => {
-  const reference = booking?.checkIn || booking?.check_in || booking?.createdAt;
+  const reference = booking?.checkIn;
   const parsed = new Date(reference);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
@@ -139,11 +139,6 @@ const getBookingParticipants = (booking) => {
     : 0;
   const venueGuests = Number(booking?.venueParticipants || 0);
 
-  if (roomGuests === 0 && venueGuests === 0) {
-    if (Array.isArray(booking?.participants)) return booking.participants.length;
-    return Number(booking?.participants || 0);
-  }
-
   return roomGuests + venueGuests;
 };
 
@@ -155,7 +150,7 @@ const summarizeBookings = (bookings) =>
   bookings.reduce(
     (summary, booking) => {
       const status = String(booking?.status || "").trim().toLowerCase();
-      const totalPrice = Number(booking?.totalPrice || booking?.total_price || 0);
+      const totalPrice = Number(booking?.totalPrice || 0);
 
       summary.totalBookings += 1;
       summary.totalParticipants += getBookingParticipants(booking);
@@ -247,9 +242,7 @@ const fetchBookingsWithinWindow = async (start, end) => {
         $lte: end,
       },
     })
-    .select(
-      "bookingItems venueParticipants participants totalPrice total_price status payment paymentStatus checkIn createdAt"
-    )
+    .select("bookingItems venueParticipants totalPrice status payment paymentStatus checkIn")
     .lean();
 
   return bookings.filter((booking) => {
@@ -298,7 +291,7 @@ const buildHistoricalTrend = ({ bookings, reportType, periodYear, periodMonth = 
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(booking?.totalPrice || booking?.total_price || 0);
+      bucket.income += Number(booking?.totalPrice || 0);
     }
   });
 
@@ -333,7 +326,7 @@ const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(booking?.totalPrice || booking?.total_price || 0);
+      bucket.income += Number(booking?.totalPrice || 0);
     }
   });
 
@@ -445,10 +438,10 @@ const getReportData = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     const fallbackType = normalizeReportType(req.query.reportType);
-    const fallbackYear = toInteger(req.query.periodYear || req.query.year) || new Date().getFullYear();
+    const fallbackYear = toInteger(req.query.periodYear) || new Date().getFullYear();
     const fallbackMonth =
       fallbackType === "monthly"
-        ? toInteger(req.query.periodMonth || req.query.month) || new Date().getMonth() + 1
+        ? toInteger(req.query.periodMonth) || new Date().getMonth() + 1
         : null;
 
     const queryWindow =
@@ -521,8 +514,8 @@ const listReports = async (req, res) => {
     const reportType = req.query.reportType
       ? normalizeReportType(req.query.reportType)
       : null;
-    const periodYear = toInteger(req.query.periodYear || req.query.year);
-    const periodMonth = toInteger(req.query.periodMonth || req.query.month);
+    const periodYear = toInteger(req.query.periodYear);
+    const periodMonth = toInteger(req.query.periodMonth);
     const limit = Math.max(1, Math.min(toInteger(req.query.limit) || 100, 500));
 
     const filter = {};
@@ -553,12 +546,8 @@ const generateReport = async (req, res) => {
     const reportType = normalizeReportType(
       req.body.reportType || req.query.reportType
     );
-    const periodYear = toInteger(
-      req.body.periodYear || req.body.year || req.query.periodYear || req.query.year
-    );
-    const periodMonth = toInteger(
-      req.body.periodMonth || req.body.month || req.query.periodMonth || req.query.month
-    );
+    const periodYear = toInteger(req.body.periodYear || req.query.periodYear);
+    const periodMonth = toInteger(req.body.periodMonth || req.query.periodMonth);
 
     if (!periodYear) {
       return res.status(400).json({

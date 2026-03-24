@@ -220,7 +220,6 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
                       <div className="flex-grow relative z-10">
                         <div className="flex justify-between items-start">
                           <p className="text-sm font-black text-slate-800">{pkg?.name || "Package"}</p>
-                          <p className="text-sm font-black text-violet-600">₱{pkg?.price ? pkg.price.toLocaleString() : "0"}</p>
                         </div>
                         {pkg.description && (
                           <p className="text-[11px] font-medium text-slate-500 mt-1 line-clamp-2 leading-relaxed">

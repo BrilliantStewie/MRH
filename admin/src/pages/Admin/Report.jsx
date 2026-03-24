@@ -154,18 +154,12 @@ const formatAxisValue = (value, chartMode) => {
 };
 
 const getBookingDate = (booking) => {
-  const rawValue =
-    booking?.checkIn ||
-    booking?.check_in ||
-    booking?.slotDate ||
-    booking?.date ||
-    booking?.createdAt;
+  const rawValue = booking?.checkIn;
   const parsed = new Date(rawValue);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const getBookingAmount = (booking) =>
-  Number(booking?.totalPrice || booking?.total_price || booking?.amount || 0);
+const getBookingAmount = (booking) => Number(booking?.totalPrice || 0);
 
 const getBookingRooms = (booking) =>
   Array.isArray(booking?.bookingItems) ? booking.bookingItems : [];
@@ -177,11 +171,6 @@ const getBookingParticipants = (booking) => {
   );
   const venueGuests = Number(booking?.venueParticipants || 0);
 
-  if (roomGuests === 0 && venueGuests === 0) {
-    if (Array.isArray(booking?.participants)) return booking.participants.length;
-    return Number(booking?.participants || 0);
-  }
-
   return roomGuests + venueGuests;
 };
 
@@ -191,7 +180,7 @@ const isPaidBooking = (booking) =>
   booking?.payment === true || normalizeStatus(booking?.paymentStatus) === "paid";
 
 const getPaymentMethod = (booking) =>
-  String(booking?.paymentMethod || booking?.payment_method || "").trim().toLowerCase();
+  String(booking?.paymentMethod || "").trim().toLowerCase();
 
 const getReportWindow = (reportType, reportMonth, reportYear) => {
   if (reportType === "monthly") {
@@ -286,55 +275,6 @@ const summarizePeriodBookings = (bookings) =>
       gcashCount: 0,
     }
   );
-
-const buildTrendBuckets = (bookings, reportType, reportMonth, reportYear) => {
-  const buckets = [];
-
-  for (let offset = 5; offset >= 0; offset -= 1) {
-    if (reportType === "monthly") {
-      const bucketDate = new Date(reportYear, reportMonth - offset, 1);
-      buckets.push({
-        label: MONTH_NAMES_SHORT[bucketDate.getMonth()],
-        year: bucketDate.getFullYear(),
-        month: bucketDate.getMonth(),
-        bookings: 0,
-        income: 0,
-      });
-    } else {
-      buckets.push({
-        label: String(reportYear - offset),
-        year: reportYear - offset,
-        bookings: 0,
-        income: 0,
-      });
-    }
-  }
-
-  bookings.forEach((booking) => {
-    const bookingDate = getBookingDate(booking);
-    const manilaParts = getManilaDateParts(bookingDate);
-    if (!manilaParts) return;
-
-    const bucket = buckets.find((entry) =>
-      reportType === "monthly"
-        ? entry.year === manilaParts.year && entry.month === manilaParts.monthIndex
-        : entry.year === manilaParts.year
-    );
-
-    if (!bucket) return;
-
-    bucket.bookings += 1;
-    if (isPaidBooking(booking)) {
-      bucket.income += getBookingAmount(booking);
-    }
-  });
-
-  return {
-    labels: buckets.map((entry) => entry.label),
-    bookingSeries: buckets.map((entry) => entry.bookings),
-    incomeSeries: buckets.map((entry) => entry.income),
-  };
-};
 
 const buildMonthlyWeekBuckets = (bookings, reportMonth, reportYear) => {
   const daysInMonth = new Date(reportYear, reportMonth + 1, 0).getDate();
@@ -985,44 +925,6 @@ const Report = () => {
     currentStoredReport?.updatedAt || currentStoredReport?.createdAt || new Date()
   );
 
-  const trendBuckets = useMemo(() => {
-    if (liveReportData?.historicalTrend) {
-      return {
-        labels: liveReportData.historicalTrend.labels || [],
-        bookingSeries: (liveReportData.historicalTrend.bookingSeries || []).map((value) => Number(value || 0)),
-        incomeSeries: (liveReportData.historicalTrend.incomeSeries || []).map((value) => Number(value || 0)),
-      };
-    }
-
-    const baseBuckets = buildTrendBuckets(bookings, reportType, reportMonth, reportYear);
-
-    if (baseBuckets.labels.length === 0) {
-      return baseBuckets;
-    }
-
-    const currentBucketIndex = baseBuckets.labels.length - 1;
-    const selectedBookings = Number(activeReportSummary.totalBookings || 0);
-    const selectedIncome = Number(activeReportSummary.totalIncome || 0);
-
-    return {
-      ...baseBuckets,
-      bookingSeries: baseBuckets.bookingSeries.map((value, index) =>
-        index === currentBucketIndex ? selectedBookings : Number(value || 0)
-      ),
-      incomeSeries: baseBuckets.incomeSeries.map((value, index) =>
-        index === currentBucketIndex ? selectedIncome : Number(value || 0)
-      ),
-    };
-  }, [
-    activeReportSummary.totalBookings,
-    activeReportSummary.totalIncome,
-    bookings,
-    liveReportData,
-    reportMonth,
-    reportType,
-    reportYear,
-  ]);
-
   const pdfBreakdownBuckets = useMemo(() => {
     if (reportType === "monthly") {
       return liveReportData?.periodTrend
@@ -1055,7 +957,7 @@ const Report = () => {
     [pdfBreakdownBuckets.incomeSeries, pdfBreakdownBuckets.labels]
   );
 
-  const chartSeries = chartMode === "booking" ? trendBuckets.bookingSeries : trendBuckets.incomeSeries;
+  const chartSeries = chartMode === "booking" ? pdfBreakdownBuckets.bookingSeries : pdfBreakdownBuckets.incomeSeries;
   const chartMax = Math.max(...chartSeries, 1);
   const chartAxisValues = useMemo(
     () =>
@@ -1067,11 +969,11 @@ const Report = () => {
   const chartTickValues = useMemo(() => [...chartAxisValues].reverse(), [chartAxisValues]);
   const chartData = useMemo(
     () =>
-      trendBuckets.labels.map((label, index) => ({
+      pdfBreakdownBuckets.labels.map((label, index) => ({
         label,
         value: Number(chartSeries[index] || 0),
       })),
-    [chartSeries, trendBuckets.labels]
+    [chartSeries, pdfBreakdownBuckets.labels]
   );
   const hasChartData = chartData.some((entry) => entry.value > 0);
   const chartBarColor = chartMode === "booking" ? BOOKING_BAR_COLOR : INCOME_BAR_COLOR;
@@ -1601,7 +1503,12 @@ const Report = () => {
                       chartMode === "booking" ? "Bookings" : "Income",
                     ]}
                   />
-                  <Bar dataKey="value" radius={[16, 16, 0, 0]} maxBarSize={56} minPointSize={hasChartData ? 8 : 0}>
+                  <Bar
+                    dataKey="value"
+                    radius={[16, 16, 0, 0]}
+                    maxBarSize={reportType === "annual" ? 34 : 56}
+                    minPointSize={hasChartData ? 8 : 0}
+                  >
                     {chartData.map((entry, index) => (
                       <Cell key={`chart-bar-${entry.label}-${index}`} fill={chartBarColor} />
                     ))}
@@ -1619,7 +1526,7 @@ const Report = () => {
 
           <div className="mt-6">
             <p className="text-center text-[9px] font-black uppercase tracking-[0.38em] text-[#8a9fc0] sm:text-[11px]">
-              {reportType === "monthly" ? "Month" : "Year"}
+              {reportType === "monthly" ? "Week" : "Month"}
             </p>
           </div>
         </div>

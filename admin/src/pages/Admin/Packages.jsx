@@ -395,7 +395,7 @@ const Packages = () => {
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
-            <div className="inline-flex h-11 w-[260px] max-w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm">
+            <div className="inline-flex h-11 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm lg:w-[290px]">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 type="text"

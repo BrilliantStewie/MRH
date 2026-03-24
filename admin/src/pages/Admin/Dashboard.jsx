@@ -46,6 +46,7 @@ const LONG_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
 });
 
 const formatCurrency = (value) => `\u20B1${Number(value || 0).toLocaleString()}`;
+const formatCount = (value) => Number(value || 0).toLocaleString();
 const formatLongDate = (date) => LONG_DATE_FORMATTER.format(date);
 const normalizeDate = (value) => {
   const d = new Date(value);
@@ -78,6 +79,7 @@ const Dashboard = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [dashboardChartMode, setDashboardChartMode] = useState("income");
   const [reportType, setReportType] = useState("monthly");
   const [reportMonth, setReportMonth] = useState(new Date().getMonth());
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
@@ -167,29 +169,42 @@ const Dashboard = () => {
         label: MONTH_NAMES_SHORT[targetMonth.getMonth()],
         month: targetMonth.getMonth(),
         year: targetMonth.getFullYear(),
-        revenue: 0,
+        income: 0,
+        bookings: 0,
       });
     }
 
     (allBookings || []).forEach((booking) => {
+      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
       if (booking.paymentStatus === "paid" || booking.status === "approved") {
-        const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
         const monthBucket = months.find(
           (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
         );
 
         if (monthBucket) {
-          monthBucket.revenue += Number(booking.total_price || booking.amount) || 0;
+          monthBucket.income += Number(booking.total_price || booking.amount) || 0;
         }
+      }
+
+      const bookingMonthBucket = months.find(
+        (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
+      );
+      if (bookingMonthBucket) {
+        bookingMonthBucket.bookings += 1;
       }
     });
 
-    const maxRevenue = Math.max(...months.map((month) => month.revenue), 1000);
+    const maxValue = Math.max(
+      ...months.map((month) => (dashboardChartMode === "income" ? month.income : month.bookings)),
+      1
+    );
+
     return months.map((month) => ({
       ...month,
-      height: Math.round((month.revenue / maxRevenue) * 100),
+      value: dashboardChartMode === "income" ? month.income : month.bookings,
+      height: Math.round(((dashboardChartMode === "income" ? month.income : month.bookings) / maxValue) * 100),
     }));
-  }, [allBookings]);
+  }, [allBookings, dashboardChartMode]);
 
   const availableYears = useMemo(() => {
     const years = new Set(
@@ -742,15 +757,6 @@ const Dashboard = () => {
             <p className="mt-1 font-medium text-slate-500">Property Overview & Real-time Analytics</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowReportModal(true)}
-              className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-3 text-xs font-bold uppercase tracking-widest text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-95"
-            >
-              <FileDown size={18} /> Generate Report
-            </button>
-          </div>
         </header>
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -810,11 +816,48 @@ const Dashboard = () => {
               <div className="mb-8 flex items-end justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-black uppercase tracking-tight text-slate-800">
-                    <BarChart3 size={18} className="text-emerald-500" /> Income Overview
+                    <BarChart3
+                      size={18}
+                      className={dashboardChartMode === "income" ? "text-emerald-500" : "text-indigo-500"}
+                    />{" "}
+                    {dashboardChartMode === "income" ? "Income Overview" : "Bookings Overview"}
                   </h2>
                   <p className="mt-1 text-xs font-medium text-slate-400">
-                    Gross revenue over the last 6 months
+                    {dashboardChartMode === "income"
+                      ? "Gross revenue over the last 6 months"
+                      : "Total bookings over the last 6 months"}
                   </p>
+                </div>
+
+                <div
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1"
+                  role="tablist"
+                  aria-label="Dashboard chart mode"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setDashboardChartMode("income")}
+                    aria-pressed={dashboardChartMode === "income"}
+                    className={`rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                      dashboardChartMode === "income"
+                        ? "bg-emerald-500 text-white shadow-[0_10px_18px_-14px_rgba(16,185,129,0.95)]"
+                        : "text-slate-500 hover:bg-white hover:text-slate-700"
+                    }`}
+                  >
+                    Income
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDashboardChartMode("booking")}
+                    aria-pressed={dashboardChartMode === "booking"}
+                    className={`rounded-full px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition ${
+                      dashboardChartMode === "booking"
+                        ? "bg-indigo-500 text-white shadow-[0_10px_18px_-14px_rgba(99,102,241,0.95)]"
+                        : "text-slate-500 hover:bg-white hover:text-slate-700"
+                    }`}
+                  >
+                    Bookings
+                  </button>
                 </div>
               </div>
 
@@ -831,15 +874,33 @@ const Dashboard = () => {
                     className="group z-10 flex h-full flex-1 cursor-pointer flex-col items-center justify-end"
                   >
                     <div className="mb-2 whitespace-nowrap rounded-lg bg-slate-800 px-3 py-1.5 text-[10px] font-bold text-white opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                      {formatCurrency(data.revenue)}
+                      {dashboardChartMode === "income"
+                        ? formatCurrency(data.value)
+                        : `${formatCount(data.value)} bookings`}
                     </div>
                     <div
-                      className="relative w-full max-w-[48px] overflow-hidden rounded-t-xl bg-indigo-50 transition-all duration-500 group-hover:bg-indigo-500"
+                      className={`relative w-full max-w-[48px] overflow-hidden rounded-t-xl transition-all duration-500 ${
+                        dashboardChartMode === "income"
+                          ? "bg-emerald-50 group-hover:bg-emerald-500"
+                          : "bg-indigo-50 group-hover:bg-indigo-500"
+                      }`}
                       style={{ height: `${Math.max(data.height, 8)}%` }}
                     >
-                      <div className="absolute bottom-0 h-1/2 w-full bg-gradient-to-t from-indigo-200 to-transparent group-hover:from-indigo-600"></div>
+                      <div
+                        className={`absolute bottom-0 h-1/2 w-full bg-gradient-to-t to-transparent ${
+                          dashboardChartMode === "income"
+                            ? "from-emerald-200 group-hover:from-emerald-600"
+                            : "from-indigo-200 group-hover:from-indigo-600"
+                        }`}
+                      ></div>
                     </div>
-                    <span className="mt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-colors group-hover:text-indigo-600">
+                    <span
+                      className={`mt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 transition-colors ${
+                        dashboardChartMode === "income"
+                          ? "group-hover:text-emerald-600"
+                          : "group-hover:text-indigo-600"
+                      }`}
+                    >
                       {data.label}
                     </span>
                   </div>
