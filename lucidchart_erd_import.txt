@@ -1,0 +1,97 @@
+mysql	mrh	users	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	users	firstName	2	varchar	255				
+mysql	mrh	users	middleName	3	varchar	255				
+mysql	mrh	users	lastName	4	varchar	255				
+mysql	mrh	users	suffix	5	varchar	255				
+mysql	mrh	users	email	6	varchar	255	UNIQUE			
+mysql	mrh	users	password	7	varchar	255				
+mysql	mrh	users	passwordSet	8	tinyint					
+mysql	mrh	users	role	9	enum					
+mysql	mrh	users	disabled	10	tinyint					
+mysql	mrh	users	phone	11	varchar	50				
+mysql	mrh	users	image	12	varchar	255				
+mysql	mrh	users	tokenVersion	13	int					
+mysql	mrh	users	otp	14	varchar	255				
+mysql	mrh	users	otpExpires	15	datetime					
+mysql	mrh	users	authProvider	16	enum					
+mysql	mrh	users	pendingPhone	17	varchar	255				
+mysql	mrh	users	pendingEmail	18	varchar	255				
+mysql	mrh	users	phoneVerified	19	tinyint					
+mysql	mrh	users	emailVerified	20	tinyint					
+mysql	mrh	users	createdAt	21	datetime					
+mysql	mrh	users	updatedAt	22	datetime					
+mysql	mrh	buildings	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	buildings	name	2	varchar	255	UNIQUE			
+mysql	mrh	roomTypes	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	roomTypes	name	2	varchar	255	UNIQUE			
+mysql	mrh	rooms	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	rooms	name	2	varchar	255				
+mysql	mrh	rooms	buildingId	3	char	24	FOREIGN KEY	mrh	buildings	_id
+mysql	mrh	rooms	roomTypeId	4	char	24	FOREIGN KEY	mrh	roomTypes	_id
+mysql	mrh	rooms	capacity	5	int					
+mysql	mrh	rooms	description	6	text					
+mysql	mrh	rooms	amenities	7	text					
+mysql	mrh	rooms	images	8	text					
+mysql	mrh	rooms	coverImage	9	varchar	255				
+mysql	mrh	rooms	available	10	tinyint					
+mysql	mrh	rooms	createdAt	11	datetime					
+mysql	mrh	rooms	updatedAt	12	datetime					
+mysql	mrh	packages	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	packages	name	2	varchar	255				
+mysql	mrh	packages	packageType	3	varchar	255				
+mysql	mrh	packages	roomTypeId	4	char	24	FOREIGN KEY	mrh	roomTypes	_id
+mysql	mrh	packages	amenities	5	text					
+mysql	mrh	packages	price	6	decimal					
+mysql	mrh	packages	description	7	text					
+mysql	mrh	packages	createdAt	8	datetime					
+mysql	mrh	packages	updatedAt	9	datetime					
+mysql	mrh	bookings	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	bookings	userId	2	char	24	FOREIGN KEY	mrh	users	_id
+mysql	mrh	bookings	bookingName	3	varchar	255				
+mysql	mrh	bookings	bookingItems	4	text					
+mysql	mrh	bookings	extraPackages	5	text					
+mysql	mrh	bookings	venueParticipants	6	int					
+mysql	mrh	bookings	checkIn	7	datetime					
+mysql	mrh	bookings	checkOut	8	datetime					
+mysql	mrh	bookings	totalPrice	9	decimal					
+mysql	mrh	bookings	status	10	enum					
+mysql	mrh	bookings	paymentStatus	11	enum					
+mysql	mrh	bookings	paymentMethod	12	enum					
+mysql	mrh	bookings	payment	13	tinyint					
+mysql	mrh	bookings	createdAt	14	datetime					
+mysql	mrh	bookings	updatedAt	15	datetime					
+mysql	mrh	reviews	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	reviews	userId	2	char	24	FOREIGN KEY	mrh	users	_id
+mysql	mrh	reviews	bookingId	3	char	24	UNIQUE			
+mysql	mrh	reviews	bookingId	3	char	24	FOREIGN KEY	mrh	bookings	_id
+mysql	mrh	reviews	rating	4	int					
+mysql	mrh	reviews	comment	5	text					
+mysql	mrh	reviews	images	6	text					
+mysql	mrh	reviews	isHidden	7	tinyint					
+mysql	mrh	reviews	isEdited	8	tinyint					
+mysql	mrh	reviews	reviewChat	9	text					
+mysql	mrh	reviews	editHistory	10	text					
+mysql	mrh	reviews	createdAt	11	datetime					
+mysql	mrh	reviews	updatedAt	12	datetime					
+mysql	mrh	notifications	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	notifications	recipient	2	char	24	FOREIGN KEY	mrh	users	_id
+mysql	mrh	notifications	type	3	enum					
+mysql	mrh	notifications	message	4	text					
+mysql	mrh	notifications	sender	5	char	24	FOREIGN KEY	mrh	users	_id
+mysql	mrh	notifications	link	6	varchar	255				
+mysql	mrh	notifications	isRead	7	tinyint					
+mysql	mrh	notifications	createdAt	8	datetime					
+mysql	mrh	reports	_id	1	char	24	PRIMARY KEY			
+mysql	mrh	reports	reportType	2	enum					
+mysql	mrh	reports	label	3	varchar	255				
+mysql	mrh	reports	periodMonth	4	int					
+mysql	mrh	reports	periodYear	5	int					
+mysql	mrh	reports	periodStart	6	datetime					
+mysql	mrh	reports	periodEnd	7	datetime					
+mysql	mrh	reports	bookingIds	8	text					
+mysql	mrh	reports	totalBookings	9	int					
+mysql	mrh	reports	totalParticipants	10	int					
+mysql	mrh	reports	totalRoomsBooked	11	int					
+mysql	mrh	reports	totalIncome	12	decimal					
+mysql	mrh	reports	createdAt	13	datetime					
+mysql	mrh	reports	updatedAt	14	datetime					

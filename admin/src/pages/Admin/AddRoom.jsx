@@ -130,7 +130,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   }, [editRoom, aToken]);
 
   // ==============================
-  // 🏢 BUILDING CRUD HANDLERS
+  // ?? BUILDING CRUD HANDLERS
   // ==============================
   const handleSaveBuilding = async () => {
     if (!tempBuildingName.trim()) return toast.warn("Name cannot be empty");
@@ -185,7 +185,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   };
 
   // ==============================
-  // 🏷️ ROOM TYPE CRUD HANDLERS
+  // ??? ROOM TYPE CRUD HANDLERS
   // ==============================
   const handleSaveType = async () => {
     if (!tempTypeName.trim()) return toast.warn("Type name required");
@@ -261,7 +261,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   };
 
   // ==============================
-  // 📸 IMAGE VALIDATION & HANDLERS
+  // ?? IMAGE VALIDATION & HANDLERS
   // ==============================
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
@@ -291,7 +291,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   };
 
   // ==============================
-  // 🚀 SUBMISSION WITH VALIDATION
+  // ?? SUBMISSION WITH VALIDATION
   // ==============================
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -551,7 +551,7 @@ if (roomType === "Dormitory" && capacity < 3) {
                           </button>
                         )}
 
-                        {(isAddingNewTypeditingTypeId) ? (
+                        {(isAddingNewType || editingTypeId) ? (
                           <div className="p-4 bg-slate-50 space-y-3 border-t">
                             <input autoFocus value={tempTypeName} onChange={(e)=>setTempTypeName(e.target.value)} placeholder="Category name..." className="w-full px-3 py-2 border rounded-xl text-sm font-bold outline-none focus:border-amber-500" />
                             <div className="flex gap-2">
