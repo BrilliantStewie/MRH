@@ -14,14 +14,11 @@ import {
   ChevronUp,
   Reply,
   AlertCircle,
-  AlertTriangle,
   CheckCircle2,
-  Check,
   Clock,
   X,
   ChevronLeft,
-  ChevronRight,
-  MoreHorizontal
+  ChevronRight
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
@@ -43,10 +40,7 @@ const StaffReviews = () => {
   const [activeReplyId, setActiveReplyId] = useState(null);
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editText, setEditText] = useState("");
-  const [showReviewMenu, setShowReviewMenu] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [readReviewIds, setReadReviewIds] = useState(() => new Set());
-  const [clearedReviewIds, setClearedReviewIds] = useState(() => new Set());
+  const [ratingFilter, setRatingFilter] = useState("all");
   const [flashTargetId, setFlashTargetId] = useState(null);
   const handledFlashRef = useRef(null);
   
@@ -76,42 +70,14 @@ const StaffReviews = () => {
     }));
   };
 
-  const getReviewKey = (review) => String(review?._id || "");
-
-  const markReviewRead = (reviewId) => {
-    const key = String(reviewId);
-    if (!key) return;
-    setReadReviewIds((prev) => {
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-  };
-
-  const markAllReviewsRead = (reviewKeys) => {
-    setReadReviewIds((prev) => {
-      const next = new Set(prev);
-      reviewKeys.forEach((key) => next.add(key));
-      return next;
-    });
-  };
-
-  const clearAllReviews = (reviewKeys) => {
-    setClearedReviewIds((prev) => {
-      const next = new Set(prev);
-      reviewKeys.forEach((key) => next.add(key));
-      return next;
-    });
-    setShowClearConfirm(false);
-  };
-
+  const ratingBuckets = [5, 4, 3, 2, 1];
   const visibleReviews = useMemo(() => {
-    return reviews.filter((review) => !clearedReviewIds.has(getReviewKey(review)));
-  }, [reviews, clearedReviewIds]);
+    if (ratingFilter === "all") {
+      return reviews;
+    }
 
-  const unreadReviewCount = useMemo(() => {
-    return visibleReviews.filter((review) => !readReviewIds.has(getReviewKey(review))).length;
-  }, [visibleReviews, readReviewIds]);
+    return reviews.filter((review) => Number(review.rating || 0) === Number(ratingFilter));
+  }, [reviews, ratingFilter]);
 
   /* ==========================================
      HELPER: Name Formatting
@@ -384,9 +350,16 @@ const StaffReviews = () => {
   };
 
   const formatStayDate = (start, end) => {
-    if (!start) return "";
+    if (!start) return "Stay date unavailable";
     const s = new Date(start);
     const e = end ? new Date(end) : null;
+    const isStartValid = !Number.isNaN(s.getTime());
+    const isEndValid = !e || !Number.isNaN(e.getTime());
+
+    if (!isStartValid || !isEndValid) {
+      return "Stay date unavailable";
+    }
+
     const m = s.toLocaleString("default", { month: "short" });
     if (e) {
       const em = e.toLocaleString("default", { month: "short" });
@@ -396,7 +369,6 @@ const StaffReviews = () => {
     return formatDate(start);
   };
 
-  const ratingBuckets = [5, 4, 3, 2, 1];
   const ratingCounts = ratingBuckets.reduce((acc, rating) => {
     acc[rating] = reviews.filter((review) => Number(review.rating || 0) === rating).length;
     return acc;
@@ -455,94 +427,43 @@ const StaffReviews = () => {
             <p className="text-slate-500 mt-2 max-w-2xl">
               Manage guest reviews and responses.
             </p>
-          </div>
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const willShow = !showReviewMenu;
-                setShowReviewMenu(willShow);
-                if (!willShow) {
-                  setShowClearConfirm(false);
-                }
-              }}
-              className={`rounded-full p-2 text-slate-500 transition-colors hover:bg-slate-100 ${
-                showReviewMenu ? "bg-slate-100 text-slate-700" : ""
-              }`}
-              title="Review actions"
-            >
-              <MoreHorizontal size={16} />
-            </button>
-
-            {showReviewMenu && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowReviewMenu(false)}></div>
-                <div className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-md">
-                  {unreadReviewCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        markAllReviewsRead(visibleReviews.map(getReviewKey));
-                        setShowReviewMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      <Check size={12} />
-                      Mark all read
-                    </button>
-                  )}
-                  {visibleReviews.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowClearConfirm(true);
-                        setShowReviewMenu(false);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      <Trash2 size={12} />
-                      Clear all
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                Rating
+              </span>
+              <button
+                type="button"
+                onClick={() => setRatingFilter("all")}
+                className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                  ratingFilter === "all"
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                All
+              </button>
+              {ratingBuckets.map((rating) => (
+                <button
+                  key={`staff-rating-filter-${rating}`}
+                  type="button"
+                  onClick={() => setRatingFilter(String(rating))}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    ratingFilter === String(rating)
+                      ? "bg-slate-900 text-white"
+                      : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                  }`}
+                >
+                  <Star
+                    size={11}
+                    fill="currentColor"
+                    className="text-amber-400"
+                  />
+                  {rating}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-
-        {showClearConfirm && visibleReviews.length > 0 && (
-          <div className="mt-3 rounded-lg border border-rose-200/70 bg-rose-50/80 px-3 py-2 text-[10px] text-rose-700 shadow-sm">
-            <div className="flex items-start gap-2">
-              <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-white text-rose-500 ring-1 ring-rose-200">
-                <AlertTriangle size={12} />
-              </div>
-              <div className="flex-1">
-                <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-rose-600">
-                  Clear all reviews?
-                </p>
-                <p className="mt-0.5 text-[10px] font-medium text-rose-700">
-                  This only clears the list view.
-                </p>
-              </div>
-            </div>
-            <div className="mt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-rose-600 transition-colors hover:bg-rose-100"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => clearAllReviews(visibleReviews.map(getReviewKey))}
-                className="rounded-full bg-rose-600 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-rose-700"
-              >
-                Clear all
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
@@ -588,10 +509,15 @@ const StaffReviews = () => {
               <EmptyReviewsState />
             </div>
           ) : (
-            <div className="bg-white p-16 text-center rounded-xl border border-dashed border-slate-300">
-              <p className="text-slate-400 italic">
-                All reviews cleared.
-              </p>
+            <div className="flex min-h-[220px] w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
+              <div>
+                <p className="text-sm font-semibold text-slate-700">
+                  No matching reviews found.
+                </p>
+                <p className="mt-2 text-sm text-slate-500">
+                  Change the star filter to view other reviews.
+                </p>
+              </div>
             </div>
           )
         ) : (
@@ -603,13 +529,12 @@ const StaffReviews = () => {
             const reviewMessage = review.comment || "";
             const isReviewMessageExpanded = !!expandedReplyMessages[`review-${review._id}`];
             const shouldTruncateReviewMessage = reviewMessage.length > 300;
-            const isReviewRead = readReviewIds.has(getReviewKey(review));
 
             return (
               <div
                 id={`review-${review._id}`}
                 key={review._id}
-                className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${isReviewRead ? "" : "ring-1 ring-blue-100"} ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
+                className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
               >
                 <div className="p-4 pl-5">
                   
@@ -647,18 +572,6 @@ const StaffReviews = () => {
                       <p className="mt-2 text-[8px] font-bold text-slate-300 uppercase tracking-widest flex justify-end gap-1">
                         {formatDateTime(review.createdAt)} {review.isEdited && <span className="italic text-slate-400 normal-case">(Edited)</span>}
                       </p>
-                      {!isReviewRead && (
-                        <div className="flex justify-end mt-2">
-                          <button
-                            type="button"
-                            onClick={() => markReviewRead(review._id)}
-                            className="inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest text-slate-500 hover:text-slate-800 transition-colors"
-                          >
-                            <Check size={10} />
-                            Mark as read
-                          </button>
-                        </div>
-                      )}
 
                       {review.isEdited && review.editHistory && review.editHistory.length > 0 && (
                         <div className="flex justify-end mt-1">

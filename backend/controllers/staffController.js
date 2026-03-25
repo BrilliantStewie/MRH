@@ -9,6 +9,7 @@ import {
   attachReviewDataToBookings,
   buildBookingPopulate,
 } from "../utils/dataConsistency.js";
+import { hasClaimedPhone } from "../utils/userVerification.js";
 
 const normalizePHPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -319,7 +320,7 @@ export const updateStaffProfile = async (req, res) => {
         _id: { $ne: staff._id },
       });
 
-      if (phoneConflictUser && phoneConflictUser.isVerified) {
+      if (hasClaimedPhone(phoneConflictUser)) {
         return res.status(400).json({
           success: false,
           message: "Phone number already taken",
@@ -346,6 +347,9 @@ export const updateStaffProfile = async (req, res) => {
     staff.lastName = normalizedLastName;
     staff.suffix = normalizedSuffix;
     staff.email = normalizedEmail;
+    if (normalizedEmail !== currentEmail) {
+      staff.emailVerified = true;
+    }
     staff.phone = normalizedPhone;
     if (normalizedPhone !== currentPhone) {
       staff.phoneVerified = true;
@@ -420,7 +424,7 @@ export const verifyStaffPhoneFirebase = async (req, res) => {
       phone: normalizedPhone,
       _id: { $ne: staffId }
     });
-    if (conflictUser && conflictUser.isVerified) {
+    if (hasClaimedPhone(conflictUser)) {
       return res.json({ success: false, message: "Phone number already taken" });
     }
 
@@ -452,7 +456,7 @@ export const checkStaffPhoneAvailability = async (req, res) => {
 
     return res.json({
       success: true,
-      exists: Boolean(conflictUser && conflictUser.isVerified)
+      exists: hasClaimedPhone(conflictUser)
     });
   } catch (error) {
     return res.json({ success: false, message: error.message });

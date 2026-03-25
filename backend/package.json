@@ -8,7 +8,9 @@
     "start": "node server.js",
     "server": "nodemon server.js",
     "migrate:db-consistency": "node scripts/migrateDatabaseConsistency.js",
-    "migrate:report-booking-refs": "node scripts/migrateReportBookingRefs.js"
+    "migrate:report-booking-refs": "node scripts/migrateReportBookingRefs.js",
+    "migrate:user-email-verified": "node scripts/migrateUserEmailVerified.js",
+    "migrate:remove-user-is-verified": "node scripts/migrateRemoveUserIsVerified.js"
   },
   "author": "",
   "license": "ISC",

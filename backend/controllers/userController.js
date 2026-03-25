@@ -22,6 +22,11 @@ import {
 } from "../utils/dataConsistency.js";
 import { createValidatedBooking } from "../utils/bookingService.js";
 import { getBookingReviewEligibility } from "../utils/bookingRules.js";
+import {
+    hasClaimedEmail,
+    hasClaimedPhone,
+    hasVerifiedEmail,
+} from "../utils/userVerification.js";
 
 // --- HELPERS ---
 const parseGoogleDisplayName = (value, fallbackFirst = "") => {
@@ -132,7 +137,7 @@ const sendOTP = async (req, res) => {
         let user = await userModel.findOne({ email: email.toLowerCase().trim() });
 
         // ✅ PREVENT SENDING OTP IF EMAIL IS ALREADY TAKEN BY A VERIFIED USER (except for reset)
-        if (!isResetMode && user && user.isVerified && user.firstName !== "Pending") {
+        if (!isResetMode && hasClaimedEmail(user)) {
             return res.json({ success: false, message: "Email already taken" });
         }
 
@@ -156,7 +161,7 @@ const sendOTP = async (req, res) => {
                 password: dummyPassword,
                 passwordSet: false,
                 phone: null,
-                isVerified: false
+                emailVerified: false
             });
             await user.save();
         }
@@ -195,7 +200,7 @@ const sendPhoneOTP = async (req, res) => {
         let user = await userModel.findOne({ phone: normalizedPhone.trim() });
 
         // ✅ PREVENT SENDING OTP IF PHONE IS ALREADY TAKEN BY A VERIFIED USER (except for reset)
-        if (!isResetMode && user && user.isVerified && user.firstName !== "Pending") {
+        if (!isResetMode && hasClaimedPhone(user)) {
             return res.json({ success: false, message: "Phone number already taken" });
         }
 
@@ -217,8 +222,7 @@ const sendPhoneOTP = async (req, res) => {
                 otpExpires,
                 firstName: "Pending",
                 lastName: "Phone User",
-                password: dummyPassword,
-                isVerified: false
+                password: dummyPassword
             });
 
             await user.save();
@@ -348,7 +352,7 @@ const sendPhoneOTPUpdate = async (req, res) => {
             phone: normalizedPhone,
             _id: { $ne: userId }
         });
-        if (conflictUser && conflictUser.isVerified) {
+        if (hasClaimedPhone(conflictUser)) {
             return res.json({ success: false, message: "Phone number already taken" });
         }
 
@@ -383,7 +387,7 @@ const verifyPhoneFirebase = async (req, res) => {
             phone: normalizedPhone,
             _id: { $ne: userId }
         });
-        if (conflictUser && conflictUser.isVerified) {
+        if (hasClaimedPhone(conflictUser)) {
             return res.json({ success: false, message: "Phone number already taken" });
         }
 
@@ -482,8 +486,6 @@ const resetPassword = async (req, res) => {
         
         user.otp = null;
         user.otpExpires = null;
-        user.isVerified = true; 
-
         await user.save();
 
         await sendEmail(
@@ -575,14 +577,17 @@ const googleAuth = async (req, res) => {
                 user.image = photoURL;
                 updated = true;
             }
-            if (emailVerified && !user.isVerified) {
-                user.isVerified = true;
+            if (emailVerified && user.emailVerified !== true) {
+                user.emailVerified = true;
                 updated = true;
             }
             if (updated) await user.save();
         } else {
             if (normalizedIntent === "login") {
                 return res.json({ success: false, message: "No account found. Please sign up with Google." });
+            }
+            if (!emailVerified) {
+                return res.json({ success: false, message: "Google account email is not verified." });
             }
             const parsedName = parseGoogleDisplayName(fullName, "Google");
             const firstName = parsedName.firstName || "Google";
@@ -601,7 +606,7 @@ const googleAuth = async (req, res) => {
                 password: hashedPassword,
                 passwordSet: false,
                 phone: null,
-                isVerified: true,
+                emailVerified: true,
                 authProvider: "google"
             });
             await user.save();
@@ -666,7 +671,7 @@ const registerUser = async (req, res) => {
 
         if (phoneConflictUser) {
             const isDisposablePlaceholder =
-                !phoneConflictUser.isVerified &&
+                !hasClaimedPhone(phoneConflictUser) &&
                 phoneConflictUser.firstName === "Pending" &&
                 /@mrh\.local$/i.test(String(phoneConflictUser.email || ""));
 
@@ -677,39 +682,35 @@ const registerUser = async (req, res) => {
             }
         }
 
-        if (existingUser) {
-            if (existingUser.isVerified && existingUser.firstName !== "Pending") {
+        if (!existingUser) {
+            return res.json({ success: false, message: "Please verify your email first" });
+        }
+
+        if (existingUser.firstName !== "Pending") {
+            if (hasVerifiedEmail(existingUser)) {
                 return res.json({ success: false, message: "User already exists" });
             }
-            existingUser.firstName = firstName;
-            existingUser.middleName = middleName || "";
-            existingUser.lastName = lastName;
-            existingUser.suffix = suffix || "";
-            existingUser.password = hashedPassword;
-            existingUser.passwordSet = true;
-            existingUser.email = normalizedEmail;
-            existingUser.phone = normalizedPhone;
-            existingUser.phoneVerified = true;
-            existingUser.pendingPhone = "";
-            existingUser.otp = null;
-            existingUser.otpExpires = null;
-            existingUser.isVerified = true; 
-            await existingUser.save();
-        } else {
-            const newUser = new userModel({
-                firstName,
-                middleName: middleName || "",
-                lastName,
-                suffix: suffix || "",
-                email: normalizedEmail,
-                password: hashedPassword,
-                passwordSet: true,
-                phone: normalizedPhone,
-                phoneVerified: true,
-                isVerified: true 
-            });
-            await newUser.save();
+            return res.json({ success: false, message: "Please verify your email first" });
         }
+
+        if (!hasVerifiedEmail(existingUser)) {
+            return res.json({ success: false, message: "Please verify your email first" });
+        }
+
+        existingUser.firstName = firstName;
+        existingUser.middleName = middleName || "";
+        existingUser.lastName = lastName;
+        existingUser.suffix = suffix || "";
+        existingUser.password = hashedPassword;
+        existingUser.passwordSet = true;
+        existingUser.email = normalizedEmail;
+        existingUser.emailVerified = true;
+        existingUser.phone = normalizedPhone;
+        existingUser.phoneVerified = true;
+        existingUser.pendingPhone = "";
+        existingUser.otp = null;
+        existingUser.otpExpires = null;
+        await existingUser.save();
 
         await sendEmail(
             normalizedEmail,
@@ -751,7 +752,7 @@ const loginUser = async (req, res) => {
 
         if (!user) return res.json({ success: false, message: "User does not exist" });
         if (user.disabled) return res.json({ success: false, message: "Account disabled. Contact admin." });
-        if (!user.isVerified) return res.json({ success: false, message: "Please verify your email first." });
+        if (!hasVerifiedEmail(user)) return res.json({ success: false, message: "Please verify your email first." });
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
@@ -780,7 +781,7 @@ const verifyOTP = async (req, res) => {
       return res.json({ success: false, message: "OTP expired" });
     }
 
-    user.isVerified = true;
+    user.emailVerified = true;
 
     if (!isResetMode) {
         user.otp = null;
@@ -861,6 +862,7 @@ const verifyEmailChangeOTP = async (req, res) => {
         }
 
         user.email = user.pendingEmail;
+        user.emailVerified = true;
         user.pendingEmail = "";
         user.otp = null;
         user.otpExpires = null;
@@ -945,7 +947,7 @@ const updateUserProfile = async (req, res) => {
                 _id: { $ne: userId }
             });
 
-            if (phoneConflictUser && phoneConflictUser.isVerified) {
+            if (hasClaimedPhone(phoneConflictUser)) {
                 return res.json({ success: false, message: "Phone number already taken" });
             }
         }
@@ -1528,7 +1530,7 @@ const checkEmailExists = async (req, res) => {
         const user = await userModel.findOne({ email: email.toLowerCase().trim() });
         
         // If user exists and is fully registered (not just a pending OTP dummy)
-        if (user && user.isVerified && user.firstName !== "Pending") {
+        if (hasClaimedEmail(user)) {
             return res.json({ success: true, exists: true });
         }
         
@@ -1569,7 +1571,7 @@ const checkPhoneExists = async (req, res) => {
 
         const user = await userModel.findOne({ phone: phone.trim() });
 
-        if (user && user.isVerified && user.firstName !== "Pending") {
+        if (hasClaimedPhone(user)) {
             return res.json({ success: true, exists: true });
         }
 
@@ -1594,7 +1596,7 @@ const checkPhoneExistsForUpdate = async (req, res) => {
             _id: { $ne: userId }
         });
 
-        res.json({ success: true, exists: Boolean(user && user.isVerified) });
+        res.json({ success: true, exists: hasClaimedPhone(user) });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

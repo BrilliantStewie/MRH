@@ -302,7 +302,7 @@ const addGuestUser = async (req, res) => {
             phone: normalizedPhone || null,
             role: 'guest',
             image: "",
-            isVerified: true,
+            emailVerified: true,
             phoneVerified: Boolean(normalizedPhone)
         });
 
@@ -351,6 +351,8 @@ const createStaff = async (req, res) => {
             phone,
             image: imageUrl,
             role: 'staff',
+            emailVerified: true,
+            phoneVerified: Boolean(phone),
             tokenVersion: 0 
         });
 

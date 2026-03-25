@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import Navbar from "../components/Navbar";
@@ -48,6 +48,7 @@ const AllReviews = () => {
   const [editReviewNewImages, setEditReviewNewImages] = useState([]);
   const [editingReplyId, setEditingReplyId] = useState(null);
   const [editReplyText, setEditReplyText] = useState("");
+  const [ratingFilter, setRatingFilter] = useState("all");
   const [flashTargetId, setFlashTargetId] = useState(null);
   const handledFlashRef = useRef(null);
 
@@ -70,6 +71,15 @@ const AllReviews = () => {
     setExpandedReviewThreads(prev => ({ ...prev, [reviewId]: !prev[reviewId] }));
   };
 
+  const ratingBuckets = [5, 4, 3, 2, 1];
+  const visibleReviews = useMemo(() => {
+    if (ratingFilter === "all") {
+      return reviews;
+    }
+
+    return reviews.filter((review) => Number(review.rating || 0) === Number(ratingFilter));
+  }, [reviews, ratingFilter]);
+
   /* ==========================================
      API: FETCH REVIEWS
   ========================================== */
@@ -91,8 +101,8 @@ const AllReviews = () => {
   }, [backendUrl]);
 
   useEffect(() => {
-    setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), reviews.length || REVIEW_PAGE_SIZE));
-  }, [reviews.length]);
+    setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), visibleReviews.length || REVIEW_PAGE_SIZE));
+  }, [visibleReviews.length]);
 
   useEffect(() => {
     if (!reviews.length) return;
@@ -425,7 +435,6 @@ const AllReviews = () => {
       };
     });
   };
-  const ratingBuckets = [5, 4, 3, 2, 1];
   const ratingCounts = ratingBuckets.reduce((acc, rating) => {
     acc[rating] = reviews.filter((review) => Number(review.rating || 0) === rating).length;
     return acc;
@@ -490,6 +499,41 @@ const AllReviews = () => {
           <p className="text-slate-500 mt-2 max-w-2xl">
             Clear, organized feedback with booking context for quick responses.
           </p>
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              Rating
+            </span>
+            <button
+              type="button"
+              onClick={() => setRatingFilter("all")}
+              className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                ratingFilter === "all"
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              All
+            </button>
+            {ratingBuckets.map((rating) => (
+              <button
+                key={`guest-rating-filter-${rating}`}
+                type="button"
+                onClick={() => setRatingFilter(String(rating))}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                  ratingFilter === String(rating)
+                    ? "bg-slate-900 text-white"
+                    : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                }`}
+              >
+                <Star
+                  size={11}
+                  fill="currentColor"
+                  className="text-amber-400"
+                />
+                {rating}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className={`w-full max-w-[1200px] mx-auto ${hasNoReviews ? "flex justify-center" : "grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
@@ -529,12 +573,25 @@ const AllReviews = () => {
           <div className={`space-y-6 flex flex-col items-start w-full ${hasNoReviews ? "max-w-none pl-0" : "pl-8"}`}>
           {isLoading ? (
             <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading experiences...</div>
-          ) : reviews.length === 0 ? (
-            <div className="flex min-h-[320px] w-full items-center justify-center">
-              <EmptyReviewsState />
-            </div>
+          ) : visibleReviews.length === 0 ? (
+            reviews.length === 0 ? (
+              <div className="flex min-h-[320px] w-full items-center justify-center">
+                <EmptyReviewsState />
+              </div>
+            ) : (
+              <div className="flex min-h-[220px] w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">
+                    No matching reviews found.
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Change the star filter to view other reviews.
+                  </p>
+                </div>
+              </div>
+            )
           ) : (
-            reviews.slice(0, visibleReviewCount).map((review) => {
+            visibleReviews.slice(0, visibleReviewCount).map((review) => {
               const parentChats = review.reviewChat ? review.reviewChat.filter(chat => !chat.parentReplyId) : [];
               const isThreadExpanded = expandedReviewThreads[review._id];
               const RepliesToggleIcon = isThreadExpanded ? ChevronUp : ChevronDown;
@@ -1076,10 +1133,10 @@ const AllReviews = () => {
               );
             })
           )}
-          {!isLoading && reviews.length > visibleReviewCount && (
+          {!isLoading && visibleReviews.length > visibleReviewCount && (
             <div className="flex justify-center pt-2">
               <button
-                onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, reviews.length))}
+                onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, visibleReviews.length))}
                 className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
               >
                 Show more reviews

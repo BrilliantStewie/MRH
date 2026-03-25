@@ -2,6 +2,7 @@ import express from "express";
 import {
   createReview,
   getAllReviews,
+  getAllReviewsAdmin,
   editReview,
   deleteReview,
   replyToReview,
@@ -22,6 +23,8 @@ const reviewRouter = express.Router();
 
 // Anyone can view reviews
 reviewRouter.get("/all-reviews", getAllReviews);
+reviewRouter.get("/admin/all-reviews", authAdmin, getAllReviewsAdmin);
+reviewRouter.patch("/toggle/:reviewId", authAdmin, toggleReviewVisibility);
 
 
 /* ===========================
@@ -55,14 +58,6 @@ reviewRouter.put("/reply/:reviewId/:replyId", editReply);
 // Delete reply
 reviewRouter.delete("/delete-reply/:replyId", deleteReply);
 reviewRouter.delete("/reply/:reviewId/:replyId", deleteReply);
-
-
-/* ===========================
-   ADMIN ONLY
-=========================== */
-
-// Admin hide/unhide review
-reviewRouter.patch("/toggle/:reviewId", authAdmin, toggleReviewVisibility);
 
 
 export default reviewRouter;

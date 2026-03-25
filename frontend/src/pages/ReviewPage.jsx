@@ -456,8 +456,8 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                           >
                               <Star 
                                 size={38} 
-                                className={`transition-all duration-200 ${ (hoverating) >= star ? 'text-yellow-400 drop-shadow-md' : 'text-gray-200' }`} 
-                                fill={(hoverating) >= star ? COLORS.starYellow : 'transparent'} 
+                                className={`transition-all duration-200 ${ (hover || rating) >= star ? 'text-yellow-400 drop-shadow-md' : 'text-gray-200' }`} 
+                                fill={(hover || rating) >= star ? COLORS.starYellow : 'transparent'} 
                                 strokeWidth={1.2} 
                               />
                           </button>

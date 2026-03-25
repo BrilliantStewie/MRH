@@ -593,8 +593,13 @@ const AdminContextProvider = ({ children }) => {
   }, [allBookings]);
 
   const pendingReviewsCount = useMemo(() => {
-    // Counts reviews that have no replies yet
-    return allReviews.filter(r => !r.replies.length === 0).length;
+    // Counts reviews that do not yet have an admin/staff reply.
+    return allReviews.filter((review) => {
+      const reviewChat = Array.isArray(review?.reviewChat) ? review.reviewChat : [];
+      return !reviewChat.some((chat) =>
+        chat && ["admin", "staff"].includes(String(chat.senderRole || "").toLowerCase())
+      );
+    }).length;
   }, [allReviews]);
 
   // AUTO-FETCH DATA ONCE ADMIN IS AUTHENTICATED

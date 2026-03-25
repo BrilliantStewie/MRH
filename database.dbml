@@ -1,0 +1,215 @@
+// MongoDB/Mongoose schema mapped to DBML for dbdiagram.io.
+// Source: backend/models/*.js
+// Virtual fields are intentionally omitted because they are not persisted.
+// Embedded arrays are kept on their parent documents to match the persisted MongoDB schema.
+
+Enum user_role {
+  guest
+  staff
+  admin
+}
+
+Enum auth_provider {
+  local
+  google
+}
+
+Enum booking_status {
+  pending
+  approved
+  declined
+  cancelled
+  cancellation_pending
+}
+
+Enum payment_status {
+  unpaid
+  pending
+  paid
+}
+
+Enum payment_method {
+  cash
+  gcash
+}
+
+Enum review_sender_role {
+  admin
+  staff
+  guest
+}
+
+Enum notification_type {
+  new_review
+  new_reply
+  review_hidden
+  booking_update
+  payment_update
+  account_status
+}
+
+Enum report_type {
+  monthly
+  annual
+}
+
+Table users {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  firstName varchar [not null]
+  middleName varchar [not null, default: '']
+  lastName varchar [note: 'Required unless authProvider is google']
+  suffix varchar [not null, default: '']
+  email varchar [not null, unique]
+  password varchar [not null]
+  passwordSet boolean [not null, default: false]
+  role user_role [not null, default: 'guest']
+  disabled boolean [not null, default: false]
+  emailVerified boolean [not null, default: false]
+  phone varchar
+  image varchar [not null, default: '']
+  tokenVersion int [not null, default: 0]
+  otp varchar
+  otpExpires timestamp
+  authProvider auth_provider [not null, default: 'local']
+  pendingPhone varchar [not null, default: '']
+  pendingEmail varchar [not null, default: '']
+  phoneVerified boolean [not null, default: false]
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  Note: 'Backed by backend/models/userModel.js'
+}
+
+Table buildings {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  name varchar [not null, unique]
+
+  Note: 'Backed by backend/models/buildingModel.js'
+}
+
+Table room_types {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  name varchar [not null, unique]
+
+  Note: 'Backed by backend/models/roomtypeModel.js'
+}
+
+Table rooms {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  name varchar [not null]
+  buildingId ObjectId [not null, ref: > buildings._id]
+  roomTypeId ObjectId [not null, ref: > room_types._id]
+  capacity int [not null]
+  description text [not null, default: '']
+  amenities json [not null, note: 'Array of strings']
+  images json [not null, note: 'Array of image paths/URLs']
+  coverImage varchar [not null, default: '']
+  available boolean [not null, default: true]
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  Note: 'coverImage defaults to the first image when omitted'
+}
+
+Table packages {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  name varchar [not null]
+  packageType varchar [not null]
+  roomTypeId ObjectId [ref: > room_types._id, note: 'Required when packageType is room package']
+  amenities json [not null, note: 'Array of strings']
+  price decimal [not null]
+  description text [not null, default: '']
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (name, packageType, roomTypeId) [unique]
+  }
+
+  Note: 'Backed by backend/models/packageModel.js'
+}
+
+Table bookings {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  userId ObjectId [not null, ref: > users._id]
+  bookingName varchar [not null]
+  bookingItems json [not null, note: 'Embedded array of { roomId, packageId, participants, subtotal }']
+  extraPackages json [not null, note: 'Array of Package ObjectIds']
+  venueParticipants int [not null, default: 0]
+  checkIn timestamp [not null]
+  checkOut timestamp [not null]
+  totalPrice decimal [not null]
+  status booking_status [not null, default: 'pending']
+  paymentStatus payment_status [not null, default: 'unpaid']
+  paymentMethod payment_method [note: 'Nullable until selected']
+  payment boolean [not null, default: false, note: 'Derived from paymentStatus in Mongoose hooks']
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  Note: 'bookingItems and extraPackages are embedded arrays in the booking document'
+}
+
+Table reviews {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  userId ObjectId [not null, ref: > users._id]
+  bookingId ObjectId [not null, unique, ref: > bookings._id]
+  rating int [not null]
+  comment text [not null]
+  images json [not null, note: 'Array of image paths/URLs']
+  isHidden boolean [not null, default: false]
+  isEdited boolean [not null, default: false]
+  reviewChat json [not null, note: 'Embedded array of { senderId, senderRole, message, parentReplyId, isEdited, createdAt, editHistory }']
+  editHistory json [not null, note: 'Array of { rating, comment, editedAt }']
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (userId, createdAt)
+  }
+
+  Note: 'reviewChat is an embedded array in the review document'
+}
+
+Table notifications {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  recipient ObjectId [not null, ref: > users._id]
+  type notification_type [not null]
+  message text [not null]
+  sender ObjectId [ref: > users._id]
+  link varchar
+  isRead boolean [not null, default: false]
+  createdAt timestamp [not null]
+
+  Note: 'Backed by backend/models/notificationModel.js'
+}
+
+Table reports {
+  _id ObjectId [pk, note: 'Mongo ObjectId']
+  reportType report_type [not null]
+  label varchar [not null]
+  periodMonth int [note: 'Required for monthly reports; null for annual reports']
+  periodYear int [not null]
+  periodStart timestamp [not null]
+  periodEnd timestamp [not null]
+  bookingIds json [not null, note: 'Array of Booking ObjectIds referencing bookings._id']
+  totalBookings int [not null, default: 0]
+  totalParticipants int [not null, default: 0]
+  totalRoomsBooked int [not null, default: 0]
+  totalIncome decimal [not null, default: 0]
+  grossBookingValue decimal [not null, default: 0]
+  approvedCount int [not null, default: 0]
+  pendingCount int [not null, default: 0]
+  declinedCount int [not null, default: 0]
+  cancelledCount int [not null, default: 0]
+  cancellationPendingCount int [not null, default: 0]
+  approvedBookings int [not null, default: 0]
+  paidBookings int [not null, default: 0]
+  createdAt timestamp [not null]
+  updatedAt timestamp [not null]
+
+  indexes {
+    (reportType, periodYear, periodMonth) [unique]
+  }
+
+  Note: 'Collection name is explicitly set to reports in Mongoose; bookingIds persist the bookings included in the report snapshot'
+}

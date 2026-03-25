@@ -539,7 +539,7 @@ const AllBookings = () => {
       filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingRoomType(r).toLowerCase() === roomTypeFilter.toLowerCase()));
     }
 
-    if (startDatendDate) {
+    if (startDate || endDate) {
       filtered = filtered.filter(b => {
         const bDate = new Date(b.checkIn || b.date).toISOString().split('T')[0];
         return (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);

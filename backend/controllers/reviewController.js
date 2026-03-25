@@ -41,46 +41,70 @@ const sanitizeImageList = (list) =>
     ? list.filter((img) => typeof img === "string" && img.trim())
     : [];
 
+const fetchSerializedReviews = async ({ includeHidden = false } = {}) => {
+  const query = includeHidden ? {} : { isHidden: false };
+
+  const reviews = await Review.find(query)
+    .populate("userId", "firstName middleName lastName image")
+    .populate({
+      path: "reviewChat.senderId",
+      select: "firstName middleName lastName image",
+      options: { strictPopulate: false }
+    })
+    .populate({
+      path: "bookingId",
+      select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
+      populate: [
+        {
+          path: "bookingItems.roomId",
+          populate: roomReferencePopulate
+        },
+        {
+          path: "bookingItems.packageId",
+          populate: packageReferencePopulate
+        },
+        {
+          path: "extraPackages",
+          populate: packageReferencePopulate
+        }
+      ]
+    })
+    .sort({ createdAt: -1 });
+
+  return reviews.map((review) => serializeReview(review));
+};
+
 /* ============================================================
    1️⃣ GET ALL REVIEWS
 ============================================================ */
 export const getAllReviews = async (req, res) => {
   try {
-
-    const reviews = await Review.find({ isHidden: false })
-      .populate("userId", "firstName middleName lastName image")
-      .populate({
-        path: "reviewChat.senderId",
-        select: "firstName middleName lastName image",
-        options: { strictPopulate: false }
-      })
-      .populate({
-        path: "bookingId",
-        select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
-        populate: [
-          {
-            path: "bookingItems.roomId",
-            populate: roomReferencePopulate
-          },
-          {
-            path: "bookingItems.packageId",
-            populate: packageReferencePopulate
-          },
-          {
-            path: "extraPackages",
-            populate: packageReferencePopulate
-          }
-        ]
-      })
-      .sort({ createdAt: -1 });
+    const reviews = await fetchSerializedReviews();
 
     res.status(200).json({
       success: true,
-      reviews: reviews.map((review) => serializeReview(review))
+      reviews
     });
 
   } catch (err) {
     console.error("GET ALL REVIEWS ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
+export const getAllReviewsAdmin = async (req, res) => {
+  try {
+    const reviews = await fetchSerializedReviews({ includeHidden: true });
+
+    res.status(200).json({
+      success: true,
+      reviews
+    });
+  } catch (err) {
+    console.error("GET ADMIN REVIEWS ERROR:", err);
     res.status(500).json({
       success: false,
       message: err.message
