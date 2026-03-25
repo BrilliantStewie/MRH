@@ -14,10 +14,10 @@ import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const BOOKINGS_PER_PAGE = 8;
 const getBookingRoomType = (item) =>
-  String(item?.room_id?.roomType || item?.room_id?.room_type || item?.roomType || item?.room_type || "").trim();
+  String(item?.roomId?.roomType || item?.roomType || "").trim();
 
 const getBookingBuilding = (item) =>
-  String(item?.room_id?.building || item?.building || "").trim();
+  String(item?.roomId?.building || item?.building || "").trim();
 
 // --- HELPER COMPONENT: Status Badge ---
 const StatusBadge = ({ status }) => {
@@ -66,7 +66,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   if (!booking.bookingItems) return [];
 
   return booking.bookingItems
-    .map(item => item.package_id)
+    .map(item => item.packageId)
     .filter(pkg => pkg); // remove null packages
 };
 
@@ -74,10 +74,10 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   const roomList = booking.bookingItems || [];
   const bookingTitle =
     String(booking.bookingName || "").trim() ||
-    roomList[0]?.room_id?.name ||
+    roomList[0]?.roomId?.name ||
     packagesList[0]?.name ||
     "Reservation";
-  const showCustomerPhone = booking.user_id?.authProvider !== "google";
+  const showCustomerPhone = booking.userId?.authProvider !== "google";
 
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
@@ -117,21 +117,21 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Details</h3>
             <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
-                  {booking.user_id?.image ? (
-                    <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
-                  ) : (booking.user_id?.firstName?.[0] || <User size={16}/>)}
+                  {booking.userId?.image ? (
+                    <img src={booking.userId.image.startsWith('http') ? booking.userId.image : `${backendUrl}/${booking.userId.image}`} className="w-full h-full object-cover" alt="user" />
+                  ) : (booking.userId?.firstName?.[0] || <User size={16}/>)}
               </div>
               <div className="min-w-0 w-full">
-                <p className="text-sm font-black text-slate-800 truncate">{booking.user_id?.firstName} {booking.user_id?.lastName || booking.user_id?.name}</p>
+                <p className="text-sm font-black text-slate-800 truncate">{booking.userId?.firstName} {booking.userId?.lastName || booking.userId?.name}</p>
                 <div className="mt-1 space-y-1.5 w-full">
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
                         <Mail size={10} className="shrink-0" /> 
-                        <span className="break-all leading-relaxed">{booking.user_id?.email || "No Email"}</span>
+                        <span className="break-all leading-relaxed">{booking.userId?.email || "No Email"}</span>
                     </div>
                     {showCustomerPhone && (
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
                           <Phone size={10} className="shrink-0" /> 
-                          <span>{booking.user_id?.phone || "No Phone"}</span>
+                          <span>{booking.userId?.phone || "No Phone"}</span>
                       </div>
                     )}
                 </div>
@@ -145,12 +145,12 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-In</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.check_in || booking.date || booking.slotDate)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkIn || booking.date || booking.slotDate)}</p>
               </div>
               <ArrowRight size={14} className="text-blue-300" />
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.check_out || booking.checkOutDate)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkOutDate)}</p>
               </div>
             </div>
           </div>
@@ -163,10 +163,10 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {visibleRooms.map((item, i) => {
 
-  const room = item.room_id;
+  const room = item.roomId;
                 const roomImg = (Array.isArray(room.images) && room.images.length > 0) 
                   ? room.images[0] 
-                  : room.cover_image;
+                  : room.coverImage;
 
                 const imageUrl = (roomImg && typeof roomImg === 'string') 
                   ? (roomImg.startsWith('http') ? roomImg : `${backendUrl}/${roomImg}`)
@@ -187,7 +187,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                         <p className="text-[9px] text-slate-400 font-bold uppercase">{room.building}</p>
                       </div>
                       <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[10px] text-slate-500 font-medium">{room.roomType || room.room_type}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{room.roomType}</p>
                         {room.capacity && <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.capacity}</p>}
                       </div>
                     </div>
@@ -444,7 +444,7 @@ const StaffBookings = () => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter((b) =>
-        b.user_id?.name?.toLowerCase().trim().includes(term) || 
+        b.userId?.name?.toLowerCase().trim().includes(term) || 
         b._id?.toLowerCase().includes(term)
       );
     }
@@ -465,9 +465,9 @@ const StaffBookings = () => {
       filtered = filtered.filter((b) => b.status?.toLowerCase() === statusFilter.toLowerCase());
     }
 
-    if (startDate || endDate) {
+    if (startDatendDate) {
         filtered = filtered.filter((b) => {
-          const rawDate = b.slotDate || b.check_in || b.date;
+          const rawDate = b.slotDate || b.checkIn || b.date;
           if (!rawDate) return false;
           const bookingDateStr = new Date(rawDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
           if (startDate && bookingDateStr < startDate) return false;
@@ -558,7 +558,7 @@ const StaffBookings = () => {
     pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
     revenue: bookings
       .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
-      .reduce((acc, curr) => acc + (curr.total_price || curr.amount || 0), 0)
+      .reduce((acc, curr) => acc + (curr.totalPrice || curr.amount || 0), 0)
   };
 
   return (
@@ -721,20 +721,20 @@ const StaffBookings = () => {
                       <td className="px-6 py-5 align-top">
                         <div className="flex items-start gap-4">
                           <div className="h-11 w-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-                            {b.user_id?.image ? (
-                              <img src={b.user_id.image.startsWith('http') ? b.user_id.image : `${backendUrl}/${b.user_id.image}`} className="w-full h-full object-cover" alt="user" />
+                            {b.userId?.image ? (
+                              <img src={b.userId.image.startsWith('http') ? b.userId.image : `${backendUrl}/${b.userId.image}`} className="w-full h-full object-cover" alt="user" />
                             ) : <User size={20}/>}
                           </div>
                           <div className="min-w-0 flex flex-col gap-0.5">
-                            <p className="text-sm font-black text-slate-800 leading-tight">{b.user_id?.name || `${b.user_id?.firstName || ''} ${b.user_id?.lastName || ''}`.trim() || "Guest Name"}</p>
+                            <p className="text-sm font-black text-slate-800 leading-tight">{b.userId?.name || `${b.userId?.firstName || ''} ${b.userId?.lastName || ''}`.trim() || "Guest Name"}</p>
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 min-w-0">
                               <Mail size={10} className="shrink-0 text-slate-300"/>
-                              <span className="break-all leading-relaxed">{b.user_id?.email || "No Email"}</span>
+                              <span className="break-all leading-relaxed">{b.userId?.email || "No Email"}</span>
                             </div>
-                            {b.user_id?.authProvider !== "google" && b.user_id?.phone && (
+                            {b.userId?.authProvider !== "google" && b.userId?.phone && (
                               <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
                                 <Phone size={10} className="shrink-0 text-slate-300"/>
-                                <span>{b.user_id?.phone}</span>
+                                <span>{b.userId?.phone}</span>
                               </div>
                             )}
                           </div>
@@ -746,7 +746,7 @@ const StaffBookings = () => {
                         <div className="-ml-[63px] flex flex-col items-start gap-2 text-left">
                           <div className="flex w-full max-w-[220px] flex-col items-start gap-1">
                               {b.bookingItems?.slice(0, 1).map((item, idx) => {
-  const room = item.room_id;
+  const room = item.roomId;
 
   return (
     <div key={idx} className="flex items-center justify-start gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
@@ -780,7 +780,7 @@ const StaffBookings = () => {
                       <td className="px-6 py-5 align-top">
                         <div className="-ml-4 flex justify-center">
                           <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                            {formatDatePHT(b.check_in || b.slotDate || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.check_out || b.checkOutDate)}
+                            {formatDatePHT(b.checkIn || b.slotDate || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.checkOutDate)}
                           </div>
                         </div>
                       </td>
@@ -872,3 +872,5 @@ const StaffBookings = () => {
 };
 
 export default StaffBookings;
+
+

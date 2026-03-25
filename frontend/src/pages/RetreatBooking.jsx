@@ -199,9 +199,9 @@ const RetreatBooking = () => {
 
     const getRoomImage = (room) => {
         if (!room) return null;
-        if (room.cover_image) return room.cover_image;
+        if (room.coverImage) return room.coverImage;
         if (Array.isArray(room.images) && room.images.length > 0) return room.images[0];
-        return room.image_url || (Array.isArray(room.image) ? room.image[0] : room.image);
+        return room.imageUrl || (Array.isArray(room.image) ? room.image[0] : room.image);
     };
 
     const getImageUrl = (imagePath) => {
@@ -211,7 +211,7 @@ const RetreatBooking = () => {
     };
 
     const getPrice = (priceVal) => Number(priceVal?.$numberDecimal || priceVal || 0);
-    const getRoomTypeLabel = (room) => String(room?.roomType || room?.room_type || "").trim();
+    const getRoomTypeLabel = (room) => String(room?.roomType || "").trim();
 
     const hasVenuePackageSelected = () => {
         return dbPackages.some((pkg) => {
@@ -270,8 +270,8 @@ const RetreatBooking = () => {
                 if (data.success) {
                     const counts = new Map();
                     (data.bookings || []).forEach((b) => {
-                        const start = toDateObj(b.checkIn || b.check_in || b.date || b.createdAt);
-                        const end = toDateObj(b.checkOut || b.check_out || b.checkIn || b.check_in || b.date || b.createdAt);
+                        const start = toDateObj(b.checkIn || b.date || b.createdAt);
+                        const end = toDateObj(b.checkOut || b.checkIn || b.date || b.createdAt);
                         const guestCountRaw = Number(b.guestCount);
                         const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
 
@@ -532,7 +532,7 @@ const RetreatBooking = () => {
 
         const participants = Number(venueParticipants);
 
-        if (!participants || participants <= 0) {
+        if (!participants <= 0) {
             return toast.error("Enter venue participants first.");
         }
 
@@ -956,7 +956,7 @@ const RetreatBooking = () => {
                                                         </button>
                                                     </div>
                                                     <p className="text-[10px] uppercase text-slate-500 font-bold tracking-wide mb-2 flex items-center gap-2">
-                                                        {room.roomType || room.room_type} {room.building && <span>• {room.building}</span>}
+                                                        {room.roomType} {room.building && <span>• {room.building}</span>}
                                                     </p>
                                                     <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold border border-slate-200">
                                                         <Users size={10} /> Max {capacity} {capacity === 1 ? "Person" : "People"}
@@ -1151,3 +1151,5 @@ const RetreatBooking = () => {
 };
 
 export default RetreatBooking;
+
+

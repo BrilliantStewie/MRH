@@ -107,7 +107,7 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     if (editRoom) {
       setName(editRoom.name);
       setPassword(editRoom.password || ""); // Initialize password if editing
-      setRoomType(editRoom.roomType || editRoom.room_type || "");
+      setRoomType(editRoom.roomType || "");
       setBuilding(editRoom.building);
       setCapacity(editRoom.capacity);
       setDescription(editRoom.description);
@@ -551,7 +551,7 @@ if (roomType === "Dormitory" && capacity < 3) {
                           </button>
                         )}
 
-                        {(isAddingNewType || editingTypeId) ? (
+                        {(isAddingNewTypeditingTypeId) ? (
                           <div className="p-4 bg-slate-50 space-y-3 border-t">
                             <input autoFocus value={tempTypeName} onChange={(e)=>setTempTypeName(e.target.value)} placeholder="Category name..." className="w-full px-3 py-2 border rounded-xl text-sm font-bold outline-none focus:border-amber-500" />
                             <div className="flex gap-2">
@@ -706,3 +706,5 @@ if (roomType === "Dormitory" && capacity < 3) {
 };
 
 export default AddRoom;
+
+

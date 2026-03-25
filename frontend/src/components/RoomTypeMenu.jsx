@@ -185,7 +185,7 @@ const RoomTypeMenu = () => {
     const roomsByType = new Map();
 
     (rooms || []).forEach((room) => {
-      const roomType = String(room.roomType || room.room_type || "").trim();
+      const roomType = String(room.roomType || "").trim();
       if (!roomType) return;
 
       const key = normalize(roomType);
@@ -216,17 +216,16 @@ const RoomTypeMenu = () => {
       const defaults = ROOM_TYPE_DEFAULT_MAP[key];
       const matchingRooms = roomsByType.get(key)?.rooms || [];
       const featuredRoom =
-        matchingRooms.find((room) => room.cover_image || room.images?.length) ||
+        matchingRooms.find((room) => room.coverImage || room.images?.length) ||
         matchingRooms[0];
 
       return {
         roomtype: roomType,
         filterValue: roomType,
         image:
-          featuredRoom?.cover_image ||
+          featuredRoom?.coverImage ||
           featuredRoom?.images?.[0] ||
-          defaults?.image ||
-          getFallbackImage(roomType),
+          defaults?.imagetFallbackImage(roomType),
         description:
           defaults?.description ||
           featuredRoom?.description ||
@@ -404,3 +403,5 @@ const RoomTypeMenu = () => {
 };
 
 export default RoomTypeMenu;
+
+

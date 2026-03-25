@@ -106,34 +106,34 @@ const Dashboard = () => {
     const yearlyRevenue = bookings
       .filter((booking) => {
         if (booking.paymentStatus !== "paid" && booking.status !== "approved") return false;
-        const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
         return bookingDate.getFullYear() === currentDate.getFullYear();
       })
-      .reduce((sum, booking) => sum + (Number(booking.total_price || booking.amount) || 0), 0);
+      .reduce((sum, booking) => sum + (Number(booking.totalPrice || booking.amount) || 0), 0);
 
     const monthlyIncome = bookings
       .filter((booking) => {
         if (booking.paymentStatus !== "paid" && booking.status !== "approved") return false;
-        const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
         return (
           bookingDate.getMonth() === currentDate.getMonth() &&
           bookingDate.getFullYear() === currentDate.getFullYear()
         );
       })
-      .reduce((sum, booking) => sum + (Number(booking.total_price || booking.amount) || 0), 0);
+      .reduce((sum, booking) => sum + (Number(booking.totalPrice || booking.amount) || 0), 0);
 
     const occupiedRoomIds = new Set();
 
     bookings.forEach((booking) => {
       if ((booking.status || "").toLowerCase() !== "approved") return;
 
-      const checkIn = normalizeDate(booking.check_in || booking.checkIn || booking.date);
-      const checkOut = normalizeDate(booking.check_out || booking.checkOut);
+      const checkIn = normalizeDate(booking.checkIn || booking.date);
+      const checkOut = normalizeDate(booking.checkOut);
       if (!today || !checkIn || !checkOut) return;
 
       if (today >= checkIn && today < checkOut) {
         (booking.bookingItems || []).forEach((item) => {
-          const roomId = item?.room_id?._id ?? item?.room_id;
+          const roomId = item?.roomId?._id ?? item?.roomId;
           if (roomId) occupiedRoomIds.add(String(roomId));
         });
       }
@@ -175,14 +175,14 @@ const Dashboard = () => {
     }
 
     (allBookings || []).forEach((booking) => {
-      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
       if (booking.paymentStatus === "paid" || booking.status === "approved") {
         const monthBucket = months.find(
           (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
         );
 
         if (monthBucket) {
-          monthBucket.income += Number(booking.total_price || booking.amount) || 0;
+          monthBucket.income += Number(booking.totalPrice || booking.amount) || 0;
         }
       }
 
@@ -209,7 +209,7 @@ const Dashboard = () => {
   const availableYears = useMemo(() => {
     const years = new Set(
       (allBookings || [])
-        .map((booking) => new Date(booking.check_in || booking.date || booking.createdAt).getFullYear())
+        .map((booking) => new Date(booking.checkIn || booking.date || booking.createdAt).getFullYear())
         .filter((year) => !Number.isNaN(year))
     );
 
@@ -219,7 +219,7 @@ const Dashboard = () => {
 
   const reportBookings = useMemo(() => {
     return (allBookings || []).filter((booking) => {
-      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
 
       if (reportType === "monthly") {
         return bookingDate.getMonth() === reportMonth && bookingDate.getFullYear() === reportYear;
@@ -234,7 +234,7 @@ const Dashboard = () => {
 
     const totalIncome = filteredBookings
       .filter((booking) => booking.paymentStatus === "paid" || booking.status === "approved")
-      .reduce((sum, booking) => sum + (Number(booking.total_price || booking.amount) || 0), 0);
+      .reduce((sum, booking) => sum + (Number(booking.totalPrice || booking.amount) || 0), 0);
 
     const totalParticipants = filteredBookings.reduce((sum, booking) => {
       const roomGuests = Array.isArray(booking.bookingItems)
@@ -285,7 +285,7 @@ const Dashboard = () => {
   const roomUtilization = useMemo(() => {
     const rooms = allRooms || [];
     const total = rooms.length || 1;
-    const dormitoryCount = rooms.filter((room) => (room.roomType || room.room_type || "").toLowerCase().includes("dorm")).length;
+    const dormitoryCount = rooms.filter((room) => (room.roomType || "").toLowerCase().includes("dorm")).length;
     const nolascoCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("nolasco")).length;
     const margaritaCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("margarita")).length;
     const toPercent = (count) => Math.round((count / total) * 100);
@@ -333,12 +333,12 @@ const Dashboard = () => {
       ];
 
       filtered.forEach((booking) => {
-        const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
         if (bookingDate < start || bookingDate > end) return;
         const day = bookingDate.getDate();
         const bucket = buckets.find((b) => day >= b.start && day <= b.end);
         if (bucket) {
-          bucket.revenue += Number(booking.total_price || booking.amount) || 0;
+          bucket.revenue += Number(booking.totalPrice || booking.amount) || 0;
         }
       });
 
@@ -352,11 +352,11 @@ const Dashboard = () => {
     }));
 
     filtered.forEach((booking) => {
-      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
       if (bookingDate.getFullYear() !== reportYear) return;
       const bucket = months[bookingDate.getMonth()];
       if (bucket) {
-        bucket.revenue += Number(booking.total_price || booking.amount) || 0;
+        bucket.revenue += Number(booking.totalPrice || booking.amount) || 0;
       }
     });
 
@@ -981,3 +981,5 @@ const StatCard = ({ label, value, icon, color, subValue }) => {
 };
 
 export default Dashboard;
+
+

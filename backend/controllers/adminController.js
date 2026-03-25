@@ -469,7 +469,7 @@ const changeUserStatus = async (req, res) => {
 const addRoom = async (req, res) => {
     try {
         const { name, building, buildingId: providedBuildingId, capacity, description, amenities } = req.body;
-        const roomTypeInput = req.body.roomTypeId || req.body.roomType || req.body.room_type;
+        const roomTypeInput = req.body.roomTypeId || req.body.roomType;
         const normalizedName = normalizeName(name);
 
         const [buildingDoc, roomTypeDoc] = await Promise.all([
@@ -523,7 +523,7 @@ const updateRoom = async (req, res) => {
     try {
         const roomId = req.body.roomId || req.body.id; 
         const { name, building, buildingId: providedBuildingId, capacity, description, amenities, existingImages } = req.body;
-        const roomTypeInput = req.body.roomTypeId || req.body.roomType || req.body.room_type;
+        const roomTypeInput = req.body.roomTypeId || req.body.roomType;
 
         const room = await roomModel.findById(roomId);
         if (!room) {
@@ -680,7 +680,7 @@ const approveBooking = async (req, res) => {
                 <p>Hello ${booking.userId.firstName},</p>
                 <p>Your booking has been approved.</p>
                 <p>Booking: ${booking.bookingName || "Reservation"}</p>
-                <p>Check-in: ${new Date(booking.checkIn || booking.check_in).toLocaleDateString()}</p>
+                <p>Check-in: ${new Date(booking.checkIn).toLocaleDateString()}</p>
                 <p>You can view details in your account.</p>
                 <p>Mercedarian Retreat House</p>
             </div>
@@ -1013,3 +1013,5 @@ export {
     getBuildings, addBuilding, deleteBuilding, updateBuilding,
     getRoomTypes, addRoomType, deleteRoomType, updateRoomType
 };
+
+

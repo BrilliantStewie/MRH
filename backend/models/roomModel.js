@@ -12,14 +12,12 @@ const roomSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Building",
       required: true,
-      alias: "building_id",
     },
 
     roomTypeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "RoomType",
       required: true,
-      alias: "room_type_id",
     },
 
     capacity: {
@@ -50,7 +48,6 @@ const roomSchema = new mongoose.Schema(
     coverImage: {
       type: String,
       default: "",
-      alias: "cover_image",
     },
 
     available: {
@@ -73,10 +70,6 @@ roomSchema.virtual("roomType").get(function () {
   return this.roomTypeId?.name || "";
 });
 
-roomSchema.virtual("room_type").get(function () {
-  return this.roomType;
-});
-
 roomSchema.pre("validate", function (next) {
   if (!this.coverImage && Array.isArray(this.images) && this.images.length > 0) {
     this.coverImage = this.images[0];
@@ -87,3 +80,5 @@ roomSchema.pre("validate", function (next) {
 const roomModel = mongoose.models.Room || mongoose.model("Room", roomSchema);
 
 export default roomModel;
+
+

@@ -51,11 +51,11 @@ const RoomBooking = () => {
       const { data } = await axios.post(
         `${backendUrl}/api/booking/create`,
         {
-          room_id: roomId,
-          check_in: checkIn,
-          check_out: checkOut,
+          roomId: roomId,
+          checkIn: checkIn,
+          checkOut: checkOut,
           participants,
-          total_price: totalPrice,
+          totalPrice: totalPrice,
         },
         { headers: { token } }
       );
@@ -87,7 +87,7 @@ const RoomBooking = () => {
         {/* Image preview of the booked room */}
         <div className="w-full h-60 md:h-72 bg-slate-100 rounded-xl overflow-hidden">
           <img
-            src={roomInfo.image || roomInfo.image_url}
+            src={roomInfo.imageUrl}
             alt={roomInfo.name}
             className="w-full h-full object-cover"
           />
@@ -98,7 +98,7 @@ const RoomBooking = () => {
         </h1>
 
         <p className="text-sm text-gray-600">
-          {roomInfo.roomType || roomInfo.room_type} • {roomInfo.building}
+          {roomInfo.roomType} • {roomInfo.building}
         </p>
 
         <p className="text-sm text-gray-600">
@@ -180,3 +180,5 @@ const RoomBooking = () => {
 };
 
 export default RoomBooking;
+
+

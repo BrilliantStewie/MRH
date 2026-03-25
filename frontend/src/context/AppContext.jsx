@@ -9,8 +9,8 @@ const normalizeRoomRecord = (room) =>
   room
     ? {
         ...room,
-        roomType: room.roomType || room.room_type || "",
-        coverImage: room.coverImage || room.cover_image || room.images?.[0] || "",
+        roomType: room.roomType || "",
+        coverImage: room.coverImage || room.images?.[0] || "",
       }
     : room;
 
@@ -161,3 +161,5 @@ const AppContextProvider = (props) => {
 };
 
 export default AppContextProvider;
+
+

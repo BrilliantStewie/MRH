@@ -13,8 +13,8 @@ const normalizeRoomRecord = (room) =>
   room
     ? {
         ...room,
-        roomType: room.roomType || room.room_type || "",
-        coverImage: room.coverImage || room.cover_image || room.images?.[0] || "",
+        roomType: room.roomType || "",
+        coverImage: room.coverImage || room.images?.[0] || "",
       }
     : room;
 
@@ -131,7 +131,7 @@ const AdminContextProvider = ({ children }) => {
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || error.message,
+        message: error.response?.data?.messagerror.message,
       };
     }
   };
@@ -230,7 +230,7 @@ const AdminContextProvider = ({ children }) => {
       toast.error(data.message);
       return false;
     } catch (error) {
-      toast.error(error.response?.data?.message || error.message);
+      toast.error(error.response?.data?.messagerror.message);
       return false;
     }
   };
@@ -579,7 +579,7 @@ const AdminContextProvider = ({ children }) => {
       return false;
     }
   } catch (error) {
-    toast.error(error.response?.data?.message || error.message);
+    toast.error(error.response?.data?.messagerror.message);
     return false;
   }
 };
@@ -594,7 +594,7 @@ const AdminContextProvider = ({ children }) => {
 
   const pendingReviewsCount = useMemo(() => {
     // Counts reviews that have no replies yet
-    return allReviews.filter(r => !r.replies || r.replies.length === 0).length;
+    return allReviews.filter(r => !r.replies.length === 0).length;
   }, [allReviews]);
 
   // AUTO-FETCH DATA ONCE ADMIN IS AUTHENTICATED
@@ -675,4 +675,6 @@ const AdminContextProvider = ({ children }) => {
 };
 
 export default AdminContextProvider;
+
+
 

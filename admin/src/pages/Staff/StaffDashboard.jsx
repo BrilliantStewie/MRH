@@ -59,13 +59,13 @@ const StaffDashboard = () => {
     bookings.forEach((booking) => {
       if ((booking.status || "").toLowerCase() !== "approved") return;
 
-      const checkIn = normalizeDate(booking.check_in || booking.checkIn || booking.date);
-      const checkOut = normalizeDate(booking.check_out || booking.checkOut);
+      const checkIn = normalizeDate(booking.checkIn || booking.date);
+      const checkOut = normalizeDate(booking.checkOut);
       if (!today || !checkIn || !checkOut) return;
 
       if (today >= checkIn && today < checkOut) {
         (booking.bookingItems || []).forEach((item) => {
-          const roomId = item?.room_id?._id ?? item?.room_id;
+          const roomId = item?.roomId?._id ?? item?.roomId;
           if (roomId) occupiedRoomIds.add(String(roomId));
         });
       }
@@ -119,7 +119,7 @@ const StaffDashboard = () => {
     }
 
     (allBookings || []).forEach((booking) => {
-      const bookingDate = new Date(booking.check_in || booking.date || booking.createdAt);
+      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
       const monthBucket = months.find(
         (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
       );
@@ -312,3 +312,5 @@ const StatCard = ({ label, value, icon, color, subValue }) => {
 };
 
 export default StaffDashboard;
+
+

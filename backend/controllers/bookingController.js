@@ -48,14 +48,14 @@ const userId = req.userId;
   extraPackages: providedExtraPackages
  } = req.body;
 
- const checkIn = providedCheckIn || req.body.check_in;
- const checkOut = providedCheckOut || req.body.check_out;
- const extraPackagesInput = providedExtraPackages || req.body.extra_packages || [];
+ const checkIn = providedCheckIn;
+ const checkOut = providedCheckOut;
+ const extraPackagesInput = providedExtraPackages || [];
  const normalizedBookingItems = Array.isArray(bookingItems)
    ? bookingItems.map((item) => ({
        ...item,
-       roomId: item.roomId || item.room_id,
-       packageId: item.packageId || item.package_id,
+       roomId: item.roomId,
+       packageId: item.packageId,
        participants: Number(item.participants || 0)
      }))
     : [];
@@ -168,8 +168,8 @@ return res.json({success:false,message:"Past dates not allowed"});
     );
 
     const conflict = bookings.some((booking) => {
-      const existingStart = normalizeDate(booking.checkIn || booking.check_in);
-      const existingEnd = normalizeDate(booking.checkOut || booking.check_out);
+      const existingStart = normalizeDate(booking.checkIn);
+      const existingEnd = normalizeDate(booking.checkOut);
       const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
       return rangesOverlap(existingStart, cleaningEnd, start, end);
     });
@@ -190,7 +190,7 @@ const days = Math.ceil((end-start)/(1000*60*60*24)) || 1;
 
   for (const item of normalizedBookingItems){
 
- const pkg = packageById.get(String(item.packageId || item.package_id));
+ const pkg = packageById.get(String(item.packageId));
 
  if(!pkg)
   return res.json({success:false,message:"Invalid package selected"});
@@ -533,8 +533,8 @@ const bookings = await bookingModel.find(
 );
 
 const conflict = bookings.some((booking) => {
-  const existingStart = normalizeDate(booking.checkIn || booking.check_in);
-  const existingEnd = normalizeDate(booking.checkOut || booking.check_out);
+  const existingStart = normalizeDate(booking.checkIn);
+  const existingEnd = normalizeDate(booking.checkOut);
   const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
   return rangesOverlap(existingStart, cleaningEnd, start, end);
 });
@@ -568,9 +568,9 @@ const blockedDates=[];
 
 bookings.forEach(b=>{
 
-let current=new Date(b.checkIn || b.check_in);
+let current=new Date(b.checkIn);
 
-const checkoutWithCleaning = new Date(b.checkOut || b.check_out);
+const checkoutWithCleaning = new Date(b.checkOut);
 checkoutWithCleaning.setDate(checkoutWithCleaning.getDate() + 1);
 
 while(current <= checkoutWithCleaning){
@@ -622,8 +622,8 @@ try {
   const bookedSet = new Set();
   const bookedReasons = new Map();
   bookings.forEach((booking) => {
-    const existingStart = normalizeDate(booking.checkIn || booking.check_in);
-    const existingEnd = normalizeDate(booking.checkOut || booking.check_out);
+    const existingStart = normalizeDate(booking.checkIn);
+    const existingEnd = normalizeDate(booking.checkOut);
     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
 
     const isBookingOverlap = rangesOverlap(existingStart, existingEnd, start, end);
@@ -631,7 +631,7 @@ try {
     if (!isBookingOverlap && !isCleaningOverlap) return;
 
     (booking.bookingItems || []).forEach((item) => {
-      const id = String(item.roomId || item.room_id);
+      const id = String(item.roomId);
       if (!allowedIds.has(id)) return;
 
       bookedSet.add(id);
@@ -680,8 +680,8 @@ try {
     );
     const venueGuests = Number(b.venueParticipants || 0);
     return {
-      checkIn: b.checkIn || b.check_in,
-      checkOut: b.checkOut || b.check_out,
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
       status: b.status,
       paymentStatus: b.paymentStatus,
       guestCount: roomGuests + venueGuests
@@ -713,8 +713,8 @@ const cleaningRoomIds = [];
 
 bookings.forEach(b => {
 
-const checkin = normalizeDate(b.checkIn || b.check_in);
-const checkout = normalizeDate(b.checkOut || b.check_out);
+const checkin = normalizeDate(b.checkIn);
+const checkout = normalizeDate(b.checkOut);
 
 const cleaningDay = new Date(checkout);
 cleaningDay.setDate(cleaningDay.getDate() + 1);
@@ -723,7 +723,7 @@ cleaningDay.setDate(cleaningDay.getDate() + 1);
 if(today >= checkin && today < checkout){
 
 b.bookingItems.forEach(item=>{
-occupiedRoomIds.push(item.roomId || item.room_id);
+occupiedRoomIds.push(item.roomId);
 });
 
 }
@@ -732,7 +732,7 @@ occupiedRoomIds.push(item.roomId || item.room_id);
 if(today.getTime() === cleaningDay.getTime()){
 
 b.bookingItems.forEach(item=>{
-cleaningRoomIds.push(item.roomId || item.room_id);
+cleaningRoomIds.push(item.roomId);
 });
 
 }
@@ -766,8 +766,8 @@ const userBusyDates=[];
 
  bookings.forEach(b=>{
 
- const start = normalizeDate(b.checkIn || b.check_in);
- const end = normalizeDate(b.checkOut || b.check_out);
+ const start = normalizeDate(b.checkIn);
+ const end = normalizeDate(b.checkOut);
 
  if (start.getTime() === end.getTime()) {
    userBusyDates.push(new Date(start));
@@ -792,3 +792,5 @@ res.json({success:true,userBusyDates});
 res.json({success:false,message:error.message});
 }
 };
+
+

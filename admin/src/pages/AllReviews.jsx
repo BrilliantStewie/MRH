@@ -50,12 +50,12 @@ const AllReviews = () => {
                                 <div className="flex justify-between items-start mb-6">
                                     <div className="flex items-center gap-4">
                                         <img 
-                                            src={item.user_id?.image || "/default-avatar.png"} 
+                                            src={item.userId?.image || "/default-avatar.png"} 
                                             className="h-12 w-12 rounded-2xl object-cover shadow-sm" 
                                             alt="Guest"
                                         />
                                         <div>
-                                            <h3 className="font-bold text-slate-900">{item.user_id?.name || "Guest"}</h3>
+                                            <h3 className="font-bold text-slate-900">{item.userId?.name || "Guest"}</h3>
                                             <div className="flex items-center gap-1 text-amber-400">
                                                 {[...Array(5)].map((_, i) => (
                                                     <Star key={i} size={12} fill={i < item.rating ? "currentColor" : "none"} />
@@ -74,7 +74,7 @@ const AllReviews = () => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                                         <Calendar size={12} />
-                                        {new Date(item.check_in).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                        {new Date(item.checkIn).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                                     </div>
                                     <button 
                                         onClick={() => navigate(`/history/${item._id}`)}
@@ -100,3 +100,5 @@ const AllReviews = () => {
 };
 
 export default AllReviews;
+
+

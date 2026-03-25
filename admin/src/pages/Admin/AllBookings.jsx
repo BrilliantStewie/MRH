@@ -11,10 +11,10 @@ import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const BOOKINGS_PER_PAGE = 8;
 const getBookingRoomType = (item) =>
-  String(item?.room_id?.roomType || item?.room_id?.room_type || item?.roomType || item?.room_type || "").trim();
+  String(item?.roomId?.roomType || item?.roomType || "").trim();
 
 const getBookingBuilding = (item) =>
-  String(item?.room_id?.building || item?.building || "").trim();
+  String(item?.roomId?.building || item?.building || "").trim();
 
 // --- HELPER COMPONENT: Status Badge ---
 const StatusBadge = ({ status }) => {
@@ -63,7 +63,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   if (!booking.bookingItems) return [];
 
   return booking.bookingItems
-    .map(item => item.package_id)
+    .map(item => item.packageId)
     .filter(pkg => pkg); // remove null
 };
 
@@ -71,10 +71,10 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   const roomList = booking.bookingItems || [];
   const bookingTitle =
     String(booking.bookingName || "").trim() ||
-    roomList[0]?.room_id?.name ||
+    roomList[0]?.roomId?.name ||
     packagesList[0]?.name ||
     "Reservation";
-  const showCustomerPhone = booking.user_id?.authProvider !== "google";
+  const showCustomerPhone = booking.userId?.authProvider !== "google";
 
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
@@ -111,21 +111,21 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Details</h3>
             <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
-                  {booking.user_id?.image ? (
-                    <img src={booking.user_id.image.startsWith('http') ? booking.user_id.image : `${backendUrl}/${booking.user_id.image}`} className="w-full h-full object-cover" alt="user" />
-                  ) : (booking.user_id?.firstName?.[0])}
+                  {booking.userId?.image ? (
+                    <img src={booking.userId.image.startsWith('http') ? booking.userId.image : `${backendUrl}/${booking.userId.image}`} className="w-full h-full object-cover" alt="user" />
+                  ) : (booking.userId?.firstName?.[0])}
               </div>
               <div className="min-w-0 w-full">
-                <p className="text-sm font-black text-slate-800 truncate">{booking.user_id?.firstName} {booking.user_id?.lastName}</p>
+                <p className="text-sm font-black text-slate-800 truncate">{booking.userId?.firstName} {booking.userId?.lastName}</p>
                 <div className="mt-1 space-y-1.5 w-full">
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 min-w-0">
                         <Mail size={10} className="shrink-0" /> 
-                        <span className="break-all leading-relaxed">{booking.user_id?.email || "No Email"}</span>
+                        <span className="break-all leading-relaxed">{booking.userId?.email || "No Email"}</span>
                     </div>
                     {showCustomerPhone && (
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
                           <Phone size={10} className="shrink-0" /> 
-                          <span>{booking.user_id?.phone || "No Phone"}</span>
+                          <span>{booking.userId?.phone || "No Phone"}</span>
                       </div>
                     )}
                 </div>
@@ -138,12 +138,12 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-In</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.check_in || booking.date)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkIn || booking.date)}</p>
               </div>
               <ArrowRight size={14} className="text-blue-300" />
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.check_out || booking.checkOutDate)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkOutDate)}</p>
               </div>
             </div>
           </div>
@@ -154,11 +154,11 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {visibleRooms.map((room, i) => {
-                const roomData = room.room_id;
+                const roomData = room.roomId;
 
 const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
   ? roomData.images[0]
-  : roomData?.cover_image;
+  : roomData?.coverImage;
 
                 const imageUrl = (roomImg && typeof roomImg === 'string') 
                   ? (roomImg.startsWith('http') ? roomImg : `${backendUrl}/${roomImg}`)
@@ -176,13 +176,13 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
                     <div className="flex-grow">
                       <div className="flex justify-between items-start">
                         <p className="text-[11px] font-black text-slate-800">
-  {room.room_id?.name || "Room"}
+  {room.roomId?.name || "Room"}
 </p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">{room.room_id?.building}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">{room.roomId?.building}</p>
                       </div>
                       <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[10px] text-slate-500 font-medium">{room.room_id?.roomType || room.room_id?.room_type}</p>
-                        <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.room_id?.capacity}</p>
+                        <p className="text-[10px] text-slate-500 font-medium">{room.roomId?.roomType}</p>
+                        <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.roomId?.capacity}</p>
                       </div>
                     </div>
                   </div>
@@ -258,7 +258,7 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
         <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-6">
           <div className="text-right">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Billing</p>
-            <p className="text-xl font-black text-slate-900">₱{booking.total_price?.toLocaleString()}</p>
+            <p className="text-xl font-black text-slate-900">₱{booking.totalPrice?.toLocaleString()}</p>
           </div>
         </div>
       </div>
@@ -526,7 +526,7 @@ const AllBookings = () => {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(b => `${b.user_id?.firstName} ${b.user_id?.lastName}`.toLowerCase().includes(term) || b._id.toLowerCase().includes(term));
+      filtered = filtered.filter(b => `${b.userId?.firstName} ${b.userId?.lastName}`.toLowerCase().includes(term) || b._id.toLowerCase().includes(term));
     }
     
     if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingBuilding(r) === buildingFilter));
@@ -539,15 +539,15 @@ const AllBookings = () => {
       filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingRoomType(r).toLowerCase() === roomTypeFilter.toLowerCase()));
     }
 
-    if (startDate || endDate) {
+    if (startDatendDate) {
       filtered = filtered.filter(b => {
-        const bDate = new Date(b.check_in || b.date).toISOString().split('T')[0];
+        const bDate = new Date(b.checkIn || b.date).toISOString().split('T')[0];
         return (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
       });
     }
     
-    if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(b.check_in || b.date).getMonth() === months.indexOf(monthFilter));
-    if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(b.check_in || b.date).getFullYear() === parseInt(yearFilter));
+    if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(b.checkIn || b.date).getMonth() === months.indexOf(monthFilter));
+    if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(b.checkIn || b.date).getFullYear() === parseInt(yearFilter));
 
     filtered.sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt);
@@ -596,7 +596,7 @@ const AllBookings = () => {
     pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
     revenue: bookings
       .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
-      .reduce((acc, curr) => acc + (curr.total_price || 0), 0)
+      .reduce((acc, curr) => acc + (curr.totalPrice || 0), 0)
   };
 
   return (
@@ -782,18 +782,18 @@ const AllBookings = () => {
                   <td className="px-6 py-5">
                     <div className="flex items-start gap-4">
                       <div className="h-11 w-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 overflow-hidden border border-slate-200 shrink-0 shadow-sm">
-                        {b.user_id?.image ? <img src={b.user_id.image.startsWith('http') ? b.user_id.image : `${backendUrl}/${b.user_id.image}`} className="w-full h-full object-cover" alt="user" /> : <User size={20}/>}
+                        {b.userId?.image ? <img src={b.userId.image.startsWith('http') ? b.userId.image : `${backendUrl}/${b.userId.image}`} className="w-full h-full object-cover" alt="user" /> : <User size={20}/>}
                       </div>
                       <div className="min-w-0 flex flex-col gap-0.5">
-                        <p className="text-sm font-black text-slate-800 leading-tight">{b.user_id?.firstName} {b.user_id?.lastName}</p>
+                        <p className="text-sm font-black text-slate-800 leading-tight">{b.userId?.firstName} {b.userId?.lastName}</p>
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 min-w-0">
                           <Mail size={10} className="shrink-0 text-slate-300"/>
-                          <span className="break-all leading-relaxed">{b.user_id?.email || "No Email"}</span>
+                          <span className="break-all leading-relaxed">{b.userId?.email || "No Email"}</span>
                         </div>
-                        {b.user_id?.authProvider !== "google" && (
+                        {b.userId?.authProvider !== "google" && (
                           <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
                             <Phone size={10} className="shrink-0 text-slate-300"/>
-                            <span>{b.user_id?.phone || "No Phone"}</span>
+                            <span>{b.userId?.phone || "No Phone"}</span>
                           </div>
                         )}
                       </div>
@@ -806,9 +806,9 @@ const AllBookings = () => {
                                 <div key={idx} className="flex items-center justify-start gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
                                     <Home size={10} className="text-slate-400" />
                                     <span className="text-[10px] font-black text-slate-600 truncate">
-  {room.room_id?.name || "Room"}
+  {room.roomId?.name || "Room"}
 </span>
-                                    {room.room_id?.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.room_id?.capacity}</span>}
+                                    {room.roomId?.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.roomId?.capacity}</span>}
                                 </div>
                             ))}
                             {b.bookingItems?.length > 1 && (
@@ -825,7 +825,7 @@ const AllBookings = () => {
                   <td className="px-6 py-5 align-top">
                     <div className="-ml-4 flex justify-center">
                       <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                        {formatDatePHT(b.check_in || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.check_out || b.checkOutDate)}
+                        {formatDatePHT(b.checkIn || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.checkOutDate)}
                       </div>
                     </div>
                   </td>
@@ -895,7 +895,7 @@ const AllBookings = () => {
                   </td>
                   <td className="px-6 py-5 align-top">
                     <div className="flex flex-col items-start text-left">
-                      <p className="text-sm font-black text-slate-800">₱{b.total_price?.toLocaleString()}</p>
+                      <p className="text-sm font-black text-slate-800">₱{b.totalPrice?.toLocaleString()}</p>
                       <div className={`mt-1 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest ${ (b.paymentStatus === 'paid' || b.payment === true) ? 'text-emerald-500' : 'text-amber-500'}`}>
                           {(b.paymentStatus === 'paid' || b.payment === true) ? <CheckCircle2 size={10}/> : <Clock size={10}/>}
                           {(b.paymentStatus === 'paid' || b.payment === true) ? 'Paid' : 'Unpaid'}
@@ -982,3 +982,5 @@ const AllBookings = () => {
 };
 
 export default AllBookings;
+
+

@@ -86,15 +86,15 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
 
   // Data Mapping
   const bookingItems = Array.isArray(booking.bookingItems) ? booking.bookingItems : [];
-  const rooms = bookingItems.map((item) => item.room_id).filter(Boolean);
+  const rooms = bookingItems.map((item) => item.roomId).filter(Boolean);
   const mainRoom = rooms[0] || {};
   const roomNames = rooms.map((room) => room?.name).filter(Boolean);
   const roomLabel = roomNames.length > 1
     ? `${roomNames[0]} (+${roomNames.length - 1} more)`
     : roomNames[0] || "Venue-only booking";
   const packageName =
-    bookingItems[0]?.package_id?.name ||
-    booking.extra_packages?.[0]?.name ||
+    bookingItems[0]?.packageId?.name ||
+    booking.extraPackages?.[0]?.name ||
     "Venue-only package";
   const guestCount = bookingItems.reduce((sum, item) => sum + Number(item.participants || 0), 0)
     + Number(booking.venueParticipants || 0);
@@ -108,9 +108,9 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   };
   
   const selectedRoomItems = bookingItems;
-  const selectedPackageObjects = bookingItems.map((item) => item.package_id).filter(Boolean);
-  const selectedExtraPackages = Array.isArray(booking.extra_packages)
-    ? booking.extra_packages.filter((pkg) => typeof pkg === "object" && pkg)
+  const selectedPackageObjects = bookingItems.map((item) => item.packageId).filter(Boolean);
+  const selectedExtraPackages = Array.isArray(booking.extraPackages)
+    ? booking.extraPackages.filter((pkg) => typeof pkg === "object" && pkg)
     : [];
   const uniquePackages = Array.from(
     new Map([...selectedPackageObjects, ...selectedExtraPackages].map((pkg) => [pkg._id || pkg, pkg])).values()
@@ -121,14 +121,14 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     location: "Poblacion, Dauis, Bohol, Philippines",
     guestName: user?.name || "Guest", 
     roomName: booking.bookingName || roomLabel,
-    checkIn: formatDate(booking.check_in),
-    checkOut: formatDate(booking.check_out),
+    checkIn: formatDate(booking.checkIn),
+    checkOut: formatDate(booking.checkOut),
     details: {
       booking: roomLabel,
       package: packageName,
       guests: guestCount ? `${guestCount} Guests` : "Guests N/A"
     },
-    headerImage: getImageUrl(mainRoom?.cover_image || mainRoom?.images || mainRoom?.image) || venueOnlyImage
+    headerImage: getImageUrl(mainRoom?.coverImage || mainRoom?.images || mainRoom?.image) || venueOnlyImage
   };
 
   const COLORS = { black: "#1A1A1A", starYellow: "#FACC15" };
@@ -254,12 +254,12 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-in</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.check_in)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.checkIn)}</p>
                     </div>
                     <div className="hidden sm:block text-slate-300 text-sm font-bold">—</div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-out</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.check_out)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.checkOut)}</p>
                     </div>
                     <div className="sm:ml-auto">{getStatusBadge(booking.status)}</div>
                   </div>
@@ -272,8 +272,8 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                   {selectedRoomItems.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {(showAllRooms ? selectedRoomItems : selectedRoomItems.slice(0, 2)).map((item, index) => {
-                        const room = item.room_id;
-                        const roomImage = getImageUrl(room?.cover_image || room?.images || room?.image);
+                        const room = item.roomId;
+                        const roomImage = getImageUrl(room?.coverImage || room?.images || room?.image);
                         return (
                           <div key={room?._id || index} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
                             <div className="h-16 w-20 overflow-hidden rounded-xl bg-slate-100">
@@ -293,7 +293,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-slate-900">{room?.name || "Room"}</p>
                               <p className="text-[10px] text-slate-500">
-                                {(room?.roomType || room?.room_type || "Room type")
+                                {(room?.roomType || "Room type")
                                   .toString()
                                   .replace(/_/g, " ")
                                   .toUpperCase()}
@@ -362,7 +362,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                 <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Billing</p>
-                    <p className="text-xl font-extrabold text-slate-900">₱{Number(booking.total_price || 0).toLocaleString()}</p>
+                    <p className="text-xl font-extrabold text-slate-900">₱{Number(booking.totalPrice || 0).toLocaleString()}</p>
                   </div>
                   <span className="rounded-full bg-slate-900 px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
                     {booking.paymentStatus === "paid"
@@ -456,8 +456,8 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                           >
                               <Star 
                                 size={38} 
-                                className={`transition-all duration-200 ${ (hover || rating) >= star ? 'text-yellow-400 drop-shadow-md' : 'text-gray-200' }`} 
-                                fill={(hover || rating) >= star ? COLORS.starYellow : 'transparent'} 
+                                className={`transition-all duration-200 ${ (hoverating) >= star ? 'text-yellow-400 drop-shadow-md' : 'text-gray-200' }`} 
+                                fill={(hoverating) >= star ? COLORS.starYellow : 'transparent'} 
                                 strokeWidth={1.2} 
                               />
                           </button>
@@ -606,3 +606,5 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
 };
 
 export default ReviewPage;
+
+

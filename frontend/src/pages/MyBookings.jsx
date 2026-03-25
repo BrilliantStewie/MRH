@@ -183,7 +183,7 @@ const MyBookings = () => {
       const toastId = toast.loading("Preparing GCash checkout...");
       const { data } = await axios.post(backendUrl + "/api/user/create-checkout-session", { 
   bookingId: booking._id,
-  amount: booking.total_price, 
+  amount: booking.totalPrice, 
   description: `Room Booking ID: ${booking._id}`
 }, { headers: { token } });
 
@@ -258,8 +258,8 @@ const MyBookings = () => {
       const latestApproved = [...bookings]
         .filter((b) => b.status === "approved")
         .sort((a, b) => {
-          const aDate = new Date(a.updatedAt || a.createdAt || a.check_in || 0).getTime();
-          const bDate = new Date(b.updatedAt || b.createdAt || b.check_in || 0).getTime();
+          const aDate = new Date(a.updatedAt || a.createdAt || a.checkIn || 0).getTime();
+          const bDate = new Date(b.updatedAt || b.createdAt || b.checkIn || 0).getTime();
           return bDate - aDate;
         })[0];
       if (latestApproved?._id) {
@@ -303,8 +303,8 @@ const MyBookings = () => {
     const status = String(booking?.status || "").toLowerCase();
     const sortSource =
       status === "pending" || status === "cancellation_pending"
-        ? booking?.createdAt || booking?.date || booking?.updatedAt || booking?.check_in
-        : booking?.check_in || booking?.slotDate || booking?.date || booking?.createdAt;
+        ? booking?.createdAt || booking?.date || booking?.updatedAt || booking?.checkIn
+        : booking?.checkIn || booking?.slotDate || booking?.date || booking?.createdAt;
 
     const parsedDate = new Date(sortSource);
     return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
@@ -315,10 +315,10 @@ const MyBookings = () => {
 
     const mainRoom =
   b.bookingItems && b.bookingItems.length > 0
-    ? b.bookingItems[0].room_id
+    ? b.bookingItems[0].roomId
     : { name: "Room Details Unavailable" };
 
-    const date = new Date(b.check_in || Date.now());
+    const date = new Date(b.checkIn || Date.now());
 
     if (activeTab !== 'all' && b.status !== activeTab) return false;
     if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
@@ -340,7 +340,7 @@ const MyBookings = () => {
 }, [bookings, activeTab, searchQuery, monthFilter, yearFilter, sortOrder]);
   
   const uniqueYears = useMemo(() => {
-    const years = bookings.map(b => new Date(b.check_in).getFullYear());
+    const years = bookings.map(b => new Date(b.checkIn).getFullYear());
     return [...new Set(years)].sort((a, b) => b - a).map(y => ({ label: y.toString(), value: y.toString() }));
   }, [bookings]);
 
@@ -348,9 +348,9 @@ const MyBookings = () => {
   const sortOptions = [{ label: "Newest First", value: "newest" }, { label: "Oldest First", value: "oldest" }];
   const displayedBookings = showAllBookings ? filteredBookings : filteredBookings.slice(0, 5);
   const selectedRoomItems = selectedBooking?.bookingItems || [];
-  const selectedPackageObjects = selectedRoomItems.map(item => item.package_id).filter(Boolean);
-  const selectedExtraPackages = Array.isArray(selectedBooking?.extra_packages)
-    ? selectedBooking.extra_packages.filter(pkg => typeof pkg === "object" && pkg)
+  const selectedPackageObjects = selectedRoomItems.map(item => item.packageId).filter(Boolean);
+  const selectedExtraPackages = Array.isArray(selectedBooking?.extraPackages)
+    ? selectedBooking.extraPackages.filter(pkg => typeof pkg === "object" && pkg)
     : [];
   const uniquePackages = Array.from(
     new Map(
@@ -585,7 +585,7 @@ const MyBookings = () => {
             <>
               {displayedBookings.map((booking) => {
                 const roomSlides = booking.bookingItems
-                  ? booking.bookingItems.map(item => item.room_id).filter(Boolean)
+                  ? booking.bookingItems.map(item => item.roomId).filter(Boolean)
                   : [];
               const roomNames = roomSlides.map(room => room?.name).filter(Boolean);
               const primaryRoomName = roomNames[0] || "Venue only";
@@ -594,13 +594,13 @@ const MyBookings = () => {
               const isVenueOnly = roomSlides.length === 0;
               const mainRoom =
                 booking.bookingItems && booking.bookingItems.length > 0
-                  ? booking.bookingItems[0].room_id
+                  ? booking.bookingItems[0].roomId
                   : { name: "Venue only" };
               const slideIndex = isMultiRoom ? slideTick % roomSlides.length : 0;
               const slideRoom = isMultiRoom ? roomSlides[slideIndex] : mainRoom;
               
-              const checkInDate = booking.check_in ? new Date(booking.check_in) : new Date();
-              const checkOutDate = booking.check_out ? new Date(booking.check_out) : new Date();
+              const checkInDate = booking.checkIn ? new Date(booking.checkIn) : new Date();
+              const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : new Date();
               
               const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
               const isCash = booking.paymentMethod === "cash";
@@ -626,7 +626,7 @@ const MyBookings = () => {
 
               const imageUrl = isVenueOnly
                 ? venueOnlyImage
-                : getImageUrl(slideRoom?.cover_image || slideRoom?.images || slideRoom?.image);
+                : getImageUrl(slideRoom?.coverImage || slideRoom?.imageslideRoom?.image);
 
               return (
                 <div
@@ -694,7 +694,7 @@ const MyBookings = () => {
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
                           <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-2xl font-extrabold text-slate-900">₱{Number(booking.total_price).toLocaleString()}</span>
+                            <span className="text-2xl font-extrabold text-slate-900">₱{Number(booking.totalPrice).toLocaleString()}</span>
                             
                             {isPaid && (
                               <span className="flex items-center gap-1.5 pl-2 text-emerald-600 text-[11px] font-bold uppercase">
@@ -864,12 +864,12 @@ const MyBookings = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-in</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.check_in)}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.checkIn)}</p>
                   </div>
                   <div className="hidden sm:block text-slate-300 text-sm font-bold">—</div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-out</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.check_out)}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.checkOut)}</p>
                   </div>
                   <div className="sm:ml-auto">{getStatusBadge(selectedBooking.status)}</div>
                 </div>
@@ -882,8 +882,8 @@ const MyBookings = () => {
                 {selectedRoomItems.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {(showAllModalRooms ? selectedRoomItems : selectedRoomItems.slice(0, 2)).map((item, index) => {
-                      const room = item.room_id;
-                      const roomImage = getImageUrl(room?.cover_image || room?.images || room?.image);
+                      const room = item.roomId;
+                      const roomImage = getImageUrl(room?.coverImage || room?.images || room?.image);
                       return (
                         <div key={room?._id || index} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm">
                           <div className="h-16 w-20 overflow-hidden rounded-xl bg-slate-100">
@@ -903,7 +903,7 @@ const MyBookings = () => {
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-slate-900">{room?.name || "Room"}</p>
                           <p className="text-[10px] text-slate-500">
-                            {(room?.roomType || room?.room_type || "Room type")
+                            {(room?.roomType || "Room type")
                               .toString()
                               .replace(/_/g, " ")
                               .toUpperCase()}
@@ -972,7 +972,7 @@ const MyBookings = () => {
               <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Billing</p>
-                  <p className="text-xl font-extrabold text-slate-900">₱{Number(selectedBooking.total_price || 0).toLocaleString()}</p>
+                  <p className="text-xl font-extrabold text-slate-900">₱{Number(selectedBooking.totalPrice || 0).toLocaleString()}</p>
                 </div>
                 <span className="rounded-full bg-slate-900 px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
                   {selectedBooking.paymentStatus === "paid"
@@ -991,3 +991,5 @@ const MyBookings = () => {
 };
 
 export default MyBookings;
+
+

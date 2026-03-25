@@ -12,8 +12,8 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
     bookings.forEach(b => {
       const status = (b.status || b.paymentStatus || "").toLowerCase();
       if (['approved', 'paid', 'checked_in', 'pending'].includes(status)) {
-        const start = new Date(b.check_in || b.date || b.createdAt);
-        const end = new Date(b.check_out || b.check_in || b.date || b.createdAt);
+        const start = new Date(b.checkIn || b.date || b.createdAt);
+        const end = new Date(b.checkOut || b.checkIn || b.date || b.createdAt);
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         const guestCountRaw = Number(b.guestCount);
@@ -197,3 +197,5 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
 };
 
 export default AvailabilityCalendar;
+
+

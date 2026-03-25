@@ -75,12 +75,12 @@ const Rooms = () => {
 
   useEffect(() => {
     const fetchRangeBookedRooms = async () => {
-      if (!rangeStart || !rangeEnd || rangeEnd < rangeStart) {
+      if (!rangeStart || !rangeEnd < rangeStart) {
         setRangeBookedRooms([]);
         setRangeBookedReasons({});
         return;
       }
-      if (!rooms || rooms.length === 0) {
+      if (!rooms.length === 0) {
         return;
       }
       try {
@@ -140,7 +140,7 @@ const Rooms = () => {
   const roomTypeOptions = [
     "all",
     ...Array.from(
-      new Set((rooms || []).map((room) => room.roomType || room.room_type).filter(Boolean))
+      new Set((rooms || []).map((room) => room.roomType).filter(Boolean))
     ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" })),
   ];
 
@@ -204,7 +204,7 @@ const Rooms = () => {
     let data = [...(rooms || [])];
 
     if (roomType !== "all") {
-      data = data.filter((room) => normalize(room.roomType || room.room_type) === normalize(roomType));
+      data = data.filter((room) => normalize(room.roomType) === normalize(roomType));
     }
 
     if (building !== "all") {
@@ -348,7 +348,7 @@ const Rooms = () => {
 
   const getRoomImage = (room) => {
     if (!room) return null;
-    if (room.cover_image) return room.cover_image;
+    if (room.coverImage) return room.coverImage;
     if (Array.isArray(room.images) && room.images.length > 0) return room.images[0];
     return null;
   };
@@ -441,8 +441,8 @@ const Rooms = () => {
     const images =
       Array.isArray(room.images) && room.images.length > 0
         ? room.images
-        : room.cover_image
-          ? [room.cover_image]
+        : room.coverImage
+          ? [room.coverImage]
           : [];
     const slides = images.length > 0 ? images : [null];
     const amenities =
@@ -459,7 +459,7 @@ const Rooms = () => {
     }, [room._id]);
 
     const isRoomSelected = isSelected(room._id);
-    const roomTypeLabel = (room.roomType || room.room_type || room.type || "").replace(/_/g, " ");
+    const roomTypeLabel = (room.roomType || room.type || "").replace(/_/g, " ");
     const {
       isAdminUnavailable: isRoomAdminUnavailable,
       isUnavailable: isRoomUnavailable,
@@ -887,7 +887,7 @@ const Rooms = () => {
                   } = getRoomAvailabilityState(room);
                   const selected = isLoggedIn && isSelected(room._id);
                   const canSelectRoom = isLoggedIn && !isUnavailable;
-                  const roomTypeLabel = (room.roomType || room.room_type || room.type || "").replace(/_/g, " ");
+                  const roomTypeLabel = (room.roomType || room.type || "").replace(/_/g, " ");
 
                   return (
                     <div
@@ -1134,3 +1134,5 @@ const Rooms = () => {
 };
 
 export default Rooms;
+
+

@@ -71,7 +71,7 @@ const RoomsList = () => {
 
   const filteredRooms = useMemo(() => {
     const data = (allRooms || []).filter((room) => {
-      const rType = room.roomType || room.room_type || room.type || "";
+      const rType = room.roomType || room.type || "";
       const matchesType = filterType
         ? rType.toLowerCase().trim() === filterType.toLowerCase().trim()
         : true;
@@ -176,7 +176,7 @@ const RoomsList = () => {
   };
 
   const getDisplayImage = (room) => {
-    if (room.cover_image) return getImageUrl(room.cover_image);
+    if (room.coverImage) return getImageUrl(room.coverImage);
     if (Array.isArray(room.images) && room.images.length > 0) return getImageUrl(room.images[0]);
     return "https://via.placeholder.com/400x300?text=No+Image";
   };
@@ -186,7 +186,7 @@ const RoomsList = () => {
 
   const images = Array.isArray(room.images) && room.images.length > 0
     ? room.images
-    : room.cover_image ? [room.cover_image] : [];
+    : room.coverImage ? [room.coverImage] : [];
      
   const [activeImgIndex, setActiveImgIndex] = useState(0);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -292,7 +292,7 @@ const RoomsList = () => {
             <div className="flex items-center justify-between w-full pr-[52px] text-[11px] font-bold">
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl">
                 <BedSingle size={16} className="text-slate-400" />
-                <span>{room.roomType || room.room_type}</span>
+                <span>{room.roomType}</span>
               </div>
               
               <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-xl">
@@ -596,7 +596,7 @@ const RoomsList = () => {
                   <p className={`min-w-0 flex-1 text-[9px] font-bold uppercase tracking-wide ${
                     room.available ? "text-slate-400" : "text-slate-300"
                   }`}>
-                    {room.roomType || room.room_type || room.type}
+                    {room.roomType || room.type}
                   </p>
                   <span className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
                     !room.available ? "text-slate-300" : "text-slate-500"
@@ -697,3 +697,5 @@ const RoomsList = () => {
 };
 
 export default RoomsList;
+
+

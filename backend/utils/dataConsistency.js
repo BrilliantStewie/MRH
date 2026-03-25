@@ -88,19 +88,15 @@ export const serializeRoom = (roomDoc) => {
   const roomTypeDoc = isPlainObject(room.roomTypeId) ? room.roomTypeId : null;
   const building = room.building || buildingDoc?.name || "";
   const roomType = room.roomType || roomTypeDoc?.name || "";
-  const coverImage = room.coverImage || room.cover_image || room.images?.[0] || "";
+  const coverImage = room.coverImage || room.images?.[0] || "";
 
   return {
     ...room,
     buildingId: extractRefId(room.buildingId),
-    building_id: extractRefId(room.buildingId),
     building,
     roomTypeId: extractRefId(room.roomTypeId),
-    room_type_id: extractRefId(room.roomTypeId),
     roomType,
-    room_type: roomType,
     coverImage,
-    cover_image: coverImage,
   };
 };
 
@@ -115,7 +111,6 @@ export const serializePackage = (packageDoc) => {
   return {
     ...roomPackage,
     roomTypeId: extractRefId(roomPackage.roomTypeId),
-    room_type_id: extractRefId(roomPackage.roomTypeId),
     roomType: roomTypeDoc || roomPackage.roomType || null,
   };
 };
@@ -135,12 +130,12 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   const booking = toPlainObject(bookingDoc);
   const review = reviewDoc ? toPlainObject(reviewDoc) : null;
   const user = isPlainObject(booking.userId) ? serializeUser(booking.userId) : booking.userId;
-  const extraPackages = (booking.extraPackages || booking.extra_packages || []).map((pkg) =>
+  const extraPackages = (booking.extraPackages || []).map((pkg) =>
     isPlainObject(pkg) ? serializePackage(pkg) : pkg
   );
   const bookingItems = (booking.bookingItems || []).map((item) => {
-    const roomValue = item.roomId || item.room_id || null;
-    const packageValue = item.packageId || item.package_id || null;
+    const roomValue = item.roomId || null;
+    const packageValue = item.packageId || null;
     const serializedRoom = isPlainObject(roomValue) ? serializeRoom(roomValue) : roomValue;
     const serializedPackage = isPlainObject(packageValue)
       ? serializePackage(packageValue)
@@ -149,9 +144,7 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
     return {
       ...item,
       roomId: serializedRoom,
-      room_id: serializedRoom,
       packageId: serializedPackage,
-      package_id: serializedPackage,
     };
   });
 
@@ -166,16 +159,11 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   return {
     ...booking,
     userId: user,
-    user_id: user,
     bookingItems,
     extraPackages,
-    extra_packages: extraPackages,
-    checkIn: booking.checkIn || booking.check_in || null,
-    checkOut: booking.checkOut || booking.check_out || null,
-    check_in: booking.check_in || booking.checkIn || null,
-    check_out: booking.check_out || booking.checkOut || null,
-    totalPrice: booking.totalPrice ?? booking.total_price ?? 0,
-    total_price: booking.total_price ?? booking.totalPrice ?? 0,
+    checkIn: booking.checkIn || null,
+    checkOut: booking.checkOut || null,
+    totalPrice: booking.totalPrice ?? 0,
     rating,
     review: comment,
     comment,
@@ -198,9 +186,7 @@ export const serializeReview = (reviewDoc) => {
   return {
     ...review,
     userId: serializedUser,
-    user_id: serializedUser,
     bookingId: serializedBooking,
-    booking_id: serializedBooking,
   };
 };
 
@@ -245,3 +231,5 @@ export const buildBookingPopulate = () => [
     populate: packageReferencePopulate,
   },
 ];
+
+

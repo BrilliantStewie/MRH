@@ -89,19 +89,19 @@ const Reviews = () => {
               <div className="p-5 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm">
-                    {item.user_id?.image ? (
-                        <img src={item.user_id.image} alt="" className="w-full h-full object-cover rounded-2xl" />
+                    {item.userId?.image ? (
+                        <img src={item.userId.image} alt="" className="w-full h-full object-cover rounded-2xl" />
                     ) : (
-                        item.user_id?.name?.[0] || <User size={20} />
+                        item.userId?.name?.[0] || <User size={20} />
                     )}
                   </div>
                   <div>
-                    <p className="font-bold text-slate-800 leading-tight">{item.user_id?.name || "Guest"}</p>
+                    <p className="font-bold text-slate-800 leading-tight">{item.userId?.name || "Guest"}</p>
                     <div className="flex items-center gap-2 mt-1">
                         <Home size={12} className="text-indigo-500" />
                         <span className="text-xs text-slate-500 font-medium">
                             {/* ✅ Displays rooms booked as populated in staffController.js */}
-                            {item.room_ids?.map(r => r.name).join(", ") || "No room info"}
+                            {item.roomIds?.map(r => r.name).join(", ") || "No room info"}
                         </span>
                     </div>
                   </div>
@@ -113,7 +113,7 @@ const Reviews = () => {
                     ))}
                   </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Check-in: {new Date(item.check_in).toLocaleDateString()}
+                    Check-in: {new Date(item.checkIn).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -192,3 +192,4 @@ const Reviews = () => {
 };
 
 export default Reviews;
+

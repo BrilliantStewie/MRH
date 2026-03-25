@@ -6,14 +6,12 @@ const bookingItemSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Room",
       required: true,
-      alias: "room_id",
     },
 
     packageId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Package",
       required: true,
-      alias: "package_id",
     },
 
     participants: {
@@ -41,7 +39,6 @@ const bookingSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      alias: "user_id",
     },
 
     bookingName: {
@@ -64,7 +61,6 @@ const bookingSchema = new mongoose.Schema(
         },
       ],
       default: [],
-      alias: "extra_packages",
     },
 
     venueParticipants: {
@@ -76,20 +72,17 @@ const bookingSchema = new mongoose.Schema(
     checkIn: {
       type: Date,
       required: true,
-      alias: "check_in",
     },
 
     checkOut: {
       type: Date,
       required: true,
-      alias: "check_out",
     },
 
     totalPrice: {
       type: Number,
       required: true,
       min: 0,
-      alias: "total_price",
     },
 
     status: {

@@ -18,7 +18,6 @@ const packageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "RoomType",
       default: null,
-      alias: "room_type_id",
       validate: {
         validator(value) {
           const normalizedType = String(this.packageType || "").trim().toLowerCase();

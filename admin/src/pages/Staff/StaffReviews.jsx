@@ -246,7 +246,7 @@ const StaffReviews = () => {
   const handleSendReply = async (reviewId, parentReplyId = null) => {
     const message = replyText[reviewId];
 
-    if (!message || message.trim() === "") {
+    if (!message.trim() === "") {
       return toast.warning("Please type a response first.");
     }
 
@@ -628,7 +628,7 @@ const StaffReviews = () => {
                           <h3 className="font-bold text-slate-900 text-[17px] leading-tight">{formatName(review.userId, "guest")}</h3>
                           <div className="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold text-slate-500">
                             <span className="flex items-center gap-1">
-                              <Calendar size={11} /> {formatStayDate(booking?.check_in, booking?.check_out)}
+                              <Calendar size={11} /> {formatStayDate(booking?.checkIn, booking?.checkOut)}
                             </span>
                           </div>
                         </div>
@@ -984,7 +984,7 @@ const StaffReviews = () => {
                                         )}
                                         
                                         <div className="mt-2 flex justify-start items-center">
-                                          {(!activeReplyId || activeReplyId !== parentChat._id) && (
+                                          {(!activeReplyId !== parentChat._id) && (
                                             <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-all hover:bg-blue-50 px-2 py-1 rounded-md -ml-2">
                                               <Reply size={14} /> Reply
                                             </button>
@@ -1186,3 +1186,5 @@ const StaffReviews = () => {
 };
 
 export default StaffReviews;
+
+

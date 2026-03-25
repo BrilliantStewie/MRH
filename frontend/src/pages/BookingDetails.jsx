@@ -87,7 +87,7 @@ const MyBookings = () => {
                         <div className="flex-grow">
                             <h3 className="font-bold text-lg mb-2">Booking #{booking._id.slice(-6)}</h3>
                             <div className="flex items-center gap-4 text-sm text-slate-500">
-                                <span className="flex items-center gap-1"><CalendarDays size={14}/> {new Date(booking.check_in).toLocaleDateString()}</span>
+                                <span className="flex items-center gap-1"><CalendarDays size={14}/> {new Date(booking.checkIn).toLocaleDateString()}</span>
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase ${
                                     booking.status === 'confirmed' ? 'bg-green-100 text-green-700' : 
                                     booking.status === 'cancelled' ? 'bg-red-100 text-red-700' :
@@ -122,3 +122,4 @@ const MyBookings = () => {
 };
 
 export default MyBookings;
+
