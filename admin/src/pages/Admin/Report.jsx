@@ -230,22 +230,12 @@ const filterBookingsByReport = (bookings, reportType, reportMonth, reportYear) =
 const summarizePeriodBookings = (bookings) =>
   bookings.reduce(
     (accumulator, booking) => {
-      const normalizedStatus = normalizeStatus(booking?.status);
       const amount = getBookingAmount(booking);
 
       accumulator.totalBookings += 1;
       accumulator.totalParticipants += getBookingParticipants(booking);
       accumulator.totalRoomsBooked += getBookingRooms(booking).length;
-      accumulator.totalAmount += amount;
-
-      if (normalizedStatus === "approved") accumulator.approvedCount += 1;
-      if (normalizedStatus === "pending") accumulator.pendingCount += 1;
-      if (normalizedStatus === "cancellation_pending") accumulator.cancellationPendingCount += 1;
-      if (normalizedStatus === "declined") accumulator.declinedCount += 1;
-      if (normalizedStatus === "cancelled") accumulator.cancelledCount += 1;
-
       if (isPaidBooking(booking)) {
-        accumulator.paidCount += 1;
         accumulator.totalIncome += amount;
       }
 
@@ -263,14 +253,7 @@ const summarizePeriodBookings = (bookings) =>
       totalBookings: 0,
       totalParticipants: 0,
       totalRoomsBooked: 0,
-      totalAmount: 0,
       totalIncome: 0,
-      approvedCount: 0,
-      pendingCount: 0,
-      cancellationPendingCount: 0,
-      declinedCount: 0,
-      cancelledCount: 0,
-      paidCount: 0,
       cashCount: 0,
       gcashCount: 0,
     }
@@ -890,14 +873,7 @@ const Report = () => {
       totalBookings: Number(liveReportData.totalBookings || 0),
       totalParticipants: Number(liveReportData.totalParticipants || 0),
       totalRoomsBooked: Number(liveReportData.totalRoomsBooked || 0),
-      totalAmount: Number(liveReportData.grossBookingValue || 0),
       totalIncome: Number(liveReportData.totalIncome || 0),
-      approvedCount: Number(liveReportData.approvedCount || 0),
-      pendingCount: Number(liveReportData.pendingCount || 0),
-      cancellationPendingCount: Number(liveReportData.cancellationPendingCount || 0),
-      declinedCount: Number(liveReportData.declinedCount || 0),
-      cancelledCount: Number(liveReportData.cancelledCount || 0),
-      paidCount: Number(liveReportData.paidBookings || 0),
     };
   }, [liveReportData]);
 
@@ -910,14 +886,7 @@ const Report = () => {
       totalBookings: Number(currentStoredReport.totalBookings || 0),
       totalParticipants: Number(currentStoredReport.totalParticipants || 0),
       totalRoomsBooked: Number(currentStoredReport.totalRoomsBooked || 0),
-      totalAmount: Number(currentStoredReport.grossBookingValue || 0),
       totalIncome: Number(currentStoredReport.totalIncome || 0),
-      approvedCount: Number(currentStoredReport.approvedCount || 0),
-      pendingCount: Number(currentStoredReport.pendingCount || 0),
-      cancellationPendingCount: Number(currentStoredReport.cancellationPendingCount || 0),
-      declinedCount: Number(currentStoredReport.declinedCount || 0),
-      cancelledCount: Number(currentStoredReport.cancelledCount || 0),
-      paidCount: Number(currentStoredReport.paidBookings || 0),
     };
   }, [currentStoredReport, liveReportSummary, reportSummary]);
 
@@ -977,37 +946,6 @@ const Report = () => {
   );
   const hasChartData = chartData.some((entry) => entry.value > 0);
   const chartBarColor = chartMode === "booking" ? BOOKING_BAR_COLOR : INCOME_BAR_COLOR;
-
-  const bookingStatusItems = useMemo(
-    () => [
-      { label: "Approved", value: activeReportSummary.approvedCount, color: "#34d399" },
-      {
-        label: "Pending",
-        value: activeReportSummary.pendingCount + activeReportSummary.cancellationPendingCount,
-        color: "#f59e0b",
-      },
-      {
-        label: "Cancelled",
-        value: activeReportSummary.cancelledCount + activeReportSummary.declinedCount,
-        color: "#94a3b8",
-      },
-    ],
-    [activeReportSummary]
-  );
-
-  const pdfBookingStatusRows = useMemo(
-    () => [
-      {
-        label: "Approved",
-        value: formatCount(activeReportSummary.approvedCount),
-      },
-      {
-        label: "Cancelled",
-        value: formatCount(activeReportSummary.cancelledCount + activeReportSummary.declinedCount),
-      },
-    ],
-    [activeReportSummary.approvedCount, activeReportSummary.cancelledCount, activeReportSummary.declinedCount]
-  );
 
   const pdfReportDetailRows = useMemo(
     () => [
@@ -1302,15 +1240,7 @@ const Report = () => {
               }
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <PdfKeyValueTable
-                title="Booking Status"
-                detail="Counts by status for the selected period"
-                labelHeader="Status"
-                valueHeader="Count"
-                rows={pdfBookingStatusRows}
-              />
-
+            <div className="grid grid-cols-1 gap-3">
               <PdfKeyValueTable
                 title="Report Details"
                 detail="Coverage and generation details"

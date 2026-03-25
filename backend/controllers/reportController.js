@@ -149,7 +149,6 @@ const isPaidBooking = (booking) =>
 const summarizeBookings = (bookings) =>
   bookings.reduce(
     (summary, booking) => {
-      const status = String(booking?.status || "").trim().toLowerCase();
       const totalPrice = Number(booking?.totalPrice || 0);
 
       summary.totalBookings += 1;
@@ -157,24 +156,8 @@ const summarizeBookings = (bookings) =>
       summary.totalRoomsBooked += Array.isArray(booking?.bookingItems)
         ? booking.bookingItems.length
         : 0;
-      summary.grossBookingValue += totalPrice;
-
-      if (status === "approved") {
-        summary.approvedCount += 1;
-        summary.approvedBookings += 1;
-      } else if (status === "pending") {
-        summary.pendingCount += 1;
-      } else if (status === "declined") {
-        summary.declinedCount += 1;
-      } else if (status === "cancelled") {
-        summary.cancelledCount += 1;
-      } else if (status === "cancellation_pending") {
-        summary.cancellationPendingCount += 1;
-      }
-
       if (isPaidBooking(booking)) {
         summary.totalIncome += totalPrice;
-        summary.paidBookings += 1;
       }
 
       return summary;
@@ -184,14 +167,6 @@ const summarizeBookings = (bookings) =>
       totalParticipants: 0,
       totalRoomsBooked: 0,
       totalIncome: 0,
-      grossBookingValue: 0,
-      approvedCount: 0,
-      pendingCount: 0,
-      declinedCount: 0,
-      cancelledCount: 0,
-      cancellationPendingCount: 0,
-      approvedBookings: 0,
-      paidBookings: 0,
     }
   );
 
@@ -232,14 +207,6 @@ const serializeReport = (report, { includeBookingIds = false } = {}) => {
     totalParticipants: report.totalParticipants,
     totalRoomsBooked: report.totalRoomsBooked,
     totalIncome: report.totalIncome,
-    grossBookingValue: report.grossBookingValue,
-    approvedCount: report.approvedCount,
-    pendingCount: report.pendingCount,
-    declinedCount: report.declinedCount,
-    cancelledCount: report.cancelledCount,
-    cancellationPendingCount: report.cancellationPendingCount,
-    approvedBookings: report.approvedBookings,
-    paidBookings: report.paidBookings,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt,
   };
@@ -452,13 +419,23 @@ const generateAndStoreReport = async ({
     periodMonth: reportType === "monthly" ? periodMonth : null,
   };
 
-  const update = {
-    ...periodWindow,
-    bookingIds,
-    ...summary,
-  };
-
-  const report = await reportModel.findOneAndUpdate(filter, update, {
+  const report = await reportModel.findOneAndUpdate(filter, {
+    $set: {
+      ...periodWindow,
+      bookingIds,
+      ...summary,
+    },
+    $unset: {
+      approvedBookings: "",
+      approvedCount: "",
+      cancelledCount: "",
+      cancellationPendingCount: "",
+      declinedCount: "",
+      grossBookingValue: "",
+      pendingCount: "",
+      paidBookings: "",
+    },
+  }, {
     new: true,
     upsert: true,
     runValidators: true,
