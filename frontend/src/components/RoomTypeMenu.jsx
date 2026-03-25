@@ -225,7 +225,7 @@ const RoomTypeMenu = () => {
         image:
           featuredRoom?.coverImage ||
           featuredRoom?.images?.[0] ||
-          defaults?.imagetFallbackImage(roomType),
+          getFallbackImage(roomType),
         description:
           defaults?.description ||
           featuredRoom?.description ||
