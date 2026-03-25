@@ -20,6 +20,8 @@ import {
     roomReferencePopulate,
     serializeReview,
 } from "../utils/dataConsistency.js";
+import { createValidatedBooking } from "../utils/bookingService.js";
+import { getBookingReviewEligibility } from "../utils/bookingRules.js";
 
 // --- HELPERS ---
 const parseGoogleDisplayName = (value, fallbackFirst = "") => {
@@ -993,28 +995,21 @@ const updateUserProfile = async (req, res) => {
 const createBooking = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { roomId, packageId, checkIn, checkOut, participants, totalPrice, bookingName } = req.body;
-        
-        const bookingData = {
+        const { roomId, packageId, checkIn, checkOut, participants, bookingName } = req.body;
+
+        const newBooking = await createValidatedBooking({
             userId,
             bookingName: bookingName || "Room Booking",
             bookingItems: roomId && packageId ? [{
                 roomId,
                 packageId,
-                participants: Number(participants) || 1,
-                subtotal: Number(totalPrice) || 0
+                participants: Number(participants) || 1
             }] : [],
             extraPackages: [],
             venueParticipants: 0,
-            checkIn: new Date(checkIn),
-            checkOut: new Date(checkOut),
-            totalPrice,
-            payment: false,
-            paymentStatus: 'unpaid'
-        };
-
-        const newBooking = new bookingModel(bookingData);
-        await newBooking.save();
+            checkIn,
+            checkOut
+        });
 
         const user = await userModel.findById(userId);
         if (user) {
@@ -1025,8 +1020,8 @@ const createBooking = async (req, res) => {
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                         <p>Hello ${user.firstName},</p>
                         <p>Your booking request was received.</p>
-                        <p>Check-in: ${new Date(checkIn).toLocaleDateString()}</p>
-                        <p>Total: PHP ${totalPrice}</p>
+                        <p>Check-in: ${new Date(newBooking.checkIn).toLocaleDateString()}</p>
+                        <p>Total: PHP ${newBooking.totalPrice}</p>
                         <p>Status: Pending approval</p>
                         <p>Mercedarian Retreat House</p>
                     </div>
@@ -1367,6 +1362,11 @@ const rateBooking = async (req, res) => {
 
         if (String(booking.userId) !== String(userId)) {
             return res.json({ success: false, message: "Unauthorized booking access" });
+        }
+
+        const reviewEligibility = getBookingReviewEligibility(booking);
+        if (!reviewEligibility.eligible) {
+            return res.json({ success: false, message: reviewEligibility.message });
         }
 
         if (!normalizedRating || normalizedRating < 1 || normalizedRating > 5) {

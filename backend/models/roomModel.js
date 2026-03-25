@@ -54,6 +54,18 @@ const roomSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    bookingLockToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    bookingLockExpiresAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
   },
   {
     timestamps: true,

@@ -195,29 +195,61 @@ const summarizeBookings = (bookings) =>
     }
   );
 
-const serializeReport = (report) => ({
-  id: report._id,
-  reportType: report.reportType,
-  label: report.label,
-  periodMonth: report.periodMonth,
-  periodYear: report.periodYear,
-  periodStart: report.periodStart,
-  periodEnd: report.periodEnd,
-  totalBookings: report.totalBookings,
-  totalParticipants: report.totalParticipants,
-  totalRoomsBooked: report.totalRoomsBooked,
-  totalIncome: report.totalIncome,
-  grossBookingValue: report.grossBookingValue,
-  approvedCount: report.approvedCount,
-  pendingCount: report.pendingCount,
-  declinedCount: report.declinedCount,
-  cancelledCount: report.cancelledCount,
-  cancellationPendingCount: report.cancellationPendingCount,
-  approvedBookings: report.approvedBookings,
-  paidBookings: report.paidBookings,
-  createdAt: report.createdAt,
-  updatedAt: report.updatedAt,
-});
+const extractBookingIds = (bookings) => {
+  const seenBookingIds = new Set();
+
+  return bookings.reduce((bookingIds, booking) => {
+    const bookingId = booking?._id;
+    if (!bookingId) return bookingIds;
+
+    const bookingIdKey = String(bookingId);
+    if (seenBookingIds.has(bookingIdKey)) return bookingIds;
+
+    seenBookingIds.add(bookingIdKey);
+    bookingIds.push(bookingId);
+    return bookingIds;
+  }, []);
+};
+
+const serializeBookingIds = (bookingIds) =>
+  Array.isArray(bookingIds)
+    ? bookingIds.map((bookingId) => String(bookingId))
+    : [];
+
+const serializeReport = (report, { includeBookingIds = false } = {}) => {
+  const bookingIds = serializeBookingIds(report?.bookingIds);
+
+  const serializedReport = {
+    id: report._id,
+    reportType: report.reportType,
+    label: report.label,
+    periodMonth: report.periodMonth,
+    periodYear: report.periodYear,
+    periodStart: report.periodStart,
+    periodEnd: report.periodEnd,
+    bookingCount: bookingIds.length,
+    totalBookings: report.totalBookings,
+    totalParticipants: report.totalParticipants,
+    totalRoomsBooked: report.totalRoomsBooked,
+    totalIncome: report.totalIncome,
+    grossBookingValue: report.grossBookingValue,
+    approvedCount: report.approvedCount,
+    pendingCount: report.pendingCount,
+    declinedCount: report.declinedCount,
+    cancelledCount: report.cancelledCount,
+    cancellationPendingCount: report.cancellationPendingCount,
+    approvedBookings: report.approvedBookings,
+    paidBookings: report.paidBookings,
+    createdAt: report.createdAt,
+    updatedAt: report.updatedAt,
+  };
+
+  if (includeBookingIds) {
+    serializedReport.bookingIds = bookingIds;
+  }
+
+  return serializedReport;
+};
 
 const buildQueryWindow = (startDate, endDate) => {
   const start = new Date(startDate);
@@ -242,7 +274,7 @@ const fetchBookingsWithinWindow = async (start, end) => {
         $lte: end,
       },
     })
-    .select("bookingItems venueParticipants totalPrice status payment paymentStatus checkIn")
+    .select("_id bookingItems venueParticipants totalPrice status payment paymentStatus checkIn")
     .lean();
 
   return bookings.filter((booking) => {
@@ -373,6 +405,7 @@ const buildReportDataPayload = async ({ reportType, periodYear, periodMonth = nu
     periodWindow.periodStart,
     periodWindow.periodEnd
   );
+  const bookingIds = extractBookingIds(periodBookings);
   const summary = summarizeBookings(periodBookings);
   const historicalWindow = getHistoricalTrendWindow(reportType, periodYear, periodMonth);
   const historicalBookings = await fetchBookingsWithinWindow(
@@ -388,6 +421,7 @@ const buildReportDataPayload = async ({ reportType, periodYear, periodMonth = nu
 
   return {
     periodWindow,
+    bookingIds,
     summary,
     historicalTrend,
     periodTrend:
@@ -406,7 +440,7 @@ const generateAndStoreReport = async ({
   periodYear,
   periodMonth = null,
 }) => {
-  const { periodWindow, summary } = await buildReportDataPayload({
+  const { periodWindow, bookingIds, summary } = await buildReportDataPayload({
     reportType,
     periodYear,
     periodMonth,
@@ -420,6 +454,7 @@ const generateAndStoreReport = async ({
 
   const update = {
     ...periodWindow,
+    bookingIds,
     ...summary,
   };
 
@@ -466,7 +501,7 @@ const getReportData = async (req, res) => {
     const totalRooms = await roomModel.countDocuments();
 
     if (!startDate || !endDate) {
-      const { summary, historicalTrend, periodTrend } = await buildReportDataPayload({
+      const { bookingIds, summary, historicalTrend, periodTrend } = await buildReportDataPayload({
         reportType: fallbackType,
         periodYear: fallbackYear,
         periodMonth: fallbackMonth,
@@ -478,6 +513,7 @@ const getReportData = async (req, res) => {
           startDate: start,
           endDate: end,
         },
+        bookingCount: bookingIds.length,
         ...summary,
         historicalTrend,
         periodTrend,
@@ -487,6 +523,7 @@ const getReportData = async (req, res) => {
     }
 
     const bookings = await fetchBookingsWithinWindow(start, end);
+    const bookingIds = extractBookingIds(bookings);
     const summary = summarizeBookings(bookings);
 
     return res.json({
@@ -495,6 +532,7 @@ const getReportData = async (req, res) => {
         startDate: start,
         endDate: end,
       },
+      bookingCount: bookingIds.length,
       ...summary,
       historicalTrend: null,
       periodTrend: null,
@@ -572,7 +610,7 @@ const generateReport = async (req, res) => {
     return res.json({
       success: true,
       message: "Report generated successfully",
-      report: serializeReport(report),
+      report: serializeReport(report, { includeBookingIds: true }),
     });
   } catch (error) {
     return res.status(400).json({

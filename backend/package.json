@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
     "server": "nodemon server.js",
-    "migrate:db-consistency": "node scripts/migrateDatabaseConsistency.js"
+    "migrate:db-consistency": "node scripts/migrateDatabaseConsistency.js",
+    "migrate:report-booking-refs": "node scripts/migrateReportBookingRefs.js"
   },
   "author": "",
   "license": "ISC",

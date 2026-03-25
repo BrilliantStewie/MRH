@@ -32,6 +32,15 @@ const reportSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    bookingIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Booking",
+        },
+      ],
+      default: [],
+    },
     totalBookings: {
       type: Number,
       required: true,
@@ -121,6 +130,17 @@ reportSchema.pre("validate", function handlePeriodMonth(next) {
     return next(new Error("periodMonth is required for monthly reports"));
   }
 
+  if (Array.isArray(this.bookingIds)) {
+    const seenBookingIds = new Set();
+    this.bookingIds = this.bookingIds.filter((bookingId) => {
+      if (!bookingId) return false;
+      const bookingIdKey = String(bookingId);
+      if (seenBookingIds.has(bookingIdKey)) return false;
+      seenBookingIds.add(bookingIdKey);
+      return true;
+    });
+  }
+
   next();
 });
 
@@ -128,6 +148,7 @@ reportSchema.index(
   { reportType: 1, periodYear: 1, periodMonth: 1 },
   { unique: true }
 );
+reportSchema.index({ bookingIds: 1 });
 
 const Report =
   mongoose.models.Report || mongoose.model("Report", reportSchema);

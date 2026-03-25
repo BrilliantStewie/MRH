@@ -615,7 +615,7 @@ const MyBookings = () => {
                 !isPaid &&
                 !isCash &&
                 booking.paymentMethod !== "gcash";
-              const canRate = isApproved && (isPaid || isCash) && hasPassed && !booking.rating;
+              const canRate = isApproved && hasPassed && !booking.rating;
               const hasRated = booking.rating > 0;
 
               // Logic: Show cancel button if not passed, not already cancelled/declined, and not already pending admin review

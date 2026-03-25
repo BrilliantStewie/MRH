@@ -1,34 +1,17 @@
 import bookingModel from "../models/bookingModel.js";
-import packageModel from "../models/packageModel.js";
-import roomModel from "../models/roomModel.js";
 import Review from "../models/reviewModel.js";
 import { createOrRefreshNotifications } from "../utils/notificationUtils.js";
 import {
   attachReviewDataToBookings,
   buildBookingPopulate,
 } from "../utils/dataConsistency.js";
-
-/* ======================================================
-   HELPER: Normalize Date
-====================================================== */
-
-const normalizeDate = (date)=>{
-const d = new Date(date);
-d.setHours(0,0,0,0);
-return d;
-};
-
-const addDays = (date, days) => {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-};
-
-const rangesOverlap = (startA, endA, startB, endB) => startA <= endB && endA >= startB;
-const isRoomPackageType = (value) =>
-  String(value || "").trim().toLowerCase() === "room package";
-const isVenuePackageType = (value) =>
-  String(value || "").trim().toLowerCase() === "venue package";
+import { createValidatedBooking } from "../utils/bookingService.js";
+import {
+  addDays,
+  getBookingReviewEligibility,
+  normalizeDate,
+  rangesOverlap,
+} from "../utils/bookingRules.js";
 
 /* ======================================================
    CREATE BOOKING
@@ -39,201 +22,15 @@ try{
 
 const userId = req.userId;
 
- const {
-  bookingName,
-  bookingItems = [],
-  checkIn: providedCheckIn,
-  checkOut: providedCheckOut,
-  venueParticipants = 0,
-  extraPackages: providedExtraPackages
- } = req.body;
-
- const checkIn = providedCheckIn;
- const checkOut = providedCheckOut;
- const extraPackagesInput = providedExtraPackages || [];
- const normalizedBookingItems = Array.isArray(bookingItems)
-   ? bookingItems.map((item) => ({
-       ...item,
-       roomId: item.roomId,
-       packageId: item.packageId,
-       participants: Number(item.participants || 0)
-     }))
-    : [];
-
- if(!normalizedBookingItems.length && Number(venueParticipants) <= 0)
-  return res.json({success:false,message:"Please add room selection or venue participants"});
-  
- const extraPackages = Array.isArray(extraPackagesInput) ? extraPackagesInput : [];
- const uniqueRooms = [...new Set(normalizedBookingItems.map((item) => String(item.roomId || "")).filter(Boolean))];
- const uniquePackages = [...new Set(normalizedBookingItems.map((item) => String(item.packageId || "")).filter(Boolean))];
- const uniqueExtraPackages = [...new Set(extraPackages.map((item) => String(item || "")).filter(Boolean))];
-
- if (uniqueRooms.length !== normalizedBookingItems.length) {
-   return res.json({ success: false, message: "Duplicate rooms are not allowed in one booking" });
- }
-
- const [roomDocs, packageDocs, extraPackageDocs] = await Promise.all([
-   uniqueRooms.length
-     ? roomModel.find({ _id: { $in: uniqueRooms } }).select("_id roomTypeId capacity available")
-     : Promise.resolve([]),
-   uniquePackages.length
-     ? packageModel.find({ _id: { $in: uniquePackages } }).select("_id packageType roomTypeId price")
-     : Promise.resolve([]),
-   uniqueExtraPackages.length
-     ? packageModel.find({ _id: { $in: uniqueExtraPackages } }).select("_id packageType roomTypeId price")
-     : Promise.resolve([]),
- ]);
-
- if (roomDocs.length !== uniqueRooms.length) {
-   return res.json({ success: false, message: "One or more selected rooms are invalid" });
- }
-
- if (packageDocs.length !== uniquePackages.length) {
-   return res.json({ success: false, message: "Invalid package selected" });
- }
-
- if (extraPackageDocs.length !== uniqueExtraPackages.length) {
-   return res.json({ success: false, message: "Invalid package selected" });
- }
-
- const roomById = new Map(roomDocs.map((room) => [String(room._id), room]));
- const packageById = new Map(packageDocs.map((pkg) => [String(pkg._id), pkg]));
-
- for (const item of normalizedBookingItems) {
-   if (!item.roomId || !item.packageId || !item.participants) {
-     return res.json({ success: false, message: "Each room selection must include a room, package, and participants" });
-   }
-
-   const room = roomById.get(String(item.roomId));
-   const pkg = packageById.get(String(item.packageId));
-
-   if (!room || room.available === false) {
-     return res.json({ success: false, message: "One or more selected rooms are unavailable" });
-   }
-
-   if (!pkg || !isRoomPackageType(pkg.packageType)) {
-     return res.json({ success: false, message: "Each selected room must use a valid room package" });
-   }
-
-   if (String(pkg.roomTypeId || "") !== String(room.roomTypeId || "")) {
-     return res.json({ success: false, message: "Selected package does not match the room type" });
-   }
-
-   if (Number(item.participants) > Number(room.capacity || 0)) {
-     return res.json({ success: false, message: "Selected participants exceed the room capacity" });
-   }
- }
-
- if (extraPackageDocs.some((pkg) => isRoomPackageType(pkg.packageType))) {
-   return res.json({
-     success: false,
-     message: "Room packages must be selected per room, not as extra packages"
-   });
- }
-
- if (!normalizedBookingItems.length) {
-   if (!extraPackageDocs.length) {
-     return res.json({ success: false, message: "Please select a venue retreat package" });
-   }
-   const hasVenuePackage = extraPackageDocs.some((pkg) => isVenuePackageType(pkg.packageType));
-   if (!hasVenuePackage) {
-     return res.json({ success: false, message: "Please select a venue retreat package" });
-   }
- }
-
-/* ---------- NORMALIZE DATES ---------- */
-
-const start=normalizeDate(checkIn);
-const end=normalizeDate(checkOut);
-const today=normalizeDate(new Date());
-
-if(start < today)
-return res.json({success:false,message:"Past dates not allowed"});
-
- if(end < start)
- return res.json({success:false,message:"Invalid date range"});
-
- if (end.getTime() === start.getTime() && normalizedBookingItems.length) {
-  return res.json({ success: false, message: "Rooms are not available for same-day bookings" });
- }
-
-  /* ---------- CHECK ROOM CONFLICT (WITH CLEANING DAY) ---------- */
-  if (normalizedBookingItems.length) {
-   const bookings = await bookingModel.find(
-     {
-        "bookingItems.roomId": { $in: uniqueRooms },
-        status: { $in: ["pending", "approved"] }
-     },
-     "checkIn checkOut bookingItems"
-    );
-
-    const conflict = bookings.some((booking) => {
-      const existingStart = normalizeDate(booking.checkIn);
-      const existingEnd = normalizeDate(booking.checkOut);
-      const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
-      return rangesOverlap(existingStart, cleaningEnd, start, end);
-    });
-
-   if (conflict) {
-     return res.json({
-       success: false,
-       message: "One or more selected rooms are already booked (includes cleaning day)"
-     });
-   }
- }
-
-/* ---------- CALCULATE PRICE ---------- */
-
-const days = Math.ceil((end-start)/(1000*60*60*24)) || 1;
-
- let totalPrice = 0;
-
-  for (const item of normalizedBookingItems){
-
- const pkg = packageById.get(String(item.packageId));
-
- if(!pkg)
-  return res.json({success:false,message:"Invalid package selected"});
-
- const subtotal = pkg.price * item.participants * days;
-
- item.subtotal = subtotal;
-
- totalPrice += subtotal;
-
- }
-
- if (extraPackageDocs.length) {
-   const participantsForExtras = normalizedBookingItems.length
-     ? normalizedBookingItems.reduce((sum, item) => sum + Number(item.participants || 0), 0)
-     : Number(venueParticipants) || 0;
- 
-   for (const pkg of extraPackageDocs) {
-      totalPrice += pkg.price * participantsForExtras * days;
-   }
- }
-
-/* ---------- CREATE BOOKING ---------- */
-
-const booking = await bookingModel.create({
-
-userId,
- bookingName: String(bookingName || "").trim() || "Reservation",
- 
-  bookingItems: normalizedBookingItems,
-  extraPackages: uniqueExtraPackages,
-   venueParticipants: Number(venueParticipants) || 0,
- 
-checkIn:start,
-checkOut:end,
- 
- totalPrice,
-
-status:"pending",
-payment:false,
-paymentStatus:"unpaid"
-
-});
+ const booking = await createValidatedBooking({
+  userId,
+  bookingName: req.body.bookingName,
+  bookingItems: req.body.bookingItems || [],
+  checkIn: req.body.checkIn,
+  checkOut: req.body.checkOut,
+  venueParticipants: req.body.venueParticipants || 0,
+  extraPackages: req.body.extraPackages || [],
+ });
 
 /* ---------- NOTIFY ADMINS ---------- */
 
@@ -243,7 +40,7 @@ const notifications = recipients.map(user=>({
 recipient:user._id,
 sender:userId,
 type:"booking_update",
-message:`Booking request received: ${bookingName}`,
+message:`Booking request received: ${booking.bookingName || "Reservation"}`,
 link:`/admin/bookings?bookingId=${booking._id}`,
 isRead:false
 }));
@@ -421,6 +218,11 @@ return res.json({success:false,message:"Booking not found"});
 
 if(String(booking.userId) !== String(req.userId))
 return res.json({success:false,message:"Unauthorized"});
+
+const reviewEligibility = getBookingReviewEligibility(booking);
+
+if (!reviewEligibility.eligible)
+return res.json({success:false,message:reviewEligibility.message});
 
 if (!normalizedRating || normalizedRating < 1 || normalizedRating > 5)
 return res.json({success:false,message:"Please provide a rating between 1 and 5"});

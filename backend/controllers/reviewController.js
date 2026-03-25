@@ -11,6 +11,7 @@ import {
   roomReferencePopulate,
   serializeReview,
 } from "../utils/dataConsistency.js";
+import { getBookingReviewEligibility } from "../utils/bookingRules.js";
 
 const uploadReviewImage = (fileBuffer, folder = "mrh_reviews") =>
   new Promise((resolve, reject) => {
@@ -96,6 +97,8 @@ export const createReview = async (req, res) => {
   const { bookingId, rating, comment } = req.body;
   const userId = req.userId;
   const imageFiles = Array.isArray(req.files) ? req.files : [];
+  const normalizedRating = Number(rating);
+  const normalizedComment = String(comment || "").trim();
 
   if (!userId) {
     return res.status(401).json({
@@ -119,6 +122,28 @@ export const createReview = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: "You can only review your own stay."
+      });
+    }
+
+    const reviewEligibility = getBookingReviewEligibility(booking);
+    if (!reviewEligibility.eligible) {
+      return res.status(400).json({
+        success: false,
+        message: reviewEligibility.message
+      });
+    }
+
+    if (!normalizedRating || normalizedRating < 1 || normalizedRating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a rating between 1 and 5."
+      });
+    }
+
+    if (!normalizedComment) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a review comment."
       });
     }
 
@@ -160,8 +185,8 @@ export const createReview = async (req, res) => {
             JSON.stringify(sanitizeImageList(existingReview.images || [])));
 
       const isChanged =
-        existingReview.rating !== Number(rating) ||
-        existingReview.comment !== comment ||
+        existingReview.rating !== normalizedRating ||
+        existingReview.comment !== normalizedComment ||
         imagesChanged;
 
       if (isChanged) {
@@ -172,8 +197,8 @@ export const createReview = async (req, res) => {
           editedAt: new Date()
         });
 
-        existingReview.rating = Number(rating);
-        existingReview.comment = comment;
+        existingReview.rating = normalizedRating;
+        existingReview.comment = normalizedComment;
         if (imagesChanged) {
           existingReview.images = finalImages;
         }
@@ -199,8 +224,8 @@ export const createReview = async (req, res) => {
     const newReview = new Review({
       bookingId,
       userId,
-      rating: Number(rating),
-      comment,
+      rating: normalizedRating,
+      comment: normalizedComment,
       images: uploadedImages,
       isHidden: false
     });
@@ -213,7 +238,7 @@ export const createReview = async (req, res) => {
       recipient: user._id,
       sender: userId,
       type: "new_review",
-      message: `New ${rating}-star review received.`,
+      message: `New ${normalizedRating}-star review received.`,
       link: `/admin/reviews?reviewId=${newReview._id}`,
       isRead: false
     }));
@@ -248,6 +273,8 @@ export const editReview = async (req, res) => {
     const { comment, rating } = req.body;
     const userId = req.userId;
     const imageFiles = Array.isArray(req.files) ? req.files : [];
+    const normalizedComment = typeof comment === "undefined" ? undefined : String(comment).trim();
+    const normalizedRating = typeof rating === "undefined" ? undefined : Number(rating);
 
     const review = await Review.findById(reviewId);
 
@@ -269,6 +296,20 @@ export const editReview = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "You can upload up to 6 images per review."
+      });
+    }
+
+    if (typeof normalizedRating !== "undefined" && (!normalizedRating || normalizedRating < 1 || normalizedRating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a rating between 1 and 5."
+      });
+    }
+
+    if (typeof normalizedComment !== "undefined" && !normalizedComment) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a review comment."
       });
     }
 
@@ -302,12 +343,12 @@ export const editReview = async (req, res) => {
       editedAt: new Date()
     });
 
-    if (typeof comment !== "undefined") {
-      review.comment = comment;
+    if (typeof normalizedComment !== "undefined") {
+      review.comment = normalizedComment;
     }
 
-    if (rating) {
-      review.rating = Number(rating);
+    if (typeof normalizedRating !== "undefined") {
+      review.rating = normalizedRating;
     }
 
     if (imagesChanged) {
