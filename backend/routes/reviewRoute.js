@@ -13,6 +13,7 @@ import {
 
 import authUser from "../middlewares/authUser.js";
 import authAdmin from "../middlewares/authAdmin.js";
+import authAny from "../middlewares/authAny.js";
 import upload from "../middlewares/multer.js";
 
 const reviewRouter = express.Router();
@@ -22,7 +23,7 @@ const reviewRouter = express.Router();
 =========================== */
 
 // Anyone can view reviews
-reviewRouter.get("/all-reviews", getAllReviews);
+reviewRouter.get("/all-reviews", authAny, getAllReviews);
 reviewRouter.get("/admin/all-reviews", authAdmin, getAllReviewsAdmin);
 reviewRouter.patch("/toggle/:reviewId", authAdmin, toggleReviewVisibility);
 

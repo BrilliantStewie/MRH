@@ -41,8 +41,20 @@ const sanitizeImageList = (list) =>
     ? list.filter((img) => typeof img === "string" && img.trim())
     : [];
 
-const fetchSerializedReviews = async ({ includeHidden = false } = {}) => {
-  const query = includeHidden ? {} : { isHidden: false };
+const fetchSerializedReviews = async ({
+  includeHidden = false,
+  viewerUserId = null
+} = {}) => {
+  const query = includeHidden
+    ? {}
+    : viewerUserId
+      ? {
+          $or: [
+            { isHidden: false },
+            { isHidden: true, userId: viewerUserId }
+          ]
+        }
+      : { isHidden: false };
 
   const reviews = await Review.find(query)
     .populate("userId", "firstName middleName lastName image")
@@ -79,7 +91,9 @@ const fetchSerializedReviews = async ({ includeHidden = false } = {}) => {
 ============================================================ */
 export const getAllReviews = async (req, res) => {
   try {
-    const reviews = await fetchSerializedReviews();
+    const reviews = await fetchSerializedReviews({
+      viewerUserId: req.userId || null
+    });
 
     res.status(200).json({
       success: true,
@@ -681,7 +695,7 @@ export const toggleReviewVisibility = async (req, res) => {
       await createOrRefreshNotification({
         recipient: review.userId,
         type: "review_hidden",
-        message: "Review hidden by moderation.",
+        message: "Review hidden by Admin.",
         link: "/my-bookings",
         isRead: false
       });

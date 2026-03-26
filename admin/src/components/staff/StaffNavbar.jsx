@@ -141,8 +141,20 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
     });
   };
 
+  const getNotificationSenderName = (notification) => {
+    const sender = notification?.sender;
+    if (!sender || typeof sender !== "object") return "";
+
+    return [sender.firstName, sender.middleName, sender.lastName, sender.suffix]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" ");
+  };
+
   const getNotificationMeta = (notification) => {
     const rawMessage = notification?.message?.trim() || "";
+    const senderName = getNotificationSenderName(notification);
+    const reviewStars = rawMessage.match(/(\d+)-star/i)?.[1];
 
     switch (notification?.type) {
       case "booking_update": {
@@ -173,7 +185,9 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
       case "new_review":
         return {
           title: "New Review",
-          message: rawMessage || "A new review was posted.",
+          message: senderName
+            ? `${senderName} submitted${reviewStars ? ` a ${reviewStars}-star` : " a"} review.`
+            : rawMessage || "A new review was posted.",
           Icon: Star,
           link: "/staff-reviews",
           iconClass: notification?.isRead
@@ -183,7 +197,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
       case "review_hidden":
         return {
           title: "Review Hidden",
-          message: rawMessage || "A review was hidden by moderation.",
+          message: rawMessage || "A review was hidden by Admin.",
           Icon: AlertTriangle,
           link: "/staff-reviews",
           iconClass: notification?.isRead
@@ -193,7 +207,9 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
       case "new_reply":
         return {
           title: "Review Reply",
-          message: rawMessage || "A reply was added to a review.",
+          message: senderName
+            ? `${senderName} replied to a review.`
+            : rawMessage || "A reply was added to a review.",
           Icon: MessageSquare,
           link: "/staff-reviews",
           iconClass: notification?.isRead

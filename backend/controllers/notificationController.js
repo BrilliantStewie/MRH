@@ -12,6 +12,7 @@ export const getUserNotifications = async (req, res) => {
       recipient: userId,
       type: { $ne: "account_status" },
     })
+      .populate("sender", "firstName middleName lastName suffix role image")
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();

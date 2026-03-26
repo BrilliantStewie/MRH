@@ -4,26 +4,47 @@ const normalizeLink = (link) => String(link || "").trim();
 
 const normalizeMessage = (message) => String(message || "").trim();
 
-const buildNotificationKey = ({ recipient, type, message, link }) =>
-  `${String(recipient)}::${type}::${normalizeMessage(message)}::${normalizeLink(link)}`;
+const normalizeObjectIdLike = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    if (value._id) return String(value._id);
+    if (value.id) return String(value.id);
+  }
+  return String(value);
+};
+
+const buildStringFieldEmptyFilter = (field) => ({
+  $or: [{ [field]: "" }, { [field]: null }, { [field]: { $exists: false } }],
+});
+
+const buildObjectIdFieldEmptyFilter = (field) => ({
+  $or: [{ [field]: null }, { [field]: { $exists: false } }],
+});
+
+const buildNotificationKey = ({ recipient, sender, type, message, link }) =>
+  `${normalizeObjectIdLike(recipient)}::${normalizeObjectIdLike(sender)}::${type}::${normalizeMessage(message)}::${normalizeLink(link)}`;
 
 export const buildNotificationMatchFilter = ({
   recipient,
+  sender,
   type,
   message,
   link,
 }) => {
   const normalizedLink = normalizeLink(link);
+  const normalizedSender = normalizeObjectIdLike(sender);
 
   return {
-    recipient,
-    type,
-    message: normalizeMessage(message),
-    ...(normalizedLink
-      ? { link: normalizedLink }
-      : {
-          $or: [{ link: "" }, { link: null }, { link: { $exists: false } }],
-        }),
+    $and: [
+      { recipient },
+      { type },
+      { message: normalizeMessage(message) },
+      normalizedLink ? { link: normalizedLink } : buildStringFieldEmptyFilter("link"),
+      normalizedSender
+        ? { sender: normalizedSender }
+        : buildObjectIdFieldEmptyFilter("sender"),
+    ],
   };
 };
 

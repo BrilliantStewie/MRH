@@ -85,7 +85,9 @@ const AllReviews = () => {
   ========================================== */
   const fetchReviews = async () => {
     try {
-      const response = await axios.get(`${backendUrl}/api/reviews/all-reviews`);
+      const response = await axios.get(`${backendUrl}/api/reviews/all-reviews`, token
+        ? { headers: { token } }
+        : undefined);
       if (response.data.success) {
         setReviews(response.data.reviews || []);
       }
@@ -98,7 +100,7 @@ const AllReviews = () => {
 
   useEffect(() => { 
     fetchReviews(); 
-  }, [backendUrl]);
+  }, [backendUrl, token]);
 
   useEffect(() => {
     setVisibleReviewCount((prev) => Math.min(Math.max(REVIEW_PAGE_SIZE, prev), visibleReviews.length || REVIEW_PAGE_SIZE));
@@ -633,6 +635,11 @@ const AllReviews = () => {
                                 <Calendar size={11} /> {formatDateRange(booking?.checkIn, booking?.checkOut)}
                               </span>
                             </div>
+                            {review.isHidden && isMyReview && (
+                              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-rose-700">
+                                Hidden By Admin
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

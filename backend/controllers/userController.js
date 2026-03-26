@@ -1486,7 +1486,16 @@ const deleteReviewReply = async (req, res) => {
 
 const getAllPublicReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({ isHidden: false })
+        const query = req.userId
+            ? {
+                $or: [
+                    { isHidden: false },
+                    { isHidden: true, userId: req.userId }
+                ]
+            }
+            : { isHidden: false };
+
+        const reviews = await Review.find(query)
             .populate("userId", "firstName middleName lastName image")
             .populate({
                 path: "reviewChat.senderId",
