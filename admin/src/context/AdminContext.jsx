@@ -466,6 +466,29 @@ const AdminContextProvider = ({ children }) => {
     }
 };
 
+  const updateBookingStayStatus = async (bookingId, action) => {
+    try {
+      const { data } = await axios.put(
+        `${backendUrl}/api/admin/bookings/${bookingId}/stay-status`,
+        { action },
+        { headers: { token: aToken } }
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+        getAllBookings();
+        getDashboardData();
+        return true;
+      }
+
+      toast.error(data.message);
+      return false;
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+      return false;
+    }
+  };
+
   // ============================================================
   // 📦 PACKAGES MANAGEMENT
   // ============================================================
@@ -656,6 +679,7 @@ const AdminContextProvider = ({ children }) => {
     declineBooking,
     paymentConfirmed,
     approveCancellation,
+    updateBookingStayStatus,
     hasNewBookings, // ✅ Exported for Sidebar
 
     // Packages

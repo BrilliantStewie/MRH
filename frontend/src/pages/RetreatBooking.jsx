@@ -10,6 +10,10 @@ import {
     Trash2, Image as ImageIcon, Building2, Users,
     Utensils, Wind, Tag, ChevronDown, ChevronUp, Info
 } from "lucide-react";
+import {
+    getBookingCheckInDateValue,
+    getBookingCheckOutDateValue,
+} from "../utils/bookingDateFields";
 
 const RetreatBooking = () => {
     const { backendUrl, token, selectedRooms, addRoom, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
@@ -270,8 +274,8 @@ const RetreatBooking = () => {
                 if (data.success) {
                     const counts = new Map();
                     (data.bookings || []).forEach((b) => {
-                        const start = toDateObj(b.checkIn || b.date || b.createdAt);
-                        const end = toDateObj(b.checkOut || b.checkIn || b.date || b.createdAt);
+                        const start = toDateObj(getBookingCheckInDateValue(b));
+                        const end = toDateObj(getBookingCheckOutDateValue(b));
                         const guestCountRaw = Number(b.guestCount);
                         const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
 
@@ -486,8 +490,8 @@ const RetreatBooking = () => {
             const bookingPayload = {
                 bookingName,
                 roomIds: selectedRooms.map(r => r._id),
-                checkIn: startDate,
-                checkOut: endDate,
+                checkInDate: startDate,
+                checkOutDate: endDate,
                 venueParticipants: Number(venueParticipants) || 0,
 
                 bookingItems: selectedRooms.map(room => ({

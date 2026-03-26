@@ -10,6 +10,7 @@ import {
   verifyStaffPhoneFirebase,
   checkStaffPhoneAvailability,
 } from "../controllers/staffController.js";
+import { updateBookingStayStatus } from "../controllers/bookingStayController.js";
 
 // ✅ Import Admin controllers to reuse the logic for staff
 import { getAllRooms, getAllUsers } from "../controllers/adminController.js"; 
@@ -48,6 +49,7 @@ router.post("/check-phone", authStaff, checkStaffPhoneAvailability);
    STAFF VIEW ALL GUEST BOOKINGS
 ========================= */
 router.get("/bookings", authStaff, getStaffBookings);
+router.put("/bookings/:bookingId/stay-status", authStaff, updateBookingStayStatus);
 
 /* =========================
    NEW: STAFF ACCESS TO ROOMS & USERS

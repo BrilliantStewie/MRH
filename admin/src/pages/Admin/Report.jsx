@@ -23,6 +23,7 @@ import reportHero from "../../assets/report_hero.png?inline";
 import reportLogo from "../../assets/logo.svg?inline";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
 import { AdminContext } from "../../context/AdminContext";
+import { getBookingCheckInDateValue } from "../../utils/bookingDateFields";
 
 const MONTH_NAMES = [
   "January",
@@ -153,8 +154,21 @@ const formatAxisValue = (value, chartMode) => {
   return Number(value || 0).toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 };
 
+const normalizePeriodMonth = (value) => {
+  const match = MONTH_NAMES.find(
+    (monthName) => monthName.toLowerCase() === String(value || "").trim().toLowerCase()
+  );
+
+  return match || null;
+};
+
+const getPeriodMonthIndex = (value) => {
+  const normalizedMonth = normalizePeriodMonth(value);
+  return normalizedMonth ? MONTH_NAMES.indexOf(normalizedMonth) : -1;
+};
+
 const getBookingDate = (booking) => {
-  const rawValue = booking?.checkIn;
+  const rawValue = getBookingCheckInDateValue(booking);
   const parsed = new Date(rawValue);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
@@ -692,7 +706,7 @@ const fetchReportData = async ({
 }) => {
   const params =
     reportType === "monthly"
-      ? { reportType, periodYear: reportYear, periodMonth: reportMonth + 1 }
+      ? { reportType, periodYear: reportYear, periodMonth: MONTH_NAMES[reportMonth] }
       : { reportType, periodYear: reportYear };
 
   const { data } = await axios.get(`${backendUrl}/api/report`, {
@@ -861,7 +875,7 @@ const Report = () => {
       storedReports.find((report) =>
         report.reportType === reportType &&
         Number(report.periodYear) === Number(reportYear) &&
-        (reportType !== "monthly" || Number(report.periodMonth) === reportMonth + 1)
+        (reportType !== "monthly" || normalizePeriodMonth(report.periodMonth) === MONTH_NAMES[reportMonth])
       ) || null,
     [reportMonth, reportType, reportYear, storedReports]
   );
@@ -1059,7 +1073,7 @@ const Report = () => {
     try {
       const payload =
         reportType === "monthly"
-          ? { reportType, periodMonth: reportMonth + 1, periodYear: reportYear }
+          ? { reportType, periodMonth: MONTH_NAMES[reportMonth], periodYear: reportYear }
           : { reportType, periodYear: reportYear };
 
       const { data } = await axios.post(`${backendUrl}/api/reports/generate`, payload, {
@@ -1097,7 +1111,7 @@ const Report = () => {
           if (report.reportType !== savedReport.reportType) return true;
           if (Number(report.periodYear) !== Number(savedReport.periodYear)) return true;
           if (savedReport.reportType === "monthly") {
-            return Number(report.periodMonth) !== Number(savedReport.periodMonth);
+            return normalizePeriodMonth(report.periodMonth) !== normalizePeriodMonth(savedReport.periodMonth);
           }
           return false;
         });
@@ -1106,7 +1120,7 @@ const Report = () => {
           const firstYear = Number(first.periodYear || 0);
           const secondYear = Number(second.periodYear || 0);
           if (secondYear !== firstYear) return secondYear - firstYear;
-          return Number(second.periodMonth || 0) - Number(first.periodMonth || 0);
+          return getPeriodMonthIndex(second.periodMonth) - getPeriodMonthIndex(first.periodMonth);
         });
       });
 

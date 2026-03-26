@@ -1,5 +1,9 @@
 import React, { useContext, useEffect } from "react";
 import StaffContext from "../../context/StaffContext";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../../utils/bookingDateFields";
 import { assets } from "../../assets/assets";   // ✅ named import
 
 const StaffAppointments = () => {
@@ -26,6 +30,10 @@ const StaffAppointments = () => {
 
         {bookings?.reverse()?.map((item, index) => (
           <div className="flex flex-wrap justify-between max-sm:gap-5 max-sm:text-base sm:grid grid-cols-[0.5fr_2fr_1fr_1fr_2fr_1fr_1fr_1fr] gap-1 items-center text-gray-500 py-3 px-6 border-b hover:bg-gray-50" key={index}>
+            {(() => {
+              const statusToken = String(item.status || "").replace(/[_-\s]/g, "").toLowerCase();
+              return (
+                <>
             <p className="max-sm:hidden">{index + 1}</p>
             
             {/* Guest Info */}
@@ -41,7 +49,7 @@ const StaffAppointments = () => {
             <p>{item.participants}</p>
             
             {/* Date */}
-            <p>{slotDateFormat(item.checkIn)} - {slotDateFormat(item.checkOut)}</p>
+            <p>{slotDateFormat(getBookingCheckInDateValue(item))} - {slotDateFormat(getBookingCheckOutDateValue(item))}</p>
             
             {/* Amount */}
             <p>{currency(item.totalPrice)}</p>
@@ -73,7 +81,7 @@ const StaffAppointments = () => {
               <p className="text-red-400 text-xs font-medium">Cancelled</p>
             ) : item.status === 'completed' ? (
               <p className="text-green-500 text-xs font-medium">Completed</p>
-            ) : item.status === 'checked_in' ? (
+            ) : statusToken === 'checkedin' ? (
               <div className="flex gap-2">
                 <img onClick={() => checkOut(item.id)} className="w-8 cursor-pointer" src={assets.checkoutIcon} alt="Check Out" />
               </div>
@@ -87,6 +95,9 @@ const StaffAppointments = () => {
                 <img onClick={() => checkIn(item.id)} className="w-8 cursor-pointer" src={assets.checkinIcon} alt="Check In" />
               </div>
             )}
+                </>
+              );
+            })()}
           </div>
         ))}
       </div>

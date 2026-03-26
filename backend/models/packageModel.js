@@ -30,6 +30,11 @@ const packageSchema = new mongoose.Schema(
       },
     },
 
+    description: {
+      type: String,
+      default: "",
+    },
+
     amenities: [
       {
         type: String,
@@ -41,11 +46,6 @@ const packageSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
-    },
-
-    description: {
-      type: String,
-      default: "",
     },
   },
   {

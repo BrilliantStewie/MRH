@@ -2,24 +2,21 @@ import bookingModel from "../models/bookingModel.js";
 import reportModel from "../models/reportModel.js";
 import roomModel from "../models/roomModel.js";
 import userModel from "../models/userModel.js";
+import {
+  BOOKING_DATE_SELECT,
+  buildLegacyBookingDateRangeQuery,
+  getBookingCheckInDate,
+} from "../utils/bookingDateFields.js";
+import {
+  MONTH_NAMES,
+  comparePeriodMonthsDesc,
+  getPeriodMonthIndex,
+  normalizePeriodMonth,
+} from "../utils/reportMonths.js";
 
 const MANILA_START_HOUR_UTC = -8;
 const MANILA_END_HOUR_UTC = 15;
 const MANILA_OFFSET_MS = 8 * 60 * 60 * 1000;
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 const MONTH_NAMES_SHORT = [
   "Jan",
   "Feb",
@@ -67,16 +64,19 @@ const createManilaBoundary = ({
 
 const getPeriodWindow = (reportType, periodYear, periodMonth = null) => {
   if (reportType === "monthly") {
-    if (!periodMonth || periodMonth < 1 || periodMonth > 12) {
-      throw new Error("periodMonth must be between 1 and 12 for monthly reports");
+    const normalizedPeriodMonth = normalizePeriodMonth(periodMonth);
+    const monthNumber = getPeriodMonthIndex(normalizedPeriodMonth);
+
+    if (!normalizedPeriodMonth || !monthNumber) {
+      throw new Error("periodMonth must be a valid month name for monthly reports");
     }
 
-    const monthIndex = periodMonth - 1;
-    const lastDay = new Date(periodYear, periodMonth, 0).getDate();
+    const monthIndex = monthNumber - 1;
+    const lastDay = new Date(periodYear, monthNumber, 0).getDate();
 
     return {
-      label: `${MONTH_NAMES[monthIndex]} ${periodYear}`,
-      periodMonth,
+      label: `${normalizedPeriodMonth} ${periodYear}`,
+      periodMonth: normalizedPeriodMonth,
       periodYear,
       periodStart: createManilaBoundary({
         year: periodYear,
@@ -111,9 +111,7 @@ const getPeriodWindow = (reportType, periodYear, periodMonth = null) => {
 };
 
 const getBookingReferenceDate = (booking) => {
-  const reference = booking?.checkIn;
-  const parsed = new Date(reference);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return getBookingCheckInDate(booking);
 };
 
 const getManilaDateParts = (value) => {
@@ -236,12 +234,9 @@ const buildQueryWindow = (startDate, endDate) => {
 const fetchBookingsWithinWindow = async (start, end) => {
   const bookings = await bookingModel
     .find({
-      checkIn: {
-        $gte: start,
-        $lte: end,
-      },
+      ...buildLegacyBookingDateRangeQuery("checkIn", start, end),
     })
-    .select("_id bookingItems venueParticipants totalPrice status payment paymentStatus checkIn")
+    .select(`_id bookingItems venueParticipants totalPrice status payment paymentStatus ${BOOKING_DATE_SELECT}`)
     .lean();
 
   return bookings.filter((booking) => {
@@ -252,10 +247,11 @@ const fetchBookingsWithinWindow = async (start, end) => {
 
 const buildHistoricalTrend = ({ bookings, reportType, periodYear, periodMonth = null }) => {
   const buckets = [];
+  const periodMonthIndex = getPeriodMonthIndex(periodMonth);
 
   for (let offset = 5; offset >= 0; offset -= 1) {
     if (reportType === "monthly") {
-      const bucketDate = new Date(periodYear, periodMonth - 1 - offset, 1);
+      const bucketDate = new Date(periodYear, periodMonthIndex - 1 - offset, 1);
       buckets.push({
         label: MONTH_NAMES_SHORT[bucketDate.getMonth()],
         year: bucketDate.getFullYear(),
@@ -302,7 +298,8 @@ const buildHistoricalTrend = ({ bookings, reportType, periodYear, periodMonth = 
 };
 
 const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
-  const daysInMonth = new Date(periodYear, periodMonth, 0).getDate();
+  const periodMonthIndex = getPeriodMonthIndex(periodMonth);
+  const daysInMonth = new Date(periodYear, periodMonthIndex, 0).getDate();
   const bucketCount = Math.ceil(daysInMonth / 7);
   const buckets = Array.from({ length: bucketCount }, (_, index) => ({
     label: `W${index + 1}`,
@@ -315,7 +312,7 @@ const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
     const manilaParts = getManilaDateParts(referenceDate);
 
     if (!manilaParts) return;
-    if (manilaParts.year !== periodYear || manilaParts.monthIndex !== periodMonth - 1) return;
+    if (manilaParts.year !== periodYear || manilaParts.monthIndex !== periodMonthIndex - 1) return;
 
     const bucketIndex = Math.floor((manilaParts.day - 1) / 7);
     const bucket = buckets[bucketIndex];
@@ -338,7 +335,8 @@ const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
 
 const getHistoricalTrendWindow = (reportType, periodYear, periodMonth = null) => {
   if (reportType === "monthly") {
-    const startDate = new Date(periodYear, periodMonth - 1 - 5, 1);
+    const periodMonthIndex = getPeriodMonthIndex(periodMonth);
+    const startDate = new Date(periodYear, periodMonthIndex - 1 - 5, 1);
     const selectedWindow = getPeriodWindow(reportType, periodYear, periodMonth);
 
     return {
@@ -453,7 +451,7 @@ const getReportData = async (req, res) => {
     const fallbackYear = toInteger(req.query.periodYear) || new Date().getFullYear();
     const fallbackMonth =
       fallbackType === "monthly"
-        ? toInteger(req.query.periodMonth) || new Date().getMonth() + 1
+        ? normalizePeriodMonth(req.query.periodMonth) || MONTH_NAMES[new Date().getMonth()]
         : null;
 
     const queryWindow =
@@ -530,7 +528,7 @@ const listReports = async (req, res) => {
       ? normalizeReportType(req.query.reportType)
       : null;
     const periodYear = toInteger(req.query.periodYear);
-    const periodMonth = toInteger(req.query.periodMonth);
+    const periodMonth = normalizePeriodMonth(req.query.periodMonth);
     const limit = Math.max(1, Math.min(toInteger(req.query.limit) || 100, 500));
 
     const filter = {};
@@ -541,12 +539,23 @@ const listReports = async (req, res) => {
 
     const reports = await reportModel
       .find(filter)
-      .sort({ periodYear: -1, periodMonth: -1, updatedAt: -1 })
+      .sort({ periodYear: -1, updatedAt: -1 })
       .limit(limit);
+
+    const sortedReports = [...reports].sort((first, second) => {
+      if (first.periodYear !== second.periodYear) {
+        return Number(second.periodYear || 0) - Number(first.periodYear || 0);
+      }
+
+      const monthDifference = comparePeriodMonthsDesc(first.periodMonth, second.periodMonth);
+      if (monthDifference !== 0) return monthDifference;
+
+      return new Date(second.updatedAt).getTime() - new Date(first.updatedAt).getTime();
+    });
 
     return res.json({
       success: true,
-      reports: reports.map(serializeReport),
+      reports: sortedReports.map(serializeReport),
     });
   } catch (error) {
     return res.status(500).json({
@@ -562,7 +571,7 @@ const generateReport = async (req, res) => {
       req.body.reportType || req.query.reportType
     );
     const periodYear = toInteger(req.body.periodYear || req.query.periodYear);
-    const periodMonth = toInteger(req.body.periodMonth || req.query.periodMonth);
+    const periodMonth = normalizePeriodMonth(req.body.periodMonth || req.query.periodMonth);
 
     if (!periodYear) {
       return res.status(400).json({

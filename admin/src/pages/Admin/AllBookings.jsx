@@ -8,6 +8,17 @@ import {
   AlertCircle, CheckCircle2, XCircle, Banknote, Mail, Users, ChevronUp, ChevronLeft, ChevronRight
 } from "lucide-react";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
+import {
+  getAvailableStayActions,
+  getStayConfirmationDetails,
+  getStayStatusDescription,
+  getStayStatusMeta,
+  matchesBookingStatusFilter,
+} from "../../utils/bookingStayStatus";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../../utils/bookingDateFields";
 
 const BOOKINGS_PER_PAGE = 8;
 const getBookingRoomType = (item) =>
@@ -20,12 +31,12 @@ const getBookingBuilding = (item) =>
 const StatusBadge = ({ status }) => {
   let styles = "bg-slate-100 text-slate-500 border-slate-200";
   let Icon = Clock;
-  const s = (status || "").toLowerCase();
+  const s = String(status || "").replace(/[_-\s]/g, "").toLowerCase();
 
-  if (["approved", "confirmed", "checked_in"].includes(s)) {
+  if (["approved", "confirmed", "checkedin"].includes(s)) {
     styles = "bg-emerald-50 text-emerald-700 border-emerald-100";
     Icon = CheckCircle2;
-  } else if (s === 'pending' || s === 'cancellation_pending') {
+  } else if (s === 'pending' || s === 'cancellationpending') {
     styles = "bg-amber-50 text-amber-700 border-amber-100";
     Icon = AlertCircle;
   } else if (s === "cancelled") {
@@ -41,6 +52,17 @@ const StatusBadge = ({ status }) => {
     <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border ${styles} inline-flex items-center gap-1.5`}>
       <Icon size={10} />
       {status?.replace('_', ' ')}
+    </span>
+  );
+};
+
+const StayStatusBadge = ({ booking }) => {
+  const meta = getStayStatusMeta(booking);
+
+  return (
+    <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase border ${meta.className} inline-flex items-center gap-1.5`}>
+      <CheckCircle2 size={10} />
+      {meta.label}
     </span>
   );
 };
@@ -78,6 +100,8 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 
   const visibleRooms = showAllRooms ? roomList : roomList.slice(0, 2);
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
+  const stayConfirmationDetails = getStayConfirmationDetails(booking);
+  const stayMeta = getStayStatusMeta(booking);
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -138,12 +162,50 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
             <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-In</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkIn || booking.date)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(getBookingCheckInDateValue(booking))}</p>
               </div>
               <ArrowRight size={14} className="text-blue-300" />
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkOut)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(getBookingCheckOutDateValue(booking))}</p>
+              </div>
+            </div>
+            <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Stay Confirmation</p>
+                <span className={`rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.16em] ${stayMeta.className}`}>
+                  {stayMeta.label}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Check-In</p>
+                    <span className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-600">
+                      {stayConfirmationDetails.checkIn.label}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+                    {stayConfirmationDetails.checkIn.actorName || "No confirmer yet"}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+                    {stayConfirmationDetails.checkIn.timestamp || stayConfirmationDetails.checkIn.fallbackMessage}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Check-Out</p>
+                    <span className="text-[8px] font-black uppercase tracking-[0.14em] text-sky-600">
+                      {stayConfirmationDetails.checkOut.label}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+                    {stayConfirmationDetails.checkOut.actorName || "No confirmer yet"}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+                    {stayConfirmationDetails.checkOut.timestamp || stayConfirmationDetails.checkOut.fallbackMessage}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -329,7 +391,17 @@ const ActionAlertModal = ({
 
 // --- MAIN PAGE ---
 const AllBookings = () => {
- const { aToken, allBookings, getAllBookings, approveBooking, declineBooking, paymentConfirmed, approveCancellation, backendUrl } = useContext(AdminContext);
+ const {
+   aToken,
+   allBookings,
+   getAllBookings,
+   approveBooking,
+   declineBooking,
+   paymentConfirmed,
+   approveCancellation,
+   updateBookingStayStatus,
+   backendUrl,
+ } = useContext(AdminContext);
   const location = useLocation();
 
   const [bookings, setBookings] = useState([]);
@@ -343,6 +415,7 @@ const AllBookings = () => {
   const [flashBookingId, setFlashBookingId] = useState(null);
   const handledFlashRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeStayActionKey, setActiveStayActionKey] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [buildingFilter, setBuildingFilter] = useState("All Buildings");
@@ -411,6 +484,10 @@ const AllBookings = () => {
     { value: "All Status", label: "All Status" },
     { value: "pending", label: "Pending" },
     { value: "approved", label: "Approved" },
+    { value: "awaitingCheckIn", label: "Awaiting Check-In" },
+    { value: "checkedIn", label: "Checked In" },
+    { value: "checkedOut", label: "Checked Out" },
+    { value: "noShow", label: "No-Show" },
     { value: "cancelled", label: "Cancelled" },
     { value: "cancellation_pending", label: "Cancel Pending" },
     { value: "declined", label: "Declined" },
@@ -458,6 +535,17 @@ const AllBookings = () => {
       setActionAlert(null);
     } finally {
       setIsActionSubmitting(false);
+    }
+  };
+
+  const handleStayAction = async (bookingId, action) => {
+    const actionKey = `${bookingId}:${action}`;
+    setActiveStayActionKey(actionKey);
+
+    try {
+      await updateBookingStayStatus(bookingId, action);
+    } finally {
+      setActiveStayActionKey("");
     }
   };
 
@@ -532,7 +620,7 @@ const AllBookings = () => {
     if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingBuilding(r) === buildingFilter));
     
     if (statusFilter !== "All Status") {
-      filtered = filtered.filter(b => b.status?.toLowerCase() === statusFilter.toLowerCase());
+      filtered = filtered.filter((b) => matchesBookingStatusFilter(b, statusFilter));
     }
 
     if (roomTypeFilter !== "All Room Types") {
@@ -541,13 +629,13 @@ const AllBookings = () => {
 
     if (startDate || endDate) {
       filtered = filtered.filter(b => {
-        const bDate = new Date(b.checkIn || b.date).toISOString().split('T')[0];
+        const bDate = new Date(getBookingCheckInDateValue(b)).toISOString().split('T')[0];
         return (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
       });
     }
     
-    if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(b.checkIn || b.date).getMonth() === months.indexOf(monthFilter));
-    if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(b.checkIn || b.date).getFullYear() === parseInt(yearFilter));
+    if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(getBookingCheckInDateValue(b)).getMonth() === months.indexOf(monthFilter));
+    if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(getBookingCheckInDateValue(b)).getFullYear() === parseInt(yearFilter));
 
     filtered.sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt);
@@ -590,9 +678,13 @@ const AllBookings = () => {
     setMonthFilter("All Months");
   };
 
-  // Total Bookings now only counts "approved", "confirmed", or "checked_in" statuses
+  // Total Bookings now only counts "approved", "confirmed", or "checkedIn" statuses
   const stats = {
-    total: bookings.filter(b => ["approved", "confirmed", "checked_in"].includes(b.status?.toLowerCase())).length,
+    total: bookings.filter((b) =>
+      ["approved", "confirmed", "checkedin"].includes(
+        String(b.status || "").replace(/[_-\s]/g, "").toLowerCase()
+      )
+    ).length,
     pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
     revenue: bookings
       .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
@@ -825,17 +917,21 @@ const AllBookings = () => {
                   <td className="px-6 py-5 align-top">
                     <div className="-ml-4 flex justify-center">
                       <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                        {formatDatePHT(b.checkIn || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.checkOut)}
+                        {formatDatePHT(getBookingCheckInDateValue(b))} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(getBookingCheckOutDateValue(b))}
                       </div>
                     </div>
                   </td>
                   <td className="pl-2 pr-4 py-5 align-top">
-                    <div className="-ml-[10px] flex justify-start">
+                    <div className="-ml-[10px] flex max-w-[190px] flex-col items-start gap-2">
                       <StatusBadge status={b.status} />
+                      <StayStatusBadge booking={b} />
+                      <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
+                        {getStayStatusDescription(b)}
+                      </p>
                     </div>
                   </td>
                   <td className="w-[220px] px-4 py-5 align-top">
-                    <div className="-ml-[25px] flex items-center justify-center gap-2">
+                    <div className="-ml-[25px] flex flex-wrap items-center justify-center gap-2">
                         {/* ACTION BUTTONS */}
                         {b.status?.toLowerCase() === "pending" && (
                           <>
@@ -871,6 +967,42 @@ const AllBookings = () => {
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
                           >
                             <Banknote size={12}/> Confirm Payment
+                          </button>
+                        )}
+
+                        {getAvailableStayActions(b).canConfirmCheckIn && (
+                          <button
+                            type="button"
+                            onClick={() => handleStayAction(b._id, "checkIn")}
+                            disabled={activeStayActionKey === `${b._id}:checkIn`}
+                            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-emerald-100 transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                          >
+                            <CheckCircle2 size={12} />
+                            {activeStayActionKey === `${b._id}:checkIn` ? "Saving..." : "Confirm Check-In"}
+                          </button>
+                        )}
+
+                        {getAvailableStayActions(b).canMarkNoShow && (
+                          <button
+                            type="button"
+                            onClick={() => handleStayAction(b._id, "noShow")}
+                            disabled={activeStayActionKey === `${b._id}:noShow`}
+                            className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-rose-500 transition-all hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-rose-100 disabled:text-rose-300"
+                          >
+                            <XCircle size={12} />
+                            {activeStayActionKey === `${b._id}:noShow` ? "Saving..." : "Mark No-Show"}
+                          </button>
+                        )}
+
+                        {getAvailableStayActions(b).canConfirmCheckOut && (
+                          <button
+                            type="button"
+                            onClick={() => handleStayAction(b._id, "checkOut")}
+                            disabled={activeStayActionKey === `${b._id}:checkOut`}
+                            className="flex items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-sky-100 transition-all hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-sky-300"
+                          >
+                            <CheckCircle2 size={12} />
+                            {activeStayActionKey === `${b._id}:checkOut` ? "Saving..." : "Confirm Check-Out"}
                           </button>
                         )}
 

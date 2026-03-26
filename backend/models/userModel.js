@@ -11,20 +11,21 @@ const userSchema = new mongoose.Schema({
   },
   suffix: { type: String, default: "" },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  passwordSet: { type: Boolean, default: false },
-  role: { type: String, enum: ["guest", "staff", "admin"], default: "guest"},
-  disabled: { type: Boolean, default: false },
   phone: { type: String, default: null },
   image: { type: String, default: "" },
-  tokenVersion: { type: Number, default: 0 },
+  authProvider: { type: String, enum: ["local", "google"], default: "local" },
+  password: { type: String, required: true },
+  passwordSet: { type: Boolean, default: false },
   otp: { type: String, default: null },
   otpExpires: { type: Date, default: null },
-  authProvider: { type: String, enum: ["local", "google"], default: "local" },
-  pendingPhone: { type: String, default: "" },
+  role: { type: String, enum: ["guest", "staff", "admin"], default: "guest"},
+  disabled: { type: Boolean, default: false },
   pendingEmail: { type: String, default: "" },
+  pendingPhone: { type: String, default: "" },
+  emailVerified: { type: Boolean, default: false },
   phoneVerified: { type: Boolean, default: false },
-  emailVerified: { type: Boolean, default: false }
+  sessionVersion: { type: Number, default: 0 },
+  tokenVersion: { type: Number, default: 0 }
 }, { minimize: false, toJSON: { virtuals: true }, toObject: { virtuals: true }, timestamps: true });
 
 userSchema.virtual("name").get(function () {
@@ -32,6 +33,15 @@ userSchema.virtual("name").get(function () {
 });
 
 userSchema.pre("save", function (next) {
+  if (
+    (this.sessionVersion === null || typeof this.sessionVersion === "undefined") &&
+    typeof this.tokenVersion !== "undefined"
+  ) {
+    this.sessionVersion = this.tokenVersion;
+  }
+
+  this.tokenVersion = this.sessionVersion || 0;
+
   if (typeof this.emailVerified === "undefined") {
     this.emailVerified =
       this.authProvider === "google" ||

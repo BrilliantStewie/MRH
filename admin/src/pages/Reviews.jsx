@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 // ✅ Use StaffContext and sToken to match your staffRoute.js middleware
 import { StaffContext } from '../context/StaffContext'; 
 import { Star, MessageCircle, User, Home, Loader2, Send, Clock, History } from 'lucide-react';
+import { getBookingCheckInDateValue } from '../utils/bookingDateFields';
 
 const Reviews = () => {
   const { backendUrl, sToken } = useContext(StaffContext); 
@@ -113,7 +114,7 @@ const Reviews = () => {
                     ))}
                   </div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    Check-in: {new Date(item.checkIn).toLocaleDateString()}
+                    Check-in: {new Date(getBookingCheckInDateValue(item)).toLocaleDateString()}
                   </p>
                 </div>
               </div>

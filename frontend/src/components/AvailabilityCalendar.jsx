@@ -2,6 +2,10 @@ import React, { useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../utils/bookingDateFields";
 
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   const [viewDate, setViewDate] = useState(new Date());
@@ -10,10 +14,12 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
     const counts = new Map();
     if (!bookings) return counts;
     bookings.forEach(b => {
-      const status = (b.status || b.paymentStatus || "").toLowerCase();
-      if (['approved', 'paid', 'checked_in', 'pending'].includes(status)) {
-        const start = new Date(b.checkIn || b.date || b.createdAt);
-        const end = new Date(b.checkOut || b.checkIn || b.date || b.createdAt);
+      const status = String(b.status || b.paymentStatus || "")
+        .replace(/[_-\s]/g, "")
+        .toLowerCase();
+      if (['approved', 'paid', 'checkedin', 'pending'].includes(status)) {
+        const start = new Date(getBookingCheckInDateValue(b));
+        const end = new Date(getBookingCheckOutDateValue(b));
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
         const guestCountRaw = Number(b.guestCount);

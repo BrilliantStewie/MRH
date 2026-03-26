@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import { getBookingStayFlags } from "../utils/bookingStay.js";
+import { coerceBookingDateValue } from "../utils/bookingDateFields.js";
 
 const bookingItemSchema = new mongoose.Schema(
   {
@@ -47,6 +49,22 @@ const bookingSchema = new mongoose.Schema(
       trim: true,
     },
 
+    status: {
+      type: String,
+      enum: ["pending", "approved", "declined", "cancelled", "cancellation_pending"],
+      default: "pending",
+    },
+
+    checkInDate: {
+      type: Date,
+      required: true,
+    },
+
+    checkOutDate: {
+      type: Date,
+      required: true,
+    },
+
     bookingItems: {
       type: [bookingItemSchema],
       required: true,
@@ -69,32 +87,10 @@ const bookingSchema = new mongoose.Schema(
       min: 0,
     },
 
-    checkIn: {
-      type: Date,
-      required: true,
-    },
-
-    checkOut: {
-      type: Date,
-      required: true,
-    },
-
     totalPrice: {
       type: Number,
       required: true,
       min: 0,
-    },
-
-    status: {
-      type: String,
-      enum: ["pending", "approved", "declined", "cancelled", "cancellation_pending"],
-      default: "pending",
-    },
-
-    paymentStatus: {
-      type: String,
-      enum: ["unpaid", "pending", "paid"],
-      default: "unpaid",
     },
 
     paymentMethod: {
@@ -103,9 +99,70 @@ const bookingSchema = new mongoose.Schema(
       default: null,
     },
 
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "pending", "paid"],
+      default: "unpaid",
+    },
+
     payment: {
       type: Boolean,
       default: false,
+    },
+
+    checkIn: {
+      type: Boolean,
+      default: false,
+      set(value) {
+        const legacyDate = coerceBookingDateValue(value);
+        if (legacyDate && !this.checkInDate) {
+          this.checkInDate = legacyDate;
+          return false;
+        }
+
+        return Boolean(value);
+      },
+    },
+
+    checkOut: {
+      type: Boolean,
+      default: false,
+      set(value) {
+        const legacyDate = coerceBookingDateValue(value);
+        if (legacyDate && !this.checkOutDate) {
+          this.checkOutDate = legacyDate;
+          return false;
+        }
+
+        return Boolean(value);
+      },
+    },
+
+    noShow: {
+      type: Boolean,
+      default: false,
+    },
+
+    checkInConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+
+    checkInConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    checkOutConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+
+    checkOutConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   {
@@ -120,17 +177,62 @@ bookingSchema.pre("validate", function (next) {
     this.paymentMethod = undefined;
   }
 
+  const legacyCheckInDate = coerceBookingDateValue(this.checkIn);
+  const legacyCheckOutDate = coerceBookingDateValue(this.checkOut);
+
+  if (!this.checkInDate && legacyCheckInDate) {
+    this.checkInDate = legacyCheckInDate;
+  }
+
+  if (!this.checkOutDate && legacyCheckOutDate) {
+    this.checkOutDate = legacyCheckOutDate;
+  }
+
+  const legacyFlags = getBookingStayFlags(this);
+
+  if (!this.isModified("checkIn") && legacyFlags.checkIn) {
+    this.checkIn = true;
+  }
+
+  if (!this.isModified("checkOut") && legacyFlags.checkOut) {
+    this.checkOut = true;
+  }
+
+  if (!this.isModified("noShow") && legacyFlags.noShow) {
+    this.noShow = true;
+  }
+
+  if (this.noShow) {
+    this.checkIn = false;
+    this.checkOut = false;
+    this.checkOutConfirmedAt = null;
+    this.checkOutConfirmedBy = null;
+  } else if (!this.checkIn) {
+    this.checkOut = false;
+    this.checkInConfirmedAt = null;
+    this.checkInConfirmedBy = null;
+    this.checkOutConfirmedAt = null;
+    this.checkOutConfirmedBy = null;
+  } else if (!this.checkOut) {
+    this.checkOutConfirmedAt = null;
+    this.checkOutConfirmedBy = null;
+  }
+
+  if (this.checkOut && !this.checkIn) {
+    return next(new Error("Cannot confirm check-out before check-in"));
+  }
+
   this.payment = this.paymentStatus === "paid";
   next();
 });
 
 bookingSchema.pre("save", function (next) {
-  if (this.checkOut < this.checkIn) {
+  if (this.checkOutDate < this.checkInDate) {
     return next(new Error("Check-out must be after check-in"));
   }
 
   if (
-    this.checkOut.getTime() === this.checkIn.getTime() &&
+    this.checkOutDate.getTime() === this.checkInDate.getTime() &&
     Array.isArray(this.bookingItems) &&
     this.bookingItems.length > 0
   ) {

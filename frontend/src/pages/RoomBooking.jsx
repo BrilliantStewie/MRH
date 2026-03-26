@@ -52,8 +52,8 @@ const RoomBooking = () => {
         `${backendUrl}/api/booking/create`,
         {
           roomId: roomId,
-          checkIn: checkIn,
-          checkOut: checkOut,
+          checkInDate: checkIn,
+          checkOutDate: checkOut,
           participants,
           totalPrice: totalPrice,
         },

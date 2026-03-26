@@ -1,12 +1,29 @@
 import nodemailer from "nodemailer";
 
+const EMAIL_USER = String(process.env.EMAIL_USER || "").trim();
+const EMAIL_PASS = String(process.env.EMAIL_PASS || "").trim();
+
+const createFriendlyEmailError = (error) => {
+  const combinedMessage = `${error?.message || ""} ${error?.response || ""}`;
+
+  if (error?.code === "EAUTH" && /gmail|gsmtp|badcredentials/i.test(combinedMessage)) {
+    return "Gmail rejected the login. Generate a new Google App Password for EMAIL_USER, update EMAIL_PASS in backend/.env, and restart the server.";
+  }
+
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    return "Email is not configured. Set EMAIL_USER and EMAIL_PASS in backend/.env.";
+  }
+
+  return error?.message || "Unable to send email right now.";
+};
+
 const sendEmail = async (to, subject, htmlContent, plainText = "") => {
   try {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS, 
+        user: EMAIL_USER,
+        pass: EMAIL_PASS,
       },
     });
 
@@ -41,7 +58,7 @@ const sendEmail = async (to, subject, htmlContent, plainText = "") => {
     `;
 
     const info = await transporter.sendMail({
-      from: `"Mercedarian Retreat House" <${process.env.EMAIL_USER}>`,
+      from: `"Mercedarian Retreat House" <${EMAIL_USER}>`,
       to,
       subject,
       text: plainText, // Plain text version for spam filters/watchOS/accessibility
@@ -52,8 +69,9 @@ const sendEmail = async (to, subject, htmlContent, plainText = "") => {
     return { success: true };
 
   } catch (error) {
-    console.error("Email error:", error);
-    return { success: false, message: error.message };
+    const message = createFriendlyEmailError(error);
+    console.error("Email error:", message);
+    return { success: false, message, cause: error };
   }
 };
 

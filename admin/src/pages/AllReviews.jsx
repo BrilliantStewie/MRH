@@ -4,6 +4,7 @@ import { StaffContext } from "../context/StaffContext";
 import { Star, User, MessageSquare, Loader2, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import EmptyReviewsState from "../components/EmptyReviewsState";
+import { getBookingCheckInDateValue } from "../utils/bookingDateFields";
 
 const AllReviews = () => {
     const [reviews, setReviews] = useState([]);
@@ -74,7 +75,7 @@ const AllReviews = () => {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
                                         <Calendar size={12} />
-                                        {new Date(item.checkIn).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                        {new Date(getBookingCheckInDateValue(item)).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                                     </div>
                                     <button 
                                         onClick={() => navigate(`/history/${item._id}`)}

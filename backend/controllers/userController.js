@@ -20,6 +20,10 @@ import {
     roomReferencePopulate,
     serializeReview,
 } from "../utils/dataConsistency.js";
+import {
+    BOOKING_DATE_SELECT,
+    getBookingCheckInDate,
+} from "../utils/bookingDateFields.js";
 import { createValidatedBooking } from "../utils/bookingService.js";
 import { getBookingReviewEligibility } from "../utils/bookingRules.js";
 import {
@@ -27,6 +31,11 @@ import {
     hasClaimedPhone,
     hasVerifiedEmail,
 } from "../utils/userVerification.js";
+import {
+    buildSessionTokenPayload,
+    bumpSessionVersion,
+    getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 // --- HELPERS ---
 const parseGoogleDisplayName = (value, fallbackFirst = "") => {
@@ -45,9 +54,9 @@ const parseGoogleDisplayName = (value, fallbackFirst = "") => {
     };
 };
 
-const createToken = (id, name, role, tokenVersion = 0) => {
+const createToken = (id, name, role, sessionVersion = 0) => {
     return jwt.sign(
-        { id, name, role, tokenVersion },
+        buildSessionTokenPayload({ id, name, role, sessionVersion }),
         process.env.JWT_SECRET,
         { expiresIn: "30d" }
     );
@@ -123,6 +132,16 @@ const streamUpload = (fileBuffer) => {
     });
 };
 
+const ensureEmailSent = async (...args) => {
+    const result = await sendEmail(...args);
+
+    if (!result?.success) {
+        throw new Error(result?.message || "Unable to send email right now.");
+    }
+
+    return result;
+};
+
 // --- AUTHENTICATION ---
 
 // ✅ Send OTP for Email Verification or Password Reset
@@ -166,7 +185,7 @@ const sendOTP = async (req, res) => {
             await user.save();
         }
 
-        await sendEmail(
+        await ensureEmailSent(
             email,
             "Your verification code",
             `
@@ -294,7 +313,7 @@ const sendEmailChangeOTP = async (req, res) => {
         user.otpExpires = otpExpires;
         await user.save();
 
-        await sendEmail(
+        await ensureEmailSent(
             normalizedEmail,
             "Confirm your new email address",
             `
@@ -479,7 +498,7 @@ const resetPassword = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
         user.passwordSet = true;
-        user.tokenVersion = (user.tokenVersion || 0) + 1;
+        bumpSessionVersion(user);
         if (isPhone) {
             user.phoneVerified = true;
         }
@@ -624,7 +643,7 @@ const googleAuth = async (req, res) => {
             );
         }
 
-        const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, user.tokenVersion || 0);
+        const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, getSessionVersion(user));
         res.json({ success: true, token });
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -756,7 +775,7 @@ const loginUser = async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (isMatch) {
-            const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, user.tokenVersion || 0);
+            const token = createToken(user._id, `${user.firstName} ${user.lastName}`, user.role, getSessionVersion(user));
             res.json({ success: true, token });
         } else {
             res.json({ success: false, message: "Invalid credentials" });
@@ -976,7 +995,7 @@ const updateUserProfile = async (req, res) => {
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(newPassword, salt);
             user.passwordSet = true;
-            user.tokenVersion = (user.tokenVersion || 0) + 1;
+            bumpSessionVersion(user);
         }
 
         if (removeImage === 'true' || removeImage === true) user.image = "";
@@ -997,7 +1016,16 @@ const updateUserProfile = async (req, res) => {
 const createBooking = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { roomId, packageId, checkIn, checkOut, participants, bookingName } = req.body;
+        const {
+            roomId,
+            packageId,
+            checkInDate,
+            checkOutDate,
+            checkIn,
+            checkOut,
+            participants,
+            bookingName,
+        } = req.body;
 
         const newBooking = await createValidatedBooking({
             userId,
@@ -1009,8 +1037,8 @@ const createBooking = async (req, res) => {
             }] : [],
             extraPackages: [],
             venueParticipants: 0,
-            checkIn,
-            checkOut
+            checkInDate: checkInDate || checkIn,
+            checkOutDate: checkOutDate || checkOut
         });
 
         const user = await userModel.findById(userId);
@@ -1022,7 +1050,7 @@ const createBooking = async (req, res) => {
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                         <p>Hello ${user.firstName},</p>
                         <p>Your booking request was received.</p>
-                        <p>Check-in: ${new Date(newBooking.checkIn).toLocaleDateString()}</p>
+                        <p>Check-in: ${new Date(getBookingCheckInDate(newBooking)).toLocaleDateString()}</p>
                         <p>Total: PHP ${newBooking.totalPrice}</p>
                         <p>Status: Pending approval</p>
                         <p>Mercedarian Retreat House</p>
@@ -1087,7 +1115,7 @@ const cancelBooking = async (req, res) => {
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                         <p>Hello ${booking.userId.firstName || "Guest"},</p>
                         <p>Your booking was cancelled.</p>
-                        <p>Check-in: ${new Date(booking.checkIn).toLocaleDateString()}</p>
+                        <p>Check-in: ${new Date(getBookingCheckInDate(booking)).toLocaleDateString()}</p>
                         <p>Mercedarian Retreat House</p>
                     </div>
                 `
@@ -1504,7 +1532,7 @@ const getAllPublicReviews = async (req, res) => {
             })
             .populate({
                 path: "bookingId",
-                select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
+                select: `${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus`,
                 populate: [
                     {
                         path: "bookingItems.roomId",

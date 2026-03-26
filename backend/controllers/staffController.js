@@ -10,6 +10,11 @@ import {
   buildBookingPopulate,
 } from "../utils/dataConsistency.js";
 import { hasClaimedPhone } from "../utils/userVerification.js";
+import {
+  buildSessionTokenPayload,
+  bumpSessionVersion,
+  getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 const normalizePHPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
@@ -159,12 +164,12 @@ export const staffLogin = async (req, res) => {
     // ✅ UPDATED: Added name to payload for Review Chat identification
     // This allows the middleware to verify identity and display the correct sender name
     const token = jwt.sign(
-      { 
-        id: user._id, 
+      buildSessionTokenPayload({
+        id: user._id,
         role: "staff",
         name: user.firstName ? `${user.firstName} ${user.lastName}` : user.name,
-        tokenVersion: user.tokenVersion || 0 
-      },
+        sessionVersion: getSessionVersion(user),
+      }),
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
@@ -370,7 +375,7 @@ export const updateStaffProfile = async (req, res) => {
       }
       const salt = await bcrypt.genSalt(10);
       staff.password = await bcrypt.hash(newPassword, salt);
-      staff.tokenVersion = (staff.tokenVersion || 0) + 1;
+      bumpSessionVersion(staff);
     }
 
     if (removeImage === "true" || removeImage === true) {

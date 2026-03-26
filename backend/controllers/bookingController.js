@@ -5,6 +5,11 @@ import {
   attachReviewDataToBookings,
   buildBookingPopulate,
 } from "../utils/dataConsistency.js";
+import {
+  BOOKING_DATE_SELECT,
+  getBookingCheckInDate,
+  getBookingCheckOutDate,
+} from "../utils/bookingDateFields.js";
 import { createValidatedBooking } from "../utils/bookingService.js";
 import {
   addDays,
@@ -26,8 +31,8 @@ const userId = req.userId;
   userId,
   bookingName: req.body.bookingName,
   bookingItems: req.body.bookingItems || [],
-  checkIn: req.body.checkIn,
-  checkOut: req.body.checkOut,
+  checkInDate: req.body.checkInDate || req.body.checkIn,
+  checkOutDate: req.body.checkOutDate || req.body.checkOut,
   venueParticipants: req.body.venueParticipants || 0,
   extraPackages: req.body.extraPackages || [],
  });
@@ -315,14 +320,16 @@ res.json({success:false,message:error.message});
 export const checkAvailability = async (req,res)=>{
 try{
 
-const {roomIds=[],checkIn,checkOut}=req.body;
+const {roomIds=[],checkInDate,checkOutDate,checkIn,checkOut}=req.body;
+const requestedCheckIn = checkInDate || checkIn;
+const requestedCheckOut = checkOutDate || checkOut;
 
-if (!roomIds.length || !checkIn || !checkOut) {
+if (!roomIds.length || !requestedCheckIn || !requestedCheckOut) {
   return res.json({ success: true });
 }
 
-const start=normalizeDate(checkIn);
-const end=normalizeDate(checkOut);
+const start=normalizeDate(requestedCheckIn);
+const end=normalizeDate(requestedCheckOut);
 
 const uniqueRooms = roomIds;
 
@@ -331,12 +338,12 @@ const bookings = await bookingModel.find(
     "bookingItems.roomId": { $in: uniqueRooms },
     status: { $in: ["pending", "approved"] }
   },
-  "checkIn checkOut bookingItems"
+  `${BOOKING_DATE_SELECT} bookingItems`
 );
 
 const conflict = bookings.some((booking) => {
-  const existingStart = normalizeDate(booking.checkIn);
-  const existingEnd = normalizeDate(booking.checkOut);
+  const existingStart = normalizeDate(getBookingCheckInDate(booking));
+  const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
   const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
   return rangesOverlap(existingStart, cleaningEnd, start, end);
 });
@@ -370,9 +377,9 @@ const blockedDates=[];
 
 bookings.forEach(b=>{
 
-let current=new Date(b.checkIn);
+let current=new Date(getBookingCheckInDate(b));
 
-const checkoutWithCleaning = new Date(b.checkOut);
+const checkoutWithCleaning = new Date(getBookingCheckOutDate(b));
 checkoutWithCleaning.setDate(checkoutWithCleaning.getDate() + 1);
 
 while(current <= checkoutWithCleaning){
@@ -398,14 +405,16 @@ res.json({success:false,message:error.message});
 
 export const getBookedRoomsForRange = async (req, res) => {
 try {
-  const { roomIds = [], checkIn, checkOut } = req.body;
+  const { roomIds = [], checkInDate, checkOutDate, checkIn, checkOut } = req.body;
+  const requestedCheckIn = checkInDate || checkIn;
+  const requestedCheckOut = checkOutDate || checkOut;
 
-  if (!checkIn || !checkOut || !roomIds.length) {
+  if (!requestedCheckIn || !requestedCheckOut || !roomIds.length) {
     return res.json({ success: true, bookedRoomIds: [] });
   }
 
-  const start = normalizeDate(checkIn);
-  const end = normalizeDate(checkOut);
+  const start = normalizeDate(requestedCheckIn);
+  const end = normalizeDate(requestedCheckOut);
 
   if (end < start) {
     return res.json({ success: true, bookedRoomIds: [] });
@@ -418,14 +427,14 @@ try {
       "bookingItems.roomId": { $in: roomIds },
       status: { $in: ["pending", "approved"] }
     },
-    "checkIn checkOut bookingItems"
+    `${BOOKING_DATE_SELECT} bookingItems`
   );
 
   const bookedSet = new Set();
   const bookedReasons = new Map();
   bookings.forEach((booking) => {
-    const existingStart = normalizeDate(booking.checkIn);
-    const existingEnd = normalizeDate(booking.checkOut);
+    const existingStart = normalizeDate(getBookingCheckInDate(booking));
+    const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
 
     const isBookingOverlap = rangesOverlap(existingStart, existingEnd, start, end);
@@ -472,7 +481,7 @@ export const getCalendarAvailability = async (req, res) => {
 try {
   const bookings = await bookingModel.find(
     { status: { $in: ["pending", "approved"] } },
-    "checkIn checkOut bookingItems venueParticipants status paymentStatus"
+    `${BOOKING_DATE_SELECT} bookingItems venueParticipants status paymentStatus`
   );
 
   const availability = bookings.map((b) => {
@@ -482,8 +491,8 @@ try {
     );
     const venueGuests = Number(b.venueParticipants || 0);
     return {
-      checkIn: b.checkIn,
-      checkOut: b.checkOut,
+      checkInDate: getBookingCheckInDate(b),
+      checkOutDate: getBookingCheckOutDate(b),
       status: b.status,
       paymentStatus: b.paymentStatus,
       guestCount: roomGuests + venueGuests
@@ -515,8 +524,8 @@ const cleaningRoomIds = [];
 
 bookings.forEach(b => {
 
-const checkin = normalizeDate(b.checkIn);
-const checkout = normalizeDate(b.checkOut);
+const checkin = normalizeDate(getBookingCheckInDate(b));
+const checkout = normalizeDate(getBookingCheckOutDate(b));
 
 const cleaningDay = new Date(checkout);
 cleaningDay.setDate(cleaningDay.getDate() + 1);
@@ -568,8 +577,8 @@ const userBusyDates=[];
 
  bookings.forEach(b=>{
 
- const start = normalizeDate(b.checkIn);
- const end = normalizeDate(b.checkOut);
+ const start = normalizeDate(getBookingCheckInDate(b));
+ const end = normalizeDate(getBookingCheckOutDate(b));
 
  if (start.getTime() === end.getTime()) {
    userBusyDates.push(new Date(start));

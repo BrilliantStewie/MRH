@@ -36,6 +36,7 @@ import {
   updatePackage,
   deletePackage
 } from "../controllers/packageController.js";
+import { updateBookingStayStatus } from "../controllers/bookingStayController.js";
 
 // ✅ Import the chat controller from your booking controller file
 import { addReviewChat } from "../controllers/bookingController.js"; 
@@ -78,6 +79,7 @@ adminRouter.post("/update-room-type", authAdmin, updateRoomType);
 adminRouter.get("/all-bookings", authAdmin, allBookings);
 adminRouter.put("/bookings/:bookingId/approve", authAdmin, approveBooking);
 adminRouter.put("/bookings/:bookingId/decline", authAdmin, declineBooking);
+adminRouter.put("/bookings/:bookingId/stay-status", authAdmin, updateBookingStayStatus);
 adminRouter.post("/confirm-payment", authAdmin, paymentConfirmed);
 adminRouter.post("/approve-cancellation", authAdmin, approveCancellationRequest);
 adminRouter.post("/check-expired-cancellations", authAdmin, checkExpiredCancellations);

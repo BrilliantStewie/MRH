@@ -1,3 +1,6 @@
+import { getBookingStayFlags } from "./bookingStay.js";
+import { getBookingCheckOutDate } from "./bookingDateFields.js";
+
 const normalizeDate = (date) => {
   const normalized = new Date(date);
   normalized.setHours(0, 0, 0, 0);
@@ -34,7 +37,14 @@ const getBookingReviewEligibility = (booking, now = new Date()) => {
     };
   }
 
-  const checkOut = new Date(booking.checkOut);
+  if (getBookingStayFlags(booking).noShow) {
+    return {
+      eligible: false,
+      message: "No-show bookings cannot be reviewed.",
+    };
+  }
+
+  const checkOut = getBookingCheckOutDate(booking);
   if (Number.isNaN(checkOut.getTime())) {
     return {
       eligible: false,

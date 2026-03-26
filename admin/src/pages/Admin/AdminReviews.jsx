@@ -27,6 +27,10 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import EmptyReviewsState from "../../components/EmptyReviewsState";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../../utils/bookingDateFields";
 
 const AdminReviews = () => {
   const { backendUrl, aToken } = useContext(AdminContext);
@@ -654,7 +658,7 @@ const AdminReviews = () => {
                           <h3 className="font-bold text-slate-900 text-[17px] leading-tight">{formatName(review.userId, "guest")}</h3>
                           <div className="mt-1 inline-flex items-center gap-1 rounded-lg border border-slate-100 bg-slate-50 px-1.5 py-0.5 text-[8px] font-semibold text-slate-500">
                             <span className="flex items-center gap-1">
-                              <Calendar size={11} /> {formatStayDate(booking?.checkIn, booking?.checkOut)}
+                              <Calendar size={11} /> {formatStayDate(getBookingCheckInDateValue(booking), getBookingCheckOutDateValue(booking))}
                             </span>
                           </div>
                         </div>

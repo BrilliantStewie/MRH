@@ -1,0 +1,154 @@
+[
+  {
+    "name": "Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Individual",
+    "price": 1300,
+    "description": "Air-conditioned accommodation inclusive of 3 meals and 2 snacks. Price is per pax.",
+    "amenities": ["AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Individual with Pullout",
+    "price": 1200,
+    "description": "Air-conditioned accommodation inclusive of 3 meals and 2 snacks for an individual room with pullout. Price is per pax.",
+    "amenities": ["AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Dormitory",
+    "price": 1100,
+    "description": "Air-conditioned dormitory accommodation inclusive of 3 meals and 2 snacks. Price is per pax.",
+    "amenities": ["AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Individual",
+    "price": 1000,
+    "description": "Non-air-conditioned accommodation inclusive of 3 meals and 2 snacks. Price is per pax.",
+    "amenities": ["NON-AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Individual with Pullout",
+    "price": 950,
+    "description": "Non-air-conditioned accommodation inclusive of 3 meals and 2 snacks for an individual room with pullout. Price is per pax.",
+    "amenities": ["NON-AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon with 3 Meals and 2 Snacks",
+    "packageType": "Room Package",
+    "roomType": "Dormitory",
+    "price": 900,
+    "description": "Non-air-conditioned dormitory accommodation inclusive of 3 meals and 2 snacks. Price is per pax.",
+    "amenities": ["NON-AIRCON", "3 MEALS", "2 SNACKS", "PER PAX"]
+  },
+  {
+    "name": "Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Individual",
+    "price": 500,
+    "description": "Air-conditioned accommodation without food. Price is per pax.",
+    "amenities": ["AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Individual with Pullout",
+    "price": 450,
+    "description": "Air-conditioned accommodation without food for an individual room with pullout. Price is per pax.",
+    "amenities": ["AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Dormitory",
+    "price": 400,
+    "description": "Air-conditioned dormitory accommodation without food. Price is per pax.",
+    "amenities": ["AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Individual",
+    "price": 450,
+    "description": "Non-air-conditioned accommodation without food. Price is per pax.",
+    "amenities": ["NON-AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Individual with Pullout",
+    "price": 400,
+    "description": "Non-air-conditioned accommodation without food for an individual room with pullout. Price is per pax.",
+    "amenities": ["NON-AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Non-Aircon without Food",
+    "packageType": "Room Package",
+    "roomType": "Dormitory",
+    "price": 350,
+    "description": "Non-air-conditioned dormitory accommodation without food. Price is per pax.",
+    "amenities": ["NON-AIRCON", "NO FOOD", "PER PAX"]
+  },
+  {
+    "name": "Regular Whole Day with Lunch and 2 Snacks",
+    "packageType": "Venue Package",
+    "price": 400,
+    "description": "Whole-day venue package with lunch and 2 snacks at the regular rate. Price is per pax.",
+    "amenities": ["WHOLE DAY", "LUNCH", "2 SNACKS", "REGULAR RATE", "PER PAX"]
+  },
+  {
+    "name": "Student Whole Day with Lunch and 2 Snacks",
+    "packageType": "Venue Package",
+    "price": 350,
+    "description": "Whole-day venue package with lunch and 2 snacks at the student rate. Price is per pax.",
+    "amenities": ["WHOLE DAY", "LUNCH", "2 SNACKS", "STUDENT RATE", "PER PAX"]
+  },
+  {
+    "name": "Regular Venue Only Whole Day",
+    "packageType": "Venue Package",
+    "price": 150,
+    "description": "Whole-day venue-only package at the regular rate. Price is per pax.",
+    "amenities": ["WHOLE DAY", "VENUE ONLY", "REGULAR RATE", "PER PAX"]
+  },
+  {
+    "name": "Student Venue Only Whole Day",
+    "packageType": "Venue Package",
+    "price": 120,
+    "description": "Whole-day venue-only package at the student rate. Price is per pax.",
+    "amenities": ["WHOLE DAY", "VENUE ONLY", "STUDENT RATE", "PER PAX"]
+  },
+  {
+    "name": "Aircon Session Hall Add-On",
+    "packageType": "Amenity",
+    "price": 1200,
+    "description": "Additional payment per group for use of the air-conditioned session hall. Price is per day.",
+    "amenities": ["SESSION HALL", "AIRCON", "PER DAY", "PER GROUP"]
+  },
+  {
+    "name": "Non-Aircon Session Hall Add-On",
+    "packageType": "Amenity",
+    "price": 600,
+    "description": "Additional payment per group for use of the non-air-conditioned session hall. Price is per day.",
+    "amenities": ["SESSION HALL", "NON-AIRCON", "PER DAY", "PER GROUP"]
+  },
+  {
+    "name": "Projector Rental (1-2 Hours)",
+    "packageType": "Amenity",
+    "price": 600,
+    "description": "Projector rental for 1 to 2 hours.",
+    "amenities": ["PROJECTOR", "1-2 HOURS"]
+  },
+  {
+    "name": "Projector Rental (1-6 Hours)",
+    "packageType": "Amenity",
+    "price": 1000,
+    "description": "Projector rental for 1 to 6 hours based on the posted additional-payment sheet.",
+    "amenities": ["PROJECTOR", "1-6 HOURS"]
+  }
+]

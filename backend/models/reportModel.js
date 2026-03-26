@@ -1,13 +1,18 @@
 import mongoose from "mongoose";
+import {
+  MONTH_NAMES,
+  getPeriodMonthIndex,
+  normalizePeriodMonth,
+} from "../utils/reportMonths.js";
 
 const REPORT_FIELDS = [
   "reportType",
   "label",
-  "bookingIds",
   "periodMonth",
   "periodYear",
   "periodStart",
   "periodEnd",
+  "bookingIds",
   "totalBookings",
   "totalParticipants",
   "totalRoomsBooked",
@@ -84,13 +89,17 @@ const applyReportInvariants = (value = {}) => {
     nextValue.bookingIds = normalizeBookingIds(nextValue.bookingIds);
   }
 
-  ["periodMonth", "periodYear", "totalParticipants", "totalRoomsBooked", "totalIncome"].forEach(
+  ["periodYear", "totalParticipants", "totalRoomsBooked", "totalIncome"].forEach(
     (field) => {
       if (hasOwn(nextValue, field)) {
         nextValue[field] = normalizeFiniteNumber(nextValue[field]);
       }
     }
   );
+
+  if (hasOwn(nextValue, "periodMonth")) {
+    nextValue.periodMonth = normalizePeriodMonth(nextValue.periodMonth);
+  }
 
   if (nextValue.reportType === "annual") {
     nextValue.periodMonth = null;
@@ -139,10 +148,10 @@ const collectReportValidationIssues = (value = {}) => {
         message: "periodMonth is required for monthly reports",
         value: value.periodMonth,
       });
-    } else if (!Number.isInteger(value.periodMonth) || value.periodMonth < 1 || value.periodMonth > 12) {
+    } else if (!getPeriodMonthIndex(value.periodMonth)) {
       issues.push({
         path: "periodMonth",
-        message: "periodMonth must be between 1 and 12 for monthly reports",
+        message: "periodMonth must be a valid month name for monthly reports",
         value: value.periodMonth,
       });
     }
@@ -350,19 +359,9 @@ const reportSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    bookingIds: {
-      type: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Booking",
-        },
-      ],
-      default: [],
-    },
     periodMonth: {
-      type: Number,
-      min: 1,
-      max: 12,
+      type: String,
+      enum: MONTH_NAMES,
       default: null,
     },
     periodYear: {
@@ -377,6 +376,15 @@ const reportSchema = new mongoose.Schema(
     periodEnd: {
       type: Date,
       required: true,
+    },
+    bookingIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Booking",
+        },
+      ],
+      default: [],
     },
     totalBookings: {
       type: Number,

@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import {
+  getDecodedSessionVersion,
+  getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 const authAny = async (req, _res, next) => {
   try {
@@ -18,7 +22,7 @@ const authAny = async (req, _res, next) => {
       return next();
     }
 
-    if ((user.tokenVersion || 0) !== (decoded.tokenVersion ?? 0)) {
+    if (getSessionVersion(user) !== getDecodedSessionVersion(decoded)) {
       return next();
     }
 

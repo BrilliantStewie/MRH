@@ -21,6 +21,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../../utils/bookingDateFields";
 
 const MONTH_NAMES = [
   "January",
@@ -106,7 +110,7 @@ const Dashboard = () => {
     const yearlyRevenue = bookings
       .filter((booking) => {
         if (booking.paymentStatus !== "paid" && booking.status !== "approved") return false;
-        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+        const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
         return bookingDate.getFullYear() === currentDate.getFullYear();
       })
       .reduce((sum, booking) => sum + (Number(booking.totalPrice || booking.amount) || 0), 0);
@@ -114,7 +118,7 @@ const Dashboard = () => {
     const monthlyIncome = bookings
       .filter((booking) => {
         if (booking.paymentStatus !== "paid" && booking.status !== "approved") return false;
-        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+        const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
         return (
           bookingDate.getMonth() === currentDate.getMonth() &&
           bookingDate.getFullYear() === currentDate.getFullYear()
@@ -127,8 +131,8 @@ const Dashboard = () => {
     bookings.forEach((booking) => {
       if ((booking.status || "").toLowerCase() !== "approved") return;
 
-      const checkIn = normalizeDate(booking.checkIn || booking.date);
-      const checkOut = normalizeDate(booking.checkOut);
+      const checkIn = normalizeDate(getBookingCheckInDateValue(booking));
+      const checkOut = normalizeDate(getBookingCheckOutDateValue(booking));
       if (!today || !checkIn || !checkOut) return;
 
       if (today >= checkIn && today < checkOut) {
@@ -175,7 +179,7 @@ const Dashboard = () => {
     }
 
     (allBookings || []).forEach((booking) => {
-      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+      const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
       if (booking.paymentStatus === "paid" || booking.status === "approved") {
         const monthBucket = months.find(
           (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
@@ -209,7 +213,7 @@ const Dashboard = () => {
   const availableYears = useMemo(() => {
     const years = new Set(
       (allBookings || [])
-        .map((booking) => new Date(booking.checkIn || booking.date || booking.createdAt).getFullYear())
+        .map((booking) => new Date(getBookingCheckInDateValue(booking) || booking.createdAt).getFullYear())
         .filter((year) => !Number.isNaN(year))
     );
 
@@ -219,7 +223,7 @@ const Dashboard = () => {
 
   const reportBookings = useMemo(() => {
     return (allBookings || []).filter((booking) => {
-      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+      const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
 
       if (reportType === "monthly") {
         return bookingDate.getMonth() === reportMonth && bookingDate.getFullYear() === reportYear;
@@ -333,7 +337,7 @@ const Dashboard = () => {
       ];
 
       filtered.forEach((booking) => {
-        const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+        const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
         if (bookingDate < start || bookingDate > end) return;
         const day = bookingDate.getDate();
         const bucket = buckets.find((b) => day >= b.start && day <= b.end);
@@ -352,7 +356,7 @@ const Dashboard = () => {
     }));
 
     filtered.forEach((booking) => {
-      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+      const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
       if (bookingDate.getFullYear() !== reportYear) return;
       const bucket = months[bookingDate.getMonth()];
       if (bucket) {

@@ -76,6 +76,40 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   const buildingRef = useRef(null);
   const typeRef = useRef(null);
 
+  const normalizeRoomTypeName = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+
+  const getRoomCapacityValidationMessage = (selectedRoomType, rawCapacity) => {
+    const normalizedType = normalizeRoomTypeName(selectedRoomType);
+    const parsedCapacity = Number(rawCapacity);
+
+    if (!Number.isFinite(parsedCapacity) || parsedCapacity < 1) {
+      return "Room capacity must be at least 1.";
+    }
+
+    if (normalizedType === "individual" && parsedCapacity !== 1) {
+      return "Individual rooms must have exactly 1 guest capacity.";
+    }
+
+    if (normalizedType === "individual with pullout" && parsedCapacity > 2) {
+      return "Individual with Pullout rooms cannot have more than 2 guest capacity.";
+    }
+
+    if (normalizedType === "dormitory" && parsedCapacity < 3) {
+      return "Dormitory rooms must have at least 3 guest capacity.";
+    }
+
+    return "";
+  };
+
+  const capacityValidationMessage =
+    roomType && capacity !== ""
+      ? getRoomCapacityValidationMessage(roomType, capacity)
+      : "";
+
   // --- CUSTOM STYLES TO HIDE SCROLLBARS ---
   const scrollbarHideStyle = {
     msOverflowStyle: 'none',
@@ -84,22 +118,6 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
   };
 
   // --- INITIALIZATION & CLICK OUTSIDE ---
-  useEffect(() => {
-
-  if (roomType === "Individual") {
-    setCapacity(1);
-  }
-
-  else if (roomType === "Individual with Pullout") {
-    setCapacity(2);
-  }
-
-  else if (roomType === "Dormitory") {
-    setCapacity(prev => (prev < 3 ? 3 : prev));
-  }
-
-}, [roomType]);
-
   useEffect(() => {
     getBuildings();
     getRoomTypes();
@@ -300,20 +318,9 @@ const AddRoom = ({ onSuccess, onClose, editRoom }) => {
     if (!name || !capacity || !description) return toast.error("Please fill in all basic fields");
     if (!building) return toast.error("Please select or add a building");
     if (!roomType) return toast.error("Please select a room category");
-    if ((files.length + existingImages.length) === 0) return toast.error("Upload at least one image");
 
-    // Room Type Capacity Validation
-if (roomType === "Individual" && capacity !== 1) {
-  return toast.error("Individual rooms must have exactly 1 guest capacity.");
-}
-
-if (roomType === "Individual with Pullout" && capacity !== 2) {
-  return toast.error("Rooms with pullout must have exactly 2 guest capacity.");
-}
-
-if (roomType === "Dormitory" && capacity < 3) {
-  return toast.error("Dormitory rooms must have at least 3 guest capacity.");
-}
+    const validationMessage = getRoomCapacityValidationMessage(roomType, capacity);
+    if (validationMessage) return toast.error(validationMessage);
 
     setLoading(true);
     try {
@@ -486,37 +493,19 @@ if (roomType === "Dormitory" && capacity < 3) {
   type="number"
   value={capacity}
   onChange={(e) => {
-
   const value = e.target.value;
-
-  // If backspace (empty input)
-  if (value === "") {
-    setCapacity("");
-    setRoomType("");
-    return;
-  }
-
-  const num = Number(value);
-  setCapacity(num);
-
-  if (num === 1) {
-    setRoomType("Individual");
-  }
-
-  else if (num === 2) {
-    setRoomType("Individual with Pullout");
-  }
-
-  else if (num >= 3) {
-    setRoomType("Dormitory");
-  }
-
+  setCapacity(value === "" ? "" : Number(value));
 }}
   required
   min="1"
   placeholder="0"
   className="w-full px-5 py-4 bg-white border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
 />
+                    {capacityValidationMessage && (
+                      <p className="mt-2 text-xs font-bold text-rose-500">
+                        {capacityValidationMessage}
+                      </p>
+                    )}
                   </div>
                 </div>
 

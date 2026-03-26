@@ -1,5 +1,10 @@
 import mongoose from "mongoose";
 import Review from "../models/reviewModel.js";
+import { getBookingStayFlags, getBookingStayStatus } from "./bookingStay.js";
+import {
+  getBookingCheckInDate,
+  getBookingCheckOutDate,
+} from "./bookingDateFields.js";
 
 const { ObjectId } = mongoose.Types;
 
@@ -130,6 +135,12 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   const booking = toPlainObject(bookingDoc);
   const review = reviewDoc ? toPlainObject(reviewDoc) : null;
   const user = isPlainObject(booking.userId) ? serializeUser(booking.userId) : booking.userId;
+  const checkInConfirmedBy = isPlainObject(booking.checkInConfirmedBy)
+    ? serializeUser(booking.checkInConfirmedBy)
+    : booking.checkInConfirmedBy;
+  const checkOutConfirmedBy = isPlainObject(booking.checkOutConfirmedBy)
+    ? serializeUser(booking.checkOutConfirmedBy)
+    : booking.checkOutConfirmedBy;
   const extraPackages = (booking.extraPackages || []).map((pkg) =>
     isPlainObject(pkg) ? serializePackage(pkg) : pkg
   );
@@ -155,14 +166,30 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
       : [];
   const comment = String(review?.comment ?? booking.review ?? booking.comment ?? "");
   const rating = Number(review?.rating ?? booking.rating ?? 0) || 0;
+  const { checkIn, checkOut, noShow } = getBookingStayFlags(booking);
+  const checkInDate = getBookingCheckInDate(booking);
+  const checkOutDate = getBookingCheckOutDate(booking);
 
   return {
     ...booking,
     userId: user,
     bookingItems,
     extraPackages,
-    checkIn: booking.checkIn || null,
-    checkOut: booking.checkOut || null,
+    checkIn,
+    checkInConfirmedAt: booking.checkInConfirmedAt || null,
+    checkInConfirmedBy,
+    checkOut,
+    checkOutConfirmedAt: booking.checkOutConfirmedAt || null,
+    checkOutConfirmedBy,
+    noShow,
+    stayStatus: getBookingStayStatus({
+      ...booking,
+      checkIn,
+      checkOut,
+      noShow,
+    }),
+    checkInDate: checkInDate || null,
+    checkOutDate: checkOutDate || null,
     totalPrice: booking.totalPrice ?? 0,
     rating,
     review: comment,
@@ -218,6 +245,14 @@ export const attachReviewDataToBookings = async (bookingDocs) => {
 
 export const buildBookingPopulate = () => [
   { path: "userId", select: "name firstName middleName lastName suffix email phone image authProvider" },
+  {
+    path: "checkInConfirmedBy",
+    select: "name firstName middleName lastName suffix role",
+  },
+  {
+    path: "checkOutConfirmedBy",
+    select: "name firstName middleName lastName suffix role",
+  },
   {
     path: "bookingItems.roomId",
     populate: roomReferencePopulate,

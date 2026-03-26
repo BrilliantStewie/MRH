@@ -9,6 +9,10 @@ import {
 } from "lucide-react"; // 👈 Added Tag and Wallet icons here
 import ReviewPage from "./ReviewPage"; // Ensure this path is correct
 import venueOnlyImage from "../assets/mrh_about.jpg";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../utils/bookingDateFields";
 
 // --- HELPER: Date Formatter ---
 const formatDate = (dateInput) => {
@@ -258,8 +262,8 @@ const MyBookings = () => {
       const latestApproved = [...bookings]
         .filter((b) => b.status === "approved")
         .sort((a, b) => {
-          const aDate = new Date(a.updatedAt || a.createdAt || a.checkIn || 0).getTime();
-          const bDate = new Date(b.updatedAt || b.createdAt || b.checkIn || 0).getTime();
+          const aDate = new Date(a.updatedAt || a.createdAt || getBookingCheckInDateValue(a) || 0).getTime();
+          const bDate = new Date(b.updatedAt || b.createdAt || getBookingCheckInDateValue(b) || 0).getTime();
           return bDate - aDate;
         })[0];
       if (latestApproved?._id) {
@@ -303,8 +307,8 @@ const MyBookings = () => {
     const status = String(booking?.status || "").toLowerCase();
     const sortSource =
       status === "pending" || status === "cancellation_pending"
-        ? booking?.createdAt || booking?.date || booking?.updatedAt || booking?.checkIn
-        : booking?.checkIn || booking?.slotDate || booking?.date || booking?.createdAt;
+        ? booking?.createdAt || booking?.date || booking?.updatedAt || getBookingCheckInDateValue(booking)
+        : getBookingCheckInDateValue(booking) || booking?.slotDate || booking?.date || booking?.createdAt;
 
     const parsedDate = new Date(sortSource);
     return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
@@ -318,7 +322,7 @@ const MyBookings = () => {
     ? b.bookingItems[0].roomId
     : { name: "Room Details Unavailable" };
 
-    const date = new Date(b.checkIn || Date.now());
+    const date = new Date(getBookingCheckInDateValue(b) || Date.now());
 
     if (activeTab !== 'all' && b.status !== activeTab) return false;
     if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
@@ -340,7 +344,7 @@ const MyBookings = () => {
 }, [bookings, activeTab, searchQuery, monthFilter, yearFilter, sortOrder]);
   
   const uniqueYears = useMemo(() => {
-    const years = bookings.map(b => new Date(b.checkIn).getFullYear());
+    const years = bookings.map(b => new Date(getBookingCheckInDateValue(b)).getFullYear());
     return [...new Set(years)].sort((a, b) => b - a).map(y => ({ label: y.toString(), value: y.toString() }));
   }, [bookings]);
 
@@ -599,8 +603,8 @@ const MyBookings = () => {
               const slideIndex = isMultiRoom ? slideTick % roomSlides.length : 0;
               const slideRoom = isMultiRoom ? roomSlides[slideIndex] : mainRoom;
               
-              const checkInDate = booking.checkIn ? new Date(booking.checkIn) : new Date();
-              const checkOut = booking.checkOut ? new Date(booking.checkOut) : new Date();
+              const checkInDate = getBookingCheckInDateValue(booking) ? new Date(getBookingCheckInDateValue(booking)) : new Date();
+              const checkOut = getBookingCheckOutDateValue(booking) ? new Date(getBookingCheckOutDateValue(booking)) : new Date();
               
               const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
               const isCash = booking.paymentMethod === "cash";
@@ -864,12 +868,12 @@ const MyBookings = () => {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-in</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.checkIn)}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatDate(getBookingCheckInDateValue(selectedBooking))}</p>
                   </div>
                   <div className="hidden sm:block text-slate-300 text-sm font-bold">—</div>
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-out</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatDate(selectedBooking.checkOut)}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatDate(getBookingCheckOutDateValue(selectedBooking))}</p>
                   </div>
                   <div className="sm:ml-auto">{getStatusBadge(selectedBooking.status)}</div>
                 </div>

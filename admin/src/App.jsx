@@ -8,8 +8,8 @@ import { StaffContext } from "./context/StaffContext";
 // Components
 import Sidebar from "./components/Admin/Sidebar";
 import Navbar from "./components/Admin/Navbar";
-import StaffNavbar from "./components/Staff/StaffNavbar";
-import StaffSidebar from "./components/Staff/StaffSidebar";
+import StaffNavbar from "./components/staff/StaffNavbar";
+import StaffSidebar from "./components/staff/StaffSidebar";
 import StyledToastContainer from "./components/StyledToastContainer";
 
 // Pages

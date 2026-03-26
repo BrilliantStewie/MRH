@@ -9,6 +9,11 @@ import {
   normalizeDate,
   rangesOverlap,
 } from "./bookingRules.js";
+import {
+  BOOKING_DATE_SELECT,
+  getBookingCheckInDate,
+  getBookingCheckOutDate,
+} from "./bookingDateFields.js";
 
 const ROOM_LOCK_WINDOW_MS = 30 * 1000;
 
@@ -97,12 +102,12 @@ const findConflictingBookings = async (roomIds, start, end) => {
       "bookingItems.roomId": { $in: roomIds },
       status: { $in: ["pending", "approved"] },
     },
-    "checkIn checkOut bookingItems"
+    `${BOOKING_DATE_SELECT} bookingItems`
   );
 
   return bookings.filter((booking) => {
-    const existingStart = normalizeDate(booking.checkIn);
-    const existingEnd = normalizeDate(booking.checkOut);
+    const existingStart = normalizeDate(getBookingCheckInDate(booking));
+    const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
     return rangesOverlap(existingStart, cleaningEnd, start, end);
   });
@@ -112,8 +117,8 @@ const createValidatedBooking = async ({
   userId,
   bookingName,
   bookingItems = [],
-  checkIn,
-  checkOut,
+  checkInDate,
+  checkOutDate,
   venueParticipants = 0,
   extraPackages = [],
 }) => {
@@ -215,8 +220,8 @@ const createValidatedBooking = async ({
     }
   }
 
-  const start = normalizeDate(checkIn);
-  const end = normalizeDate(checkOut);
+  const start = normalizeDate(checkInDate);
+  const end = normalizeDate(checkOutDate);
   const today = normalizeDate(new Date());
 
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
@@ -280,8 +285,10 @@ const createValidatedBooking = async ({
       bookingItems: normalizedBookingItems,
       extraPackages: uniqueExtraPackages,
       venueParticipants: Number(venueParticipants) || 0,
-      checkIn: start,
-      checkOut: end,
+      checkInDate: start,
+      checkOutDate: end,
+      checkIn: false,
+      checkOut: false,
       totalPrice,
       status: "pending",
       payment: false,

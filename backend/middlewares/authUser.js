@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import {
+  getDecodedSessionVersion,
+  getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 const authUser = async (req, res, next) => {
   try {
@@ -26,7 +30,7 @@ const authUser = async (req, res, next) => {
       });
     }
 
-    if ((user.tokenVersion || 0) !== (decoded.tokenVersion ?? 0)) {
+    if (getSessionVersion(user) !== getDecodedSessionVersion(decoded)) {
       return res.status(401).json({
         success: false,
         message: "Session expired due to security changes. Please login again."

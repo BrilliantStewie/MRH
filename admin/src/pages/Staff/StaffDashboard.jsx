@@ -11,6 +11,10 @@ import {
 import { toast } from "react-toastify";
 import AvailabilityCalendar from "../Admin/AvailabilityCalendar";
 import { StaffContext } from "../../context/StaffContext";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../../utils/bookingDateFields";
 
 const normalizeDate = (value) => {
   const d = new Date(value);
@@ -59,8 +63,8 @@ const StaffDashboard = () => {
     bookings.forEach((booking) => {
       if ((booking.status || "").toLowerCase() !== "approved") return;
 
-      const checkIn = normalizeDate(booking.checkIn || booking.date);
-      const checkOut = normalizeDate(booking.checkOut);
+      const checkIn = normalizeDate(getBookingCheckInDateValue(booking));
+      const checkOut = normalizeDate(getBookingCheckOutDateValue(booking));
       if (!today || !checkIn || !checkOut) return;
 
       if (today >= checkIn && today < checkOut) {
@@ -119,7 +123,7 @@ const StaffDashboard = () => {
     }
 
     (allBookings || []).forEach((booking) => {
-      const bookingDate = new Date(booking.checkIn || booking.date || booking.createdAt);
+      const bookingDate = new Date(getBookingCheckInDateValue(booking) || booking.createdAt);
       const monthBucket = months.find(
         (month) => month.month === bookingDate.getMonth() && month.year === bookingDate.getFullYear()
       );

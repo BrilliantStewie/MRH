@@ -8,6 +8,10 @@ import {
   Sparkles, Star, ArrowLeft, ArrowRight, Check, BedDouble, MapPin, PenLine, Package, Home
 } from "lucide-react";
 import venueOnlyImage from "../assets/mrh_about.jpg";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "../utils/bookingDateFields";
 
 const formatDate = (dateString) => {
   if (!dateString) return "N/A";
@@ -121,8 +125,8 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     location: "Poblacion, Dauis, Bohol, Philippines",
     guestName: user?.name || "Guest", 
     roomName: booking.bookingName || roomLabel,
-    checkIn: formatDate(booking.checkIn),
-    checkOut: formatDate(booking.checkOut),
+    checkIn: formatDate(getBookingCheckInDateValue(booking)),
+    checkOut: formatDate(getBookingCheckOutDateValue(booking)),
     details: {
       booking: roomLabel,
       package: packageName,
@@ -254,12 +258,12 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-in</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.checkIn)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatDate(getBookingCheckInDateValue(booking))}</p>
                     </div>
                     <div className="hidden sm:block text-slate-300 text-sm font-bold">—</div>
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-out</p>
-                      <p className="text-sm font-semibold text-slate-900">{formatDate(booking.checkOut)}</p>
+                      <p className="text-sm font-semibold text-slate-900">{formatDate(getBookingCheckOutDateValue(booking))}</p>
                     </div>
                     <div className="sm:ml-auto">{getStatusBadge(booking.status)}</div>
                   </div>

@@ -11,6 +11,11 @@ import buildingModel from "../models/buildingModel.js";
 import roomTypeModel from "../models/roomtypeModel.js";
 import packageModel from "../models/packageModel.js";
 import { createOrRefreshNotification } from "../utils/notificationUtils.js";
+import {
+  buildSessionTokenPayload,
+  bumpSessionVersion,
+  getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 // Utils
 import sendEmail from "../utils/sendEmail.js";
@@ -23,6 +28,7 @@ import {
   roomReferencePopulate,
   serializeRoom,
 } from "../utils/dataConsistency.js";
+import { getBookingCheckInDate } from "../utils/bookingDateFields.js";
 
 // ======================================================================
 // 🛠️ CLOUD HELPER
@@ -110,6 +116,35 @@ const resolveBuildingDoc = async (value) =>
 const resolveRoomTypeDoc = async (value) =>
   resolveNamedReference(roomTypeModel, value);
 
+const normalizeRoomTypeName = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const getRoomCapacityValidationMessage = (roomTypeName, rawCapacity) => {
+  const normalizedType = normalizeRoomTypeName(roomTypeName);
+  const capacity = Number(rawCapacity);
+
+  if (!Number.isFinite(capacity) || capacity < 1) {
+    return "Room capacity must be at least 1.";
+  }
+
+  if (normalizedType === "individual" && capacity !== 1) {
+    return "Individual rooms must have exactly 1 guest capacity.";
+  }
+
+  if (normalizedType === "individual with pullout" && capacity > 2) {
+    return "Individual with Pullout rooms cannot have more than 2 guest capacity.";
+  }
+
+  if (normalizedType === "dormitory" && capacity < 3) {
+    return "Dormitory rooms must have at least 3 guest capacity.";
+  }
+
+  return "";
+};
+
 // ======================================================================
 // 🔐 AUTHENTICATION
 // ======================================================================
@@ -151,12 +186,12 @@ const loginAdmin = async (req, res) => {
 
     // Create token
     const token = jwt.sign(
-      {
+      buildSessionTokenPayload({
         id: admin._id,
         role: admin.role,
         name: `${admin.firstName || "Admin"} ${admin.lastName || ""}`.trim(),
-        tokenVersion: admin.tokenVersion || 0
-      },
+        sessionVersion: getSessionVersion(admin),
+      }),
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
@@ -353,7 +388,7 @@ const createStaff = async (req, res) => {
             role: 'staff',
             emailVerified: true,
             phoneVerified: Boolean(phone),
-            tokenVersion: 0 
+            sessionVersion: 0
         });
 
         await newStaff.save();
@@ -384,7 +419,7 @@ const updateStaff = async (req, res) => {
         if (password && password.trim() !== "") {
             const salt = await bcrypt.genSalt(10);
             staff.password = await bcrypt.hash(password, salt);
-            staff.tokenVersion = (staff.tokenVersion || 0) + 1;
+            bumpSessionVersion(staff);
         }
 
         if (imageFile) {
@@ -483,11 +518,17 @@ const addRoom = async (req, res) => {
             return res.json({ success: false, message: "All fields are required" });
         }
 
-        const imageFiles = req.files || [];
-        if (imageFiles.length === 0) {
-            return res.json({ success: false, message: "At least one room image is required" });
+        const parsedCapacity = Number(capacity);
+        const capacityValidationMessage = getRoomCapacityValidationMessage(
+            roomTypeDoc.name,
+            parsedCapacity
+        );
+
+        if (capacityValidationMessage) {
+            return res.json({ success: false, message: capacityValidationMessage });
         }
 
+        const imageFiles = req.files || [];
         const imagesUrl = await Promise.all(
             imageFiles.map(item => streamUpload(item.buffer, "mrh_rooms"))
         );
@@ -496,11 +537,11 @@ const addRoom = async (req, res) => {
             name: normalizedName,
             roomTypeId: roomTypeDoc._id,
             buildingId: buildingDoc._id,
-            capacity: Number(capacity),
+            capacity: parsedCapacity,
             description,
             amenities: parseAmenities(amenities),
             images: imagesUrl,
-            coverImage: imagesUrl[0],
+            coverImage: imagesUrl[0] || "",
             available: true
         };
 
@@ -545,10 +586,28 @@ const updateRoom = async (req, res) => {
             return res.json({ success: false, message: "Selected room type does not exist" });
         }
 
+        const effectiveRoomTypeName = roomTypeDoc?.name || room.roomTypeId?.name || (
+            await roomTypeModel.findById(room.roomTypeId).lean()
+        )?.name;
+        const effectiveCapacity =
+            capacity !== undefined && capacity !== null && capacity !== ""
+                ? Number(capacity)
+                : Number(room.capacity);
+        const capacityValidationMessage = getRoomCapacityValidationMessage(
+            effectiveRoomTypeName,
+            effectiveCapacity
+        );
+
+        if (capacityValidationMessage) {
+            return res.json({ success: false, message: capacityValidationMessage });
+        }
+
         if (name) room.name = normalizeName(name);
         if (roomTypeDoc) room.roomTypeId = roomTypeDoc._id;
         if (buildingDoc) room.buildingId = buildingDoc._id;
-        if (capacity) room.capacity = Number(capacity);
+        if (capacity !== undefined && capacity !== null && capacity !== "") {
+            room.capacity = effectiveCapacity;
+        }
         if (description) room.description = description;
         
         if (amenities !== undefined) {
@@ -682,7 +741,7 @@ const approveBooking = async (req, res) => {
                 <p>Hello ${booking.userId.firstName},</p>
                 <p>Your booking has been approved.</p>
                 <p>Booking: ${booking.bookingName || "Reservation"}</p>
-                <p>Check-in: ${new Date(booking.checkIn).toLocaleDateString()}</p>
+                <p>Check-in: ${new Date(getBookingCheckInDate(booking)).toLocaleDateString()}</p>
                 <p>You can view details in your account.</p>
                 <p>Mercedarian Retreat House</p>
             </div>

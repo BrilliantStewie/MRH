@@ -1,5 +1,9 @@
 import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
+import {
+  getDecodedSessionVersion,
+  getSessionVersion,
+} from "../utils/sessionVersion.js";
 
 const authStaff = async (req, res, next) => {
   try {
@@ -31,7 +35,7 @@ const authStaff = async (req, res, next) => {
     }
 
     // Security check: Match token version to database version
-    if (user.tokenVersion !== decoded.tokenVersion) {
+    if (getSessionVersion(user) !== getDecodedSessionVersion(decoded)) {
       return res.status(401).json({
         success: false,
         message: "Session expired due to security changes. Please login again.",
@@ -48,6 +52,8 @@ const authStaff = async (req, res, next) => {
     // ✅ ATTACH DATA FOR CHAT & OTHER CONTROLLERS
     // 'req.user' for general profile/booking use
     req.user = { id: user._id }; 
+    req.userId = user._id;
+    req.userRole = user.role;
     
     // Specifically for our addReviewChat controller
     // This allows the chat to log the sender as "Staff [Name]"

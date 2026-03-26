@@ -11,6 +11,7 @@ import {
   roomReferencePopulate,
   serializeReview,
 } from "../utils/dataConsistency.js";
+import { BOOKING_DATE_SELECT } from "../utils/bookingDateFields.js";
 import { getBookingReviewEligibility } from "../utils/bookingRules.js";
 
 const uploadReviewImage = (fileBuffer, folder = "mrh_reviews") =>
@@ -65,7 +66,7 @@ const fetchSerializedReviews = async ({
     })
     .populate({
       path: "bookingId",
-      select: "checkIn checkOut bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus",
+      select: `${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus`,
       populate: [
         {
           path: "bookingItems.roomId",
