@@ -600,13 +600,13 @@ const MyBookings = () => {
               const slideRoom = isMultiRoom ? roomSlides[slideIndex] : mainRoom;
               
               const checkInDate = booking.checkIn ? new Date(booking.checkIn) : new Date();
-              const checkOutDate = booking.checkOut ? new Date(booking.checkOut) : new Date();
+              const checkOut = booking.checkOut ? new Date(booking.checkOut) : new Date();
               
               const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
               const isCash = booking.paymentMethod === "cash";
               const isApproved = booking.status === "approved";
               const isCancellationPending = booking.status === "cancellation_pending";
-              const hasPassed = new Date() > checkOutDate;
+              const hasPassed = new Date() > checkOut;
               const isGCashPending = booking.paymentMethod === "gcash" && booking.paymentStatus === "pending";
               
               const showPaymentButtons =
@@ -676,7 +676,7 @@ const MyBookings = () => {
                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-slate-500">
                              <span className="flex items-center gap-2">
                                <Clock size={16} className="text-slate-400" /> 
-                               {formatDate(checkInDate)} — {formatDate(checkOutDate)}
+                               {formatDate(checkInDate)} — {formatDate(checkOut)}
                              </span>
                            </div>
                            <button

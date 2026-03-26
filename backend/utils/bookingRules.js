@@ -34,15 +34,15 @@ const getBookingReviewEligibility = (booking, now = new Date()) => {
     };
   }
 
-  const checkOutDate = new Date(booking.checkOut);
-  if (Number.isNaN(checkOutDate.getTime())) {
+  const checkOut = new Date(booking.checkOut);
+  if (Number.isNaN(checkOut.getTime())) {
     return {
       eligible: false,
       message: "Booking check-out date is invalid.",
     };
   }
 
-  if (now <= checkOutDate) {
+  if (now <= checkOut) {
     return {
       eligible: false,
       message: "You can review this booking after your stay is complete.",

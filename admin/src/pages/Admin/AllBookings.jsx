@@ -143,7 +143,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
               <ArrowRight size={14} className="text-blue-300" />
               <div className="text-center">
                 <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkOutDate)}</p>
+                <p className="text-xs font-black text-slate-700">{formatDate(booking.checkOut)}</p>
               </div>
             </div>
           </div>
@@ -825,7 +825,7 @@ const AllBookings = () => {
                   <td className="px-6 py-5 align-top">
                     <div className="-ml-4 flex justify-center">
                       <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                        {formatDatePHT(b.checkIn || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.checkOutDate)}
+                        {formatDatePHT(b.checkIn || b.date)} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(b.checkOut)}
                       </div>
                     </div>
                   </td>
