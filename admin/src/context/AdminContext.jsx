@@ -116,8 +116,9 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   const adminLogin = async (email, password) => {
     try {
+      const normalizedEmail = String(email || "").trim().toLowerCase();
       const { data } = await axios.post(`${backendUrl}/api/admin/login`, {
-        email,
+        email: normalizedEmail,
         password,
       });
 

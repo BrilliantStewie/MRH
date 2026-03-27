@@ -150,15 +150,23 @@ const getRoomCapacityValidationMessage = (roomTypeName, rawCapacity) => {
 // ======================================================================
 
 const loginAdmin = async (req, res) => {
-  try {
+    try {
+  
+      const normalizedEmail = String(req.body?.email || "").trim().toLowerCase();
+      const password = String(req.body?.password || "");
 
-    const { email, password } = req.body;
-
-    // Find admin in database
-    const admin = await userModel.findOne({
-      email,
-      role: "admin"
-    });
+      if (!normalizedEmail || !password) {
+        return res.json({
+          success: false,
+          message: "Email and password are required"
+        });
+      }
+  
+      // Find admin in database
+      const admin = await userModel.findOne({
+        email: normalizedEmail,
+        role: "admin"
+      });
 
       if (!admin) {
         return res.json({
