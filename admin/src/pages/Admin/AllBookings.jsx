@@ -19,6 +19,14 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../../utils/bookingDateFields";
+import {
+  formatDatePHT as formatDatePHTValue,
+  getCurrentPHYear,
+  getMonthLabelPHT,
+  getPHDateValue,
+  getPHMonthIndex,
+  getPHYear,
+} from "../../utils/dateTime";
 
 const BOOKINGS_PER_PAGE = 8;
 const getBookingRoomType = (item) =>
@@ -428,8 +436,8 @@ const AllBookings = () => {
   const [monthFilter, setMonthFilter] = useState("All Months");
   const [yearFilter, setYearFilter] = useState("All Years");
 
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+  const months = Array.from({ length: 12 }, (_, i) => getMonthLabelPHT(i));
+  const years = Array.from({ length: 5 }, (_, i) => getCurrentPHYear() - 2 + i);
   const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE));
   const currentPageSafe = Math.min(currentPage, totalPages);
   const visiblePageCount = Math.min(3, totalPages);
@@ -505,11 +513,7 @@ const AllBookings = () => {
   }, []);
 
   const formatDatePHT = (dateInput) => {
-    if (!dateInput) return "N/A";
-    const date = new Date(dateInput);
-    return isNaN(date.getTime()) ? "N/A" : new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Manila", day: "2-digit", month: "short", year: "numeric",
-    }).format(date);
+    return formatDatePHTValue(dateInput) || "N/A";
   };
 
   const triggerBookingFlash = (bookingId) => {
@@ -629,13 +633,18 @@ const AllBookings = () => {
 
     if (startDate || endDate) {
       filtered = filtered.filter(b => {
-        const bDate = new Date(getBookingCheckInDateValue(b)).toISOString().split('T')[0];
+        const bDate = getPHDateValue(getBookingCheckInDateValue(b));
+        if (!bDate) return false;
         return (!startDate || bDate >= startDate) && (!endDate || bDate <= endDate);
       });
     }
     
-    if (monthFilter !== "All Months") filtered = filtered.filter(b => new Date(getBookingCheckInDateValue(b)).getMonth() === months.indexOf(monthFilter));
-    if (yearFilter !== "All Years") filtered = filtered.filter(b => new Date(getBookingCheckInDateValue(b)).getFullYear() === parseInt(yearFilter));
+    if (monthFilter !== "All Months") {
+      filtered = filtered.filter((b) => getPHMonthIndex(getBookingCheckInDateValue(b)) === months.indexOf(monthFilter));
+    }
+    if (yearFilter !== "All Years") {
+      filtered = filtered.filter((b) => getPHYear(getBookingCheckInDateValue(b)) === parseInt(yearFilter));
+    }
 
     filtered.sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt);

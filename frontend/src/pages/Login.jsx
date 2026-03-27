@@ -601,7 +601,7 @@ const Login = () => {
   };
 
   return (
-    <div className='min-h-screen bg-[#F4F5F7] flex items-center justify-center p-6 font-sans relative'>
+    <div className='min-h-[100svh] bg-[#F4F5F7] flex items-center justify-center p-3 sm:p-6 font-sans relative'>
       <div id="login-recaptcha-container" className="hidden"></div>
       <AccountStatusModal
         open={Boolean(disabledModalMessage)}
@@ -657,9 +657,19 @@ const Login = () => {
         />
       )}
 
-      <div className='bg-white w-full max-w-6xl rounded-[40px] overflow-hidden flex flex-col lg:flex-row shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)]'>
-        <div className='w-full lg:w-[50%] p-10 sm:p-14 flex flex-col justify-center bg-white'>
+      <div className='bg-white w-full max-w-6xl rounded-[28px] sm:rounded-[40px] overflow-hidden flex flex-col lg:flex-row shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)]'>
+        <div className='w-full lg:w-[50%] p-6 sm:p-10 lg:p-14 flex flex-col justify-center bg-white'>
           <div className='max-w-[400px] mx-auto w-full'>
+            <div className='mb-6 lg:hidden'>
+              <div className='relative overflow-hidden rounded-[24px] border border-slate-200 bg-slate-900 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.55)]'>
+                <img src={loginVisual} alt="Mercedarian Retreat House" className='h-44 w-full object-cover opacity-90' />
+                <div className='absolute inset-0 bg-gradient-to-br from-slate-950/70 via-slate-900/35 to-transparent'></div>
+                <div className='absolute inset-x-0 bottom-0 p-5 text-white'>
+                  <p className='text-[10px] font-bold uppercase tracking-[0.28em] text-white/70'>Mercedarian Retreat House</p>
+                  <h3 className='mt-2 text-xl font-bold leading-tight'>A calmer booking experience, sized for every screen.</h3>
+                </div>
+              </div>
+            </div>
             <div className='mb-8'>
               <h2 className='text-3xl font-bold text-gray-900 tracking-tight'>
                 {state === 'Reset Password' ? "Set New Password" : (state === 'Sign Up' ? "Create Account" : (showForgotEmailField ? "Reset Password" : "Welcome Back"))}
@@ -686,7 +696,7 @@ const Login = () => {
                         </label>
                       </div>
 
-                      <div className='grid grid-cols-2 gap-4'>
+                      <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
                         <div className='space-y-1.5'>
                           <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>First Name</label>
                           <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setFirstName(formatName(e.target.value))} value={firstName} placeholder="First name" required />
@@ -697,8 +707,8 @@ const Login = () => {
                         </div>
                       </div>
 
-                      <div className='grid grid-cols-4 gap-4'>
-                        <div className='col-span-3 space-y-1.5'>
+                      <div className='grid grid-cols-1 gap-4 sm:grid-cols-4'>
+                        <div className='space-y-1.5 sm:col-span-3'>
                           <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>Middle Name</label>
                           <input className='w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-sm focus:border-blue-500 outline-none' type="text" onChange={(e) => setMiddleName(formatName(e.target.value))} value={middleName} placeholder="Optional" />
                         </div>
@@ -785,7 +795,7 @@ const Login = () => {
 
                     {showForgotEmailField && state === 'Login' && (
                       <div className="mt-4 p-5 bg-white border border-gray-100 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <button
                             type="button"
                             onClick={() => {

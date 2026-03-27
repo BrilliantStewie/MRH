@@ -13,15 +13,17 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
+import {
+  formatDatePHT,
+  getMonthLabelPHT,
+  getPHDateValue,
+  getPHMonthIndex,
+  getPHYear,
+} from "../utils/dateTime";
 
 // --- HELPER: Date Formatter ---
 const formatDate = (dateInput) => {
-  if (!dateInput) return "N/A";
-  return new Date(dateInput).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  return formatDatePHT(dateInput) || "N/A";
 };
 
 // --- REUSABLE DROPDOWN COMPONENT ---
@@ -322,11 +324,13 @@ const MyBookings = () => {
     ? b.bookingItems[0].roomId
     : { name: "Room Details Unavailable" };
 
-    const date = new Date(getBookingCheckInDateValue(b) || Date.now());
+    const checkInValue = getBookingCheckInDateValue(b) || Date.now();
+    const monthIndex = getPHMonthIndex(checkInValue);
+    const yearValue = getPHYear(checkInValue);
 
     if (activeTab !== 'all' && b.status !== activeTab) return false;
-    if (monthFilter !== 'all' && date.getMonth().toString() !== monthFilter) return false;
-    if (yearFilter !== 'all' && date.getFullYear().toString() !== yearFilter) return false;
+    if (monthFilter !== 'all' && monthIndex.toString() !== monthFilter) return false;
+    if (yearFilter !== 'all' && yearValue.toString() !== yearFilter) return false;
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -344,11 +348,13 @@ const MyBookings = () => {
 }, [bookings, activeTab, searchQuery, monthFilter, yearFilter, sortOrder]);
   
   const uniqueYears = useMemo(() => {
-    const years = bookings.map(b => new Date(getBookingCheckInDateValue(b)).getFullYear());
+    const years = bookings
+      .map((b) => getPHYear(getBookingCheckInDateValue(b)))
+      .filter((year) => Number.isFinite(year));
     return [...new Set(years)].sort((a, b) => b - a).map(y => ({ label: y.toString(), value: y.toString() }));
   }, [bookings]);
 
-  const months = Array.from({ length: 12 }, (_, i) => ({ label: new Date(0, i).toLocaleString('default', { month: 'long' }), value: i.toString() }));
+  const months = Array.from({ length: 12 }, (_, i) => ({ label: getMonthLabelPHT(i), value: i.toString() }));
   const sortOptions = [{ label: "Newest First", value: "newest" }, { label: "Oldest First", value: "oldest" }];
   const displayedBookings = showAllBookings ? filteredBookings : filteredBookings.slice(0, 5);
   const selectedRoomItems = selectedBooking?.bookingItems || [];
@@ -605,12 +611,14 @@ const MyBookings = () => {
               
               const checkInDate = getBookingCheckInDateValue(booking) ? new Date(getBookingCheckInDateValue(booking)) : new Date();
               const checkOut = getBookingCheckOutDateValue(booking) ? new Date(getBookingCheckOutDateValue(booking)) : new Date();
+              const todayPH = getPHDateValue(new Date());
+              const checkOutPH = getPHDateValue(checkOut);
               
               const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
               const isCash = booking.paymentMethod === "cash";
               const isApproved = booking.status === "approved";
               const isCancellationPending = booking.status === "cancellation_pending";
-              const hasPassed = new Date() > checkOut;
+              const hasPassed = Boolean(checkOutPH && todayPH > checkOutPH);
               const isGCashPending = booking.paymentMethod === "gcash" && booking.paymentStatus === "pending";
               
               const showPaymentButtons =
@@ -630,7 +638,7 @@ const MyBookings = () => {
 
               const imageUrl = isVenueOnly
                 ? venueOnlyImage
-                : getImageUrl(slideRoom?.coverImage || slideRoom?.imageslideRoom?.image);
+                : getImageUrl(slideRoom?.coverImage || slideRoom?.images || slideRoom?.image);
 
               return (
                 <div

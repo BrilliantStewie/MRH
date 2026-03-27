@@ -6,6 +6,7 @@ import { AdminContext } from "../../context/AdminContext.jsx";
 import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { formatDatePHT } from "../../utils/dateTime";
 
 const Navbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
@@ -122,9 +123,7 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
   const totalBadgeText = notifications.length > 99 ? "99+" : notifications.length;
 
   const formatNotificationDate = (createdAt) => {
-    const date = new Date(createdAt);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, {
+    return formatDatePHT(createdAt, {
       month: "short",
       day: "numeric",
     });

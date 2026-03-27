@@ -28,6 +28,7 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../../utils/bookingDateFields";
+import { formatDatePHT, formatDateRangePHT, formatDateTimePHT } from "../../utils/dateTime";
 
 const StaffReviews = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
@@ -299,22 +300,11 @@ const StaffReviews = () => {
      HELPER: Date Formatting
   ========================================== */
   const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short", day: "numeric", year: "numeric",
-    });
+    return formatDatePHT(dateString);
   };
 
   const formatDateTime = (dateString) => {
-    if (!dateString) return "";
-    return new Date(dateString).toLocaleString("en-US", {
-      month: "short", 
-      day: "numeric", 
-      year: "numeric", 
-      hour: "numeric", 
-      minute: "2-digit", 
-      hour12: true 
-    });
+    return formatDateTimePHT(dateString);
   };
 
   const resolveReviewImage = (imagePath) => {
@@ -355,22 +345,7 @@ const StaffReviews = () => {
 
   const formatStayDate = (start, end) => {
     if (!start) return "Stay date unavailable";
-    const s = new Date(start);
-    const e = end ? new Date(end) : null;
-    const isStartValid = !Number.isNaN(s.getTime());
-    const isEndValid = !e || !Number.isNaN(e.getTime());
-
-    if (!isStartValid || !isEndValid) {
-      return "Stay date unavailable";
-    }
-
-    const m = s.toLocaleString("default", { month: "short" });
-    if (e) {
-      const em = e.toLocaleString("default", { month: "short" });
-      if (m === em) return `${m} ${s.getDate()} - ${e.getDate()}, ${s.getFullYear()}`;
-      return `${m} ${s.getDate()} - ${em} ${e.getDate()}, ${s.getFullYear()}`;
-    }
-    return formatDate(start);
+    return (end ? formatDateRangePHT(start, end) : formatDatePHT(start)) || "Stay date unavailable";
   };
 
   const ratingCounts = ratingBuckets.reduce((acc, rating) => {

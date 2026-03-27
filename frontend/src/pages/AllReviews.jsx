@@ -29,6 +29,7 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
+import { formatDateRangePHT, formatDateTimePHT } from "../utils/dateTime";
 
 const AllReviews = () => {
   const { backendUrl, token, userData } = useContext(AppContext);
@@ -396,15 +397,11 @@ const AllReviews = () => {
   };
   
   const formatDateTime = (dateString) => {
-    return dateString ? new Date(dateString).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) : "";
+    return formatDateTimePHT(dateString);
   };
   const formatDateRange = (start, end) => {
     if (!start || !end) return "Dates not available";
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const startLabel = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const endLabel = endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    return `${startLabel} - ${endLabel}`;
+    return formatDateRangePHT(start, end) || "Dates not available";
   };
   const resolveReviewImage = (imagePath) => {
     if (!imagePath || typeof imagePath !== "string") return "";

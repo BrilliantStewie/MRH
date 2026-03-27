@@ -345,7 +345,7 @@ const Login = () => {
   const submitBusyLabel = isStaffResetView ? "Updating..." : "Verifying...";
 
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-auto bg-white font-sans lg:h-screen lg:flex-row lg:overflow-hidden">
+    <div className="flex min-h-[100svh] w-full flex-col overflow-auto bg-white font-sans lg:h-screen lg:flex-row lg:overflow-hidden">
       <div id="admin-login-recaptcha-container" className="hidden"></div>
       <AccountStatusModal
         open={Boolean(disabledModalMessage)}
@@ -428,8 +428,22 @@ const Login = () => {
       </div>
 
       {/* ---------------- RIGHT SIDE: FORM (40%) ---------------- */}
-      <div className="relative flex h-full w-full flex-col justify-center bg-white px-5 py-8 sm:px-8 lg:w-[40%] lg:px-12 xl:px-24">
+      <div className="relative flex h-full w-full flex-col justify-center bg-white px-4 py-6 sm:px-8 sm:py-8 lg:w-[40%] lg:px-12 xl:px-24">
         <div className="relative z-10 mx-auto w-full max-w-xl lg:max-w-none">
+            <div className="mb-6 lg:hidden">
+                <div className="relative overflow-hidden rounded-[28px] border border-slate-200 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.55)]">
+                    <img src={BannerImage} alt="Retreat House" className="h-44 w-full object-cover" />
+                    <div className={`absolute inset-0 ${isAdmin ? 'bg-indigo-900/75' : 'bg-slate-950/75'} mix-blend-multiply`}></div>
+                    <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/70">
+                            {isAdmin ? "Admin Panel" : "Staff Panel"}
+                        </p>
+                        <h3 className="mt-2 text-xl font-bold leading-tight">
+                            {isAdmin ? "Run the retreat with confidence." : "Stay connected to daily guest service."}
+                        </h3>
+                    </div>
+                </div>
+            </div>
             <div className="mb-6 sm:mb-8">
                 <h2 className="text-3xl font-bold text-gray-800 mb-2 tracking-tight">
                 {isStaffResetView ? "Set New Password" : "Welcome Back"}

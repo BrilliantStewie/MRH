@@ -12,10 +12,10 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
+import { formatDatePHT } from "../utils/dateTime";
 
 const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return formatDatePHT(dateString, { month: "short", day: "numeric" }) || "N/A";
 };
 
 const ReviewPage = ({ booking, onClose, user, onSuccess }) => {

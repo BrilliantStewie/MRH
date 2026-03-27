@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'; // 1. Import useNavigate
 import { Star, Quote, ArrowRight, CheckCircle2, User } from 'lucide-react';
 import axios from "axios";
 import { AppContext } from "../context/AppContext";
+import { formatMonthYearPHT } from "../utils/dateTime";
 
 const Testimonials = () => {
   const navigate = useNavigate(); // 2. Initialize the hook
@@ -73,10 +74,7 @@ const Testimonials = () => {
   };
 
   const formatMonthYear = (dateInput) => {
-    if (!dateInput) return "";
-    const date = new Date(dateInput);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    return formatMonthYearPHT(dateInput);
   };
 
   const truncateText = (text, maxLength = 60) => {

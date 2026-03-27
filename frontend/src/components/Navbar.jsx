@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { formatDatePHT } from "../utils/dateTime";
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -148,9 +149,7 @@ const Navbar = () => {
   const totalBadgeText = notifications.length > 99 ? "99+" : notifications.length;
 
   const formatNotificationDate = (createdAt) => {
-    const date = new Date(createdAt);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, {
+    return formatDatePHT(createdAt, {
       month: "short",
       day: "numeric",
     });

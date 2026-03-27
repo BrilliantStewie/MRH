@@ -6,6 +6,7 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
+import { formatMonthYearPHT } from "../utils/dateTime";
 
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   const [viewDate, setViewDate] = useState(new Date());
@@ -161,7 +162,7 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
             renderCustomHeader={({ date, decreaseMonth, increaseMonth }) => (
               <div className="w-full flex items-center justify-between px-3 mb-6">
                 <span className="text-lg font-extrabold text-slate-800">
-                  {date.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                  {formatMonthYearPHT(date)}
                 </span>
                 <div className="flex gap-2">
                   <button 

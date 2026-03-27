@@ -22,6 +22,10 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../../utils/bookingDateFields";
+import {
+  formatDatePHT as formatDatePHTValue,
+  getPHDateValue,
+} from "../../utils/dateTime";
 
 const BOOKINGS_PER_PAGE = 8;
 const getBookingRoomType = (item) =>
@@ -563,7 +567,8 @@ const StaffBookings = () => {
         filtered = filtered.filter((b) => {
           const rawDate = getBookingCheckInDateValue(b);
           if (!rawDate) return false;
-          const bookingDateStr = new Date(rawDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+          const bookingDateStr = getPHDateValue(rawDate);
+          if (!bookingDateStr) return false;
           if (startDate && bookingDateStr < startDate) return false;
           if (endDate && bookingDateStr > endDate) return false;
           return true;
@@ -633,17 +638,7 @@ const StaffBookings = () => {
   };
 
   const formatDatePHT = (dateInput) => {
-    if (!dateInput) return "N/A";
-    try {
-      const date = new Date(dateInput);
-      if (isNaN(date.getTime())) return "N/A";
-      return new Intl.DateTimeFormat("en-GB", {
-        timeZone: "Asia/Manila",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }).format(date);
-    } catch (e) { return "N/A"; }
+    return formatDatePHTValue(dateInput) || "N/A";
   };
 
   // Stats matching the Admin Side logic exactly

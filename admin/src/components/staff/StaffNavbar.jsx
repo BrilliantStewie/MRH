@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { StaffContext } from "../../context/StaffContext";
 import { User, LogOut, UserCircle, Bell, BellOff, MessageSquare, MoreHorizontal, Check, Trash2, AlertTriangle, Calendar, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
 import axios from "axios";
+import { formatDatePHT } from "../../utils/dateTime";
 
 const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
@@ -133,9 +134,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   const totalBadgeText = notifications.length > 99 ? "99+" : notifications.length;
 
   const formatNotificationDate = (createdAt) => {
-    const date = new Date(createdAt);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, {
+    return formatDatePHT(createdAt, {
       month: "short",
       day: "numeric",
     });
