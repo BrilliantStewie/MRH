@@ -1268,10 +1268,10 @@ const Report = () => {
         </div>
       </div>
 
-      <div className="-mt-10 print:hidden lg:-mt-12">
+      <div className="-mt-6 print:hidden lg:-mt-12">
         <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900">Reports</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Reports</h1>
             <p className="mt-1 text-sm font-medium text-slate-500">Save monthly or yearly reports.</p>
           </div>
 
@@ -1279,7 +1279,7 @@ const Report = () => {
             type="button"
             onClick={handleGenerateReport}
             disabled={isGeneratingReport || isDownloading}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {isGeneratingReport || isDownloading ? (
               <Loader2 size={16} className="animate-spin" />
@@ -1335,7 +1335,7 @@ const Report = () => {
             </p>
           </div>
 
-          <div className="flex w-full flex-wrap items-center gap-3 lg:ml-auto lg:mr-4 lg:w-auto lg:flex-nowrap lg:justify-end">
+          <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:ml-auto lg:mr-4 lg:w-auto lg:flex-nowrap lg:justify-end">
             <FilterDropdown
               label="Report Type"
               options={REPORT_TYPE_OPTIONS}
@@ -1345,9 +1345,9 @@ const Report = () => {
               disableTriggerShadow
               flatTriggerDecorations
               neutralValue=""
-              triggerClassName="min-w-[150px] justify-between bg-slate-50 text-[12px] font-bold"
+              triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[150px]"
               showMenuHeader={false}
-              menuClassName="w-48"
+              menuClassName="w-full sm:w-48"
             />
 
             {reportType === "monthly" && (
@@ -1361,9 +1361,9 @@ const Report = () => {
                 flatTriggerDecorations
                 neutralValue=""
                 align="left"
-                triggerClassName="min-w-[140px] justify-between bg-slate-50 text-[12px] font-bold"
+                triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[140px]"
                 showMenuHeader={false}
-                menuClassName="w-[248px]"
+                menuClassName="w-full sm:w-[248px]"
                 optionListClassName={REPORT_MONTH_GRID_OPTION_LIST_CLASSNAME}
               />
             )}
@@ -1377,16 +1377,16 @@ const Report = () => {
               disableTriggerShadow
               flatTriggerDecorations
               neutralValue=""
-              triggerClassName="min-w-[128px] justify-between bg-slate-50 text-[12px] font-bold"
+              triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[128px]"
               showMenuHeader={false}
-              menuClassName="w-40"
+              menuClassName="w-full sm:w-40"
             />
           </div>
         </div>
 
         <div className="mt-2 px-3 sm:px-4">
           <div
-            className="inline-flex w-max shrink-0 items-center gap-1 rounded-full border border-[#d6e0ee] bg-[#eef4fb] p-1 shadow-[0_14px_26px_-28px_rgba(49,78,144,0.7)]"
+            className="inline-flex w-full flex-wrap items-center gap-1 rounded-full border border-[#d6e0ee] bg-[#eef4fb] p-1 shadow-[0_14px_26px_-28px_rgba(49,78,144,0.7)] sm:w-max sm:shrink-0"
             role="tablist"
             aria-label="Report chart mode"
           >
@@ -1394,7 +1394,7 @@ const Report = () => {
               type="button"
               onClick={() => setChartMode("booking")}
               aria-pressed={chartMode === "booking"}
-              className="inline-flex min-w-[108px] shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-black leading-none outline-none transition hover:bg-white hover:text-[#11284d] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3466dd]/35 focus-visible:ring-offset-0"
+              className="inline-flex min-w-[108px] flex-1 shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-black leading-none outline-none transition hover:bg-white hover:text-[#11284d] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3466dd]/35 focus-visible:ring-offset-0 sm:flex-none"
               style={getChartModeButtonStyles(chartMode === "booking", BOOKING_BAR_COLOR)}
             >
               <FileText size={14} strokeWidth={2.4} />
@@ -1404,7 +1404,7 @@ const Report = () => {
               type="button"
               onClick={() => setChartMode("income")}
               aria-pressed={chartMode === "income"}
-              className="inline-flex min-w-[108px] shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-black leading-none outline-none transition hover:bg-white hover:text-[#11284d] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12b981]/35 focus-visible:ring-offset-0"
+              className="inline-flex min-w-[108px] flex-1 shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-[13px] font-black leading-none outline-none transition hover:bg-white hover:text-[#11284d] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12b981]/35 focus-visible:ring-offset-0 sm:flex-none"
               style={getChartModeButtonStyles(chartMode === "income", INCOME_BAR_COLOR)}
             >
               <Wallet size={14} strokeWidth={2.4} />

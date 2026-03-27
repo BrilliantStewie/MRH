@@ -755,10 +755,10 @@ const Dashboard = () => {
           </div>
         )}
 
-        <header className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-center">
+        <header className="mb-6 flex flex-col justify-between gap-4 md:mb-8 md:flex-row md:items-center md:gap-6">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-900">{getGreeting()}, Admin</h1>
-            <p className="mt-1 font-medium text-slate-500">Property Overview & Real-time Analytics</p>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">{getGreeting()}, Admin</h1>
+            <p className="mt-1 text-sm font-medium text-slate-500 sm:text-base">Property Overview & Real-time Analytics</p>
           </div>
 
         </header>
@@ -814,10 +814,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
           <div className="lg:col-span-7">
-            <div className="flex h-full min-h-[320px] flex-col justify-between rounded-[32px] border border-slate-100 bg-white p-8 shadow-sm">
-              <div className="mb-8 flex items-end justify-between">
+            <div className="flex h-full min-h-[300px] flex-col justify-between rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm sm:min-h-[320px] sm:rounded-[32px] sm:p-8">
+              <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-black uppercase tracking-tight text-slate-800">
                     <BarChart3
@@ -865,7 +865,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="relative mt-auto flex h-56 items-end justify-between gap-2 pt-4 sm:gap-4">
+              <div className="relative mt-auto flex h-44 items-end justify-between gap-2 pt-4 sm:h-56 sm:gap-4">
                 <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
                   {[...Array(5)].map((_, index) => (
                     <div key={index} className="h-0 w-full border-t border-dashed border-slate-100"></div>
@@ -914,7 +914,7 @@ const Dashboard = () => {
           </div>
 
           <div className="flex lg:col-span-5">
-            <div className="group relative flex min-h-[320px] w-full flex-col justify-between overflow-hidden rounded-[32px] border border-slate-200 bg-white p-8 shadow-sm transition-colors duration-300 hover:border-indigo-200">
+            <div className="group relative flex min-h-[300px] w-full flex-col justify-between overflow-hidden rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-colors duration-300 hover:border-indigo-200 sm:min-h-[320px] sm:rounded-[32px] sm:p-8">
               <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 translate-x-1/3 -translate-y-1/3 rounded-full bg-indigo-50/80 blur-3xl transition-transform duration-700 group-hover:scale-110"></div>
               <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-48 -translate-x-1/3 translate-y-1/3 rounded-full bg-emerald-50/60 blur-3xl"></div>
 
@@ -929,15 +929,15 @@ const Dashboard = () => {
               </div>
 
               <div className="relative z-10 mt-auto">
-                <h3 className="mb-2 text-3xl font-black tracking-tight text-slate-900">Check Availability</h3>
-                <p className="mb-8 max-w-[90%] text-sm font-medium leading-relaxed text-slate-500">
+                <h3 className="mb-2 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Check Availability</h3>
+                <p className="mb-6 max-w-full text-sm font-medium leading-relaxed text-slate-500 sm:mb-8 sm:max-w-[90%]">
                   Check available dates and reservation schedules in one place.
                 </p>
 
                 <button
                   type="button"
                   onClick={() => setIsCalendarOpen(true)}
-                  className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-6 py-4 text-xs font-bold uppercase tracking-widest text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95"
+                  className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95 sm:px-6 sm:text-xs"
                 >
                   <span>View Calendar</span>
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors group-hover/btn:bg-white group-hover/btn:text-indigo-600">

@@ -31,21 +31,51 @@ import StaffProfile from "./pages/Staff/StaffProfile";
 // Route Guard
 import StaffProtectedRoute from "./routes/StaffProtectedRoute";
 
+const PANEL_SHELL_VARIANTS = {
+  contained: {
+    main: "overflow-y-auto p-3 sm:p-4 lg:p-8",
+    container: "mx-auto max-w-7xl pb-8",
+  },
+  workspace: {
+    main: "overflow-hidden p-3 sm:p-4 lg:p-8",
+    container: "h-full mx-auto max-w-7xl pb-0",
+  },
+  immersive: {
+    main: "overflow-hidden p-0",
+    container: "h-full max-w-none pb-0",
+  },
+  selfPadded: {
+    main: "overflow-y-auto p-0",
+    container: "h-full max-w-none pb-0",
+  },
+};
+
+const ROUTE_SHELL_MAP = {
+  "/admin-dashboard": "contained",
+  "/admin-analytics": "contained",
+  "/admin-reports": "contained",
+  "/staff-dashboard": "contained",
+  "/admin-packages": "workspace",
+  "/admin-users": "workspace",
+  "/admin-staff-list": "workspace",
+  "/rooms-list": "immersive",
+  "/all-bookings": "immersive",
+  "/staff-bookings": "immersive",
+  "/admin-reviews": "selfPadded",
+  "/staff-reviews": "selfPadded",
+  "/staff-profile": "selfPadded",
+};
+
+const getPanelShellLayout = (pathname) =>
+  PANEL_SHELL_VARIANTS[ROUTE_SHELL_MAP[pathname] || "contained"];
+
 const App = () => {
   const { aToken } = useContext(AdminContext);
   const { sToken } = useContext(StaffContext);
   const location = useLocation();
   const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false);
   const [isStaffSidebarOpen, setIsStaffSidebarOpen] = useState(false);
-  const isBookingsRoute =
-    location.pathname === "/all-bookings" || location.pathname === "/staff-bookings";
-  const isAdminDashboardRoute = location.pathname === "/admin-dashboard";
-  const isAdminAnalyticsRoute = location.pathname === "/admin-analytics";
-  const isAdminReportRoute = location.pathname === "/admin-reports";
-  const isAdminRoomsRoute = location.pathname === "/rooms-list";
-  const isAdminPackagesRoute = location.pathname === "/admin-packages";
-  const isAdminUsersRoute = location.pathname === "/admin-users";
-  const isAdminStaffListRoute = location.pathname === "/admin-staff-list";
+  const shellLayout = getPanelShellLayout(location.pathname);
 
   useEffect(() => {
     setIsAdminSidebarOpen(false);
@@ -68,39 +98,11 @@ const App = () => {
                 onClose={() => setIsAdminSidebarOpen(false)}
               />
             </div>
-              <main
-                className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
-                  isAdminRoomsRoute
-                    ? "overflow-hidden p-0"
-                  : isAdminPackagesRoute
-                      ? "overflow-hidden p-4 lg:p-8"
-                    : isAdminUsersRoute || isAdminStaffListRoute
-                      ? "overflow-hidden p-4 lg:p-8"
-                    : isBookingsRoute
-                      ? "overflow-hidden p-0"
-                      : "overflow-y-auto p-4 lg:p-8"
-                }`}
-              >
+            <main
+              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${shellLayout.main}`}
+            >
               <div
-                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${
-                  isAdminRoomsRoute
-                    ? "h-full max-w-none pb-0"
-                  : isAdminDashboardRoute
-                      ? "mx-auto max-w-7xl pb-0"
-                    : isAdminAnalyticsRoute
-                      ? "mx-auto max-w-7xl pb-0"
-                    : isAdminReportRoute
-                      ? "mx-auto max-w-7xl pb-0"
-                  : isAdminPackagesRoute
-                      ? "h-full mx-auto max-w-7xl pb-0"
-                    : isAdminUsersRoute
-                      ? "h-full max-w-none pb-0"
-                    : isAdminStaffListRoute
-                      ? "h-full mx-auto max-w-7xl pb-0"
-                    : isBookingsRoute
-                      ? "h-full max-w-none pb-0"
-                      : "mx-auto max-w-7xl pb-20"
-                }`}
+                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${shellLayout.container}`}
               >
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
@@ -133,14 +135,10 @@ const App = () => {
               />
             </div>
             <main
-              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${
-                isBookingsRoute ? "overflow-hidden p-0" : "overflow-y-auto"
-              }`}
+              className={`flex-1 bg-[#f8fafc] print:overflow-visible print:bg-white print:p-0 ${shellLayout.main}`}
             >
               <div
-                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${
-                  isBookingsRoute ? "h-full max-w-none pb-0" : "mx-auto max-w-7xl"
-                }`}
+                className={`w-full print:mx-0 print:max-w-none print:pb-0 ${shellLayout.container}`}
               >
                 <Routes>
                   <Route

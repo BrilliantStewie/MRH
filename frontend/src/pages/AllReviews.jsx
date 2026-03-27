@@ -30,6 +30,12 @@ import {
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
 import { formatDateRangePHT, formatDateTimePHT } from "../utils/dateTime";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../utils/realtime";
+
+const REVIEWS_REFRESH_INTERVAL_MS = 15000;
 
 const AllReviews = () => {
   const { backendUrl, token, userData } = useContext(AppContext);
@@ -88,23 +94,65 @@ const AllReviews = () => {
   /* ==========================================
      API: FETCH REVIEWS
   ========================================== */
-  const fetchReviews = async () => {
+  const fetchReviews = async ({ silent = false } = {}) => {
     try {
       const response = await axios.get(`${backendUrl}/api/reviews/all-reviews`, token
         ? { headers: { token } }
         : undefined);
       if (response.data.success) {
         setReviews(response.data.reviews || []);
+      } else if (!silent) {
+        toast.error(response.data.message);
       }
     } catch (err) {
-      toast.error("Failed to load reviews");
+      if (!silent) {
+        toast.error("Failed to load reviews");
+      } else {
+        console.error("Reviews refresh error:", err.message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { 
-    fetchReviews(); 
+  useEffect(() => {
+    if (!backendUrl) return undefined;
+
+    fetchReviews({ silent: true });
+
+    const runVisibleRefresh = () => {
+      if (document.visibilityState === "visible") {
+        fetchReviews({ silent: true });
+      }
+    };
+
+    const interval = setInterval(runVisibleRefresh, REVIEWS_REFRESH_INTERVAL_MS);
+    const handleFocus = () => fetchReviews({ silent: true });
+    const handleVisibilityChange = () => runVisibleRefresh();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [backendUrl, token]);
+
+  useEffect(() => {
+    if (!backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["reviews"])) {
+        fetchReviews({ silent: true });
+      }
+    };
+
+    window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
   }, [backendUrl, token]);
 
   useEffect(() => {

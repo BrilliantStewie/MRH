@@ -511,7 +511,7 @@ const StaffProfile = () => {
 
   if (!staffData) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="animate-spin text-blue-600" size={40} />
       </div>
     );
@@ -528,7 +528,7 @@ const StaffProfile = () => {
     : "Staff";
 
   return (
-    <div className="min-h-screen bg-slate-50/60 p-4 md:p-8">
+    <div className="min-h-full bg-slate-50/60 p-4 md:p-8">
       <div id="recaptcha-container" className="hidden"></div>
       {showPhoneOtpModal && (
         <VerifyFirebasePhoneOtp

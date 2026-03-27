@@ -26,12 +26,11 @@ const Features = () => {
   ];
 
   return (
-    // CHANGE 1: Increased vertical padding (py-32) for a taller section
-    <section className="bg-white py-32 border-b border-slate-100 font-sans text-slate-900">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="border-b border-slate-100 bg-white py-16 font-sans text-slate-900 sm:py-24 lg:py-32">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
         
         {/* --- SECTION HEADER --- */}
-        <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-6">
+        <div className="mb-12 flex flex-col justify-between gap-6 md:mb-20 md:flex-row md:items-end">
            <div className="max-w-2xl">
               <div className="flex items-center gap-2 mb-4">
                  <div className="h-px w-8 bg-blue-900"></div>
@@ -49,12 +48,11 @@ const Features = () => {
         </div>
 
         {/* --- ARCHITECTURAL GRID LAYOUT --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-t border-b border-slate-100 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+        <div className="grid grid-cols-1 divide-y divide-slate-100 border-t border-b border-slate-100 md:grid-cols-2 md:divide-x md:divide-y-0 lg:grid-cols-4">
           {features.map((item, index) => (
             <div 
                 key={index} 
-                // CHANGE 2: Increased padding (p-12 lg:p-16) and added min-height
-                className="group p-12 lg:p-16 min-h-[360px] flex flex-col justify-between hover:bg-[#F8F9FA] transition-colors duration-500 cursor-default"
+                className="group flex min-h-[240px] cursor-default flex-col justify-between p-8 transition-colors duration-500 hover:bg-[#F8F9FA] sm:min-h-[300px] sm:p-10 lg:min-h-[360px] lg:p-16"
             >
               <div>
                 {/* Icon Container */}

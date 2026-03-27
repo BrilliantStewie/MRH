@@ -8,29 +8,18 @@ import {
 } from "lucide-react";
 
 const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
-  const baseStyle =
-    "flex items-center gap-4 px-6 py-4 text-[13px] font-semibold text-slate-600 transition-all border-r-4 border-transparent hover:bg-emerald-50/50 hover:text-emerald-700 group";
-
-  const activeStyle =
-    "bg-emerald-50 border-emerald-600 text-emerald-700";
-
   const navItems = [
-    {
-      name: "Dashboard",
-      path: "/staff-dashboard",
-      icon: <LayoutDashboard size={20} />
-    },
-    {
-      name: "Bookings",
-      path: "/staff-bookings",
-      icon: <CalendarCheck size={20} />
-    },
-    {
-      name: "Guest Reviews",
-      path: "/staff-reviews",
-      icon: <MessageSquare size={20} />
-    }
+    { name: "Dashboard", path: "/staff-dashboard", icon: <LayoutDashboard size={18} /> },
+    { name: "Bookings", path: "/staff-bookings", icon: <CalendarCheck size={18} /> },
+    { name: "Guest Reviews", path: "/staff-reviews", icon: <MessageSquare size={18} /> },
   ];
+
+  const linkClass = ({ isActive }) =>
+    `group flex items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition-all ${
+      isActive
+        ? "border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm"
+        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-white"
+    }`;
 
   return (
     <>
@@ -43,12 +32,11 @@ const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-[#f8fafc] pt-20 shadow-xl transition-transform duration-300 md:static md:z-auto md:h-full md:w-64 md:max-w-none md:translate-x-0 md:pt-0 md:shadow-[4px_0_24px_-15px_rgba(0,0,0,0.05)] ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-1 border-r border-slate-200 bg-[#f8fafc] px-4 pb-4 pt-20 shadow-xl transition-transform duration-300 md:static md:z-auto md:h-full md:w-64 md:max-w-none md:translate-x-0 md:px-4 md:py-4 md:shadow-[4px_0_24px_-15px_rgba(0,0,0,0.05)] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-      <div className="flex h-full flex-col py-6">
-        <div className="mb-3 flex items-center justify-between px-6 md:hidden">
+        <div className="mb-2 flex items-center justify-between px-1 md:hidden">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-400">
               Navigation
@@ -63,26 +51,19 @@ const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
             <X size={16} />
           </button>
         </div>
-        <nav className="flex flex-col space-y-1">
+
+        <nav className="flex flex-col gap-1">
           {navItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `${baseStyle} ${isActive ? activeStyle : ""}`
-              }
-            >
-              <span className="transition-transform duration-200 group-hover:scale-110">
-                {item.icon}
-              </span>
-              <span>{item.name}</span>
+            <NavLink key={item.path} to={item.path} className={linkClass} onClick={onClose}>
+              <div className="flex items-center gap-3">
+                <span className="text-current transition-transform duration-200 group-hover:scale-110">
+                  {item.icon}
+                </span>
+                <span>{item.name}</span>
+              </div>
             </NavLink>
           ))}
         </nav>
-
-        <div className="mt-auto px-6 py-10"></div>
-      </div>
       </aside>
     </>
   );

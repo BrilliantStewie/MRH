@@ -25,6 +25,12 @@ import {
 import axios from "axios";
 import { toast } from "react-toastify";
 import { formatDatePHT } from "../utils/dateTime";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../utils/realtime";
+
+const NOTIFICATION_REFRESH_INTERVAL_MS = 15000;
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -134,13 +140,46 @@ const Navbar = () => {
 
   // ✅ Unified effect for Notifications
   useEffect(() => {
-    if (token) {
-      fetchNotifications();
-      const interval = setInterval(fetchNotifications, 60000);
-      return () => clearInterval(interval);
-    } else {
+    if (!token || !backendUrl) {
       setNotifications([]);
+      return undefined;
     }
+
+    fetchNotifications();
+
+    const runVisibleRefresh = () => {
+      if (document.visibilityState === "visible") {
+        fetchNotifications();
+      }
+    };
+
+    const interval = setInterval(runVisibleRefresh, NOTIFICATION_REFRESH_INTERVAL_MS);
+    const handleFocus = () => fetchNotifications();
+    const handleVisibilityChange = () => runVisibleRefresh();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [token, backendUrl]);
+
+  useEffect(() => {
+    if (!token || !backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["notifications"])) {
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
   }, [token, backendUrl]);
 
   const unreadCount = (notifications || []).filter(n => !n.isRead).length;

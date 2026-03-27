@@ -358,7 +358,7 @@ const RoomsList = () => {
 };
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans text-slate-900">
+    <div className="min-h-full bg-slate-50 p-4 font-sans text-slate-900 sm:p-6">
       
       {viewingRoom && (
         <RoomDetailsModal room={viewingRoom} onClose={() => setViewingRoom(null)} handleEdit={handleEdit}/>
@@ -402,16 +402,16 @@ const RoomsList = () => {
       )}
 
       {/* --- HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start mb-5 gap-4">
+      <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Room Management</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Room Management</h1>
           <p className="mt-1 text-xs text-slate-500">Manage your listings, availability, and details.</p>
         </div>
         
         <div className="flex w-full flex-col items-end md:w-auto">
           <button
             onClick={handleAddNew}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black md:w-auto"
           >
             <Plus size={20} />
             <span>Add New Room</span>
@@ -420,8 +420,8 @@ const RoomsList = () => {
       </div>
 
      {/* --- DYNAMIC FILTER BAR --- */}
-       <div className="relative z-40 mb-6 flex flex-col items-center gap-4 md:flex-row">
-        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto items-center">
+       <div className="relative z-40 mb-6 flex flex-col items-stretch gap-4 md:flex-row md:items-center">
+        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center">
          
          {/* BUILDING FILTER */}
          <div className="relative w-full md:w-48">

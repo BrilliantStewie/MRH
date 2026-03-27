@@ -120,9 +120,9 @@ const StaffList = () => {
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      <div className="mb-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 md:mb-8 md:flex-row md:items-center">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-800">
+          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-800 sm:text-3xl">
             Staff Management
           </h1>
           <p className="mt-1 text-sm text-slate-500">
@@ -132,7 +132,7 @@ const StaffList = () => {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black md:w-auto"
         >
           <UserPlus size={18} />
           Add Staff
@@ -156,7 +156,112 @@ const StaffList = () => {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm">
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="flex flex-col gap-3 p-4 md:hidden">
+          {displayedStaff.length > 0 ? (
+            displayedStaff.map((staffMember) => (
+              <div
+                key={staffMember._id}
+                className={`rounded-2xl border px-4 py-4 shadow-sm transition-colors ${
+                  staffMember.disabled
+                    ? "border-slate-200 bg-slate-50/80"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-slate-400 shadow-inner ${
+                      staffMember.disabled ? "grayscale opacity-70" : ""
+                    }`}
+                  >
+                    {staffMember.image && staffMember.image.trim() !== "" ? (
+                      <img
+                        src={staffMember.image}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <User size={20} className="text-slate-400" />
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-bold ${staffMember.disabled ? "text-slate-400" : "text-slate-900"}`}>
+                      {getFullName(staffMember)}
+                    </p>
+                    <p className="mt-1 text-xs capitalize text-slate-500">
+                      {staffMember.role}
+                    </p>
+
+                    <div className="mt-3 space-y-1.5">
+                      <div className={`flex items-start gap-2 text-xs ${
+                        staffMember.disabled ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        <Mail size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span className="break-all">{staffMember.email}</span>
+                      </div>
+                      <div className={`flex items-start gap-2 text-xs ${
+                        staffMember.disabled ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        <Phone size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span>{staffMember.phone || "N/A"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {staffMember.disabled ? (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                      <XCircle size={12} />
+                      Disabled
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                      <CircleDot size={12} className="animate-pulse" />
+                      Active
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    onClick={() => toggleStatus(staffMember._id)}
+                    className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[11px] font-bold transition-all ${
+                      staffMember.disabled
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                        : "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                    }`}
+                    title={staffMember.disabled ? "Enable Account" : "Disable Account"}
+                  >
+                    {staffMember.disabled ? <RefreshCcw size={14} /> : <Shield size={14} />}
+                    {staffMember.disabled ? "Enable" : "Disable"}
+                  </button>
+
+                  <button
+                    onClick={() => handleEdit(staffMember)}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] font-bold text-slate-900 shadow-sm transition-all hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                    title="Edit Details"
+                  >
+                    <PenBox size={15} />
+                    Edit Details
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm text-slate-400">
+              <div className="flex flex-col items-center gap-2">
+                <User size={36} className="opacity-20" />
+                <p>No staff members found matching your search.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="hidden min-h-0 flex-1 overflow-auto md:block">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50/70 uppercase text-[11px] tracking-[0.16em] text-slate-500">
               <tr>

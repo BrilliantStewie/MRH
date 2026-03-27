@@ -151,36 +151,36 @@ const Analytics = () => {
   }
 
   return (
-    <div className="bg-slate-50 font-sans">
+      <div className="bg-slate-50 font-sans">
       
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Real-Time Intelligence</h1>
-        <p className="text-slate-500 font-medium mt-1">Live metrics derived from <span className="text-slate-900 font-bold">{allBookings.length}</span> booking records.</p>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Real-Time Intelligence</h1>
+        <p className="mt-1 text-sm font-medium text-slate-500 sm:text-base">Live metrics derived from <span className="font-bold text-slate-900">{allBookings.length}</span> booking records.</p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className={`relative p-8 rounded-3xl overflow-hidden shadow-sm transition-all hover:shadow-md ${stats.isPositive ? 'bg-blue-600 text-white' : 'bg-rose-500 text-white'}`}>
+      <div className="mb-8 grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2">
+        <div className={`relative overflow-hidden rounded-[1.75rem] p-5 shadow-sm transition-all hover:shadow-md sm:rounded-3xl sm:p-8 ${stats.isPositive ? 'bg-blue-600 text-white' : 'bg-rose-500 text-white'}`}>
           <div className="relative z-10">
             <div className="flex items-center gap-2 opacity-90 mb-2">
                 <Zap size={16} fill="currentColor" />
                 <p className="text-xs font-bold uppercase tracking-widest">7-Day Velocity</p>
             </div>
-            <h3 className="text-5xl font-black tracking-tight mb-2">{stats.velocity}</h3>
+            <h3 className="mb-2 text-4xl font-black tracking-tight sm:text-5xl">{stats.velocity}</h3>
             <p className="text-sm font-medium opacity-90">{stats.recentCount} new bookings this week</p>
           </div>
           <Zap className="absolute -right-6 -bottom-6 w-40 h-40 text-white opacity-10 rotate-12" />
         </div>
 
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-center">
+        <div className="flex flex-col justify-center rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-8">
           <div className="flex items-center gap-2 mb-3">
              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
                 <Calendar size={20} />
              </div>
              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Current Season</span>
           </div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight">
+          <h3 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
             {new Date().toLocaleString('default', { month: 'long' })} {new Date().getFullYear()}
           </h3>
           <div className="flex items-center gap-2 mt-2 text-slate-500 text-xs font-medium bg-slate-50 w-fit px-3 py-1.5 rounded-full">
@@ -191,17 +191,17 @@ const Analytics = () => {
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <div className="mb-10 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-8">
         
         {/* Chart 1: Intake Trends */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+        <div className="flex min-w-0 flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
                <TrendingUp size={20} className="text-blue-600" /> Intake Trends
              </h3>
           </div>
           
-          <div className="w-full h-[300px] min-w-0">
+          <div className="h-[240px] w-full min-w-0 sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
@@ -221,14 +221,14 @@ const Analytics = () => {
         </div>
 
         {/* Chart 2: Monthly Volume */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+        <div className="flex min-w-0 flex-col rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-3xl sm:p-6">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
                <BarChart3 size={20} className="text-emerald-500" /> Monthly Volume
              </h3>
           </div>
 
-          <div className="w-full h-[300px] min-w-0">
+          <div className="h-[240px] w-full min-w-0 sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={seasonalData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -254,20 +254,20 @@ const Analytics = () => {
       {/* ==========================================
           PREDICTIVE ANALYTICS SECTION 
       ========================================== */}
-      <div className="mb-6 border-t border-slate-200 pt-10">
-        <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+      <div className="mb-6 border-t border-slate-200 pt-8 sm:pt-10">
+        <h2 className="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-900">
           <Lightbulb className="text-amber-500" fill="currentColor" size={28} /> 
           Predictive Insights
         </h2>
         <p className="text-slate-500 font-medium mt-1">AI-driven forecasts based on your historical seasonal patterns and current growth trajectory.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         
         {/* Predictive KPIs Column */}
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           {/* Next Month Projection */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                 <Activity size={20} />
@@ -278,13 +278,13 @@ const Analytics = () => {
               </div>
             </div>
             <div className="mt-4">
-              <h3 className="text-4xl font-black text-slate-900 tracking-tight">{predictiveData.nextMonthVolume}</h3>
+              <h3 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{predictiveData.nextMonthVolume}</h3>
               <p className="text-sm text-slate-500 font-medium mt-1">Estimated total bookings expected next month.</p>
             </div>
           </div>
 
           {/* Historical Peak Target */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
                 <Target size={20} />
@@ -295,14 +295,14 @@ const Analytics = () => {
               </div>
             </div>
             <div className="mt-4">
-              <h3 className="text-4xl font-black text-slate-900 tracking-tight">{predictiveData.peakMonth}</h3>
+              <h3 className="text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">{predictiveData.peakMonth}</h3>
               <p className="text-sm text-slate-500 font-medium mt-1">Prepare marketing & staff capacity for this period.</p>
             </div>
           </div>
         </div>
 
         {/* Predictive Forecast Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col min-w-0">
+        <div className="flex min-w-0 flex-col rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm sm:rounded-3xl sm:p-6 lg:col-span-2">
           <div className="mb-6 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 flex items-center gap-2">
                <TrendingUp size={20} className="text-blue-600" /> Future Demand Forecast

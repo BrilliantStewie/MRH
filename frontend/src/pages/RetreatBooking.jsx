@@ -14,6 +14,12 @@ import {
     getBookingCheckInDateValue,
     getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
+import {
+    FRONTEND_REALTIME_EVENT_NAME,
+    matchesRealtimeEntity,
+} from "../utils/realtime";
+
+const RETREAT_AVAILABILITY_REFRESH_INTERVAL_MS = 15000;
 
 const RetreatBooking = () => {
     const { backendUrl, token, selectedRooms, addRoom, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
@@ -262,45 +268,96 @@ const RetreatBooking = () => {
 
     // --- 5. AVAILABILITY CHECKS ---
     useEffect(() => {
-        if (token) fetchUserBookedDates();
-        fetchRoomUnavailableDates();
-    }, [token, selectedRooms]);
+        if (!backendUrl) return undefined;
 
-    useEffect(() => {
+        if (token) fetchUserBookedDates({ silent: true });
+        fetchRoomUnavailableDates({ silent: true });
+
+        const runVisibleRefresh = () => {
+            if (document.visibilityState !== "visible") return;
+            if (token) fetchUserBookedDates({ silent: true });
+            fetchRoomUnavailableDates({ silent: true });
+        };
+
+        const interval = setInterval(runVisibleRefresh, RETREAT_AVAILABILITY_REFRESH_INTERVAL_MS);
+        const handleFocus = () => runVisibleRefresh();
+        const handleVisibilityChange = () => runVisibleRefresh();
+
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [backendUrl, token, selectedRooms]);
+
+    const fetchGuestReservedDates = async ({ silent = false } = {}) => {
         if (!backendUrl) return;
-        const fetchGuestReservedDates = async () => {
-            try {
-                const { data } = await axios.get(backendUrl + "/api/booking/calendar-availability");
-                if (data.success) {
-                    const counts = new Map();
-                    (data.bookings || []).forEach((b) => {
-                        const start = toDateObj(getBookingCheckInDateValue(b));
-                        const end = toDateObj(getBookingCheckOutDateValue(b));
-                        const guestCountRaw = Number(b.guestCount);
-                        const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
 
-                        let current = new Date(start);
-                        while (current <= end) {
-                            const key = current.getTime();
-                            counts.set(key, (counts.get(key) || 0) + guestCount);
-                            current.setDate(current.getDate() + 1);
-                        }
-                    });
-                    const reserved = Array.from(counts.entries())
-                        .filter(([, count]) => count >= 2)
-                        .map(([time]) => new Date(time));
-                    setGuestReservedDates(reserved);
-                }
-            } catch (error) {
+        try {
+            const { data } = await axios.get(backendUrl + "/api/booking/calendar-availability");
+            if (data.success) {
+                const counts = new Map();
+                (data.bookings || []).forEach((b) => {
+                    const start = toDateObj(getBookingCheckInDateValue(b));
+                    const end = toDateObj(getBookingCheckOutDateValue(b));
+                    const guestCountRaw = Number(b.guestCount);
+                    const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
+
+                    let current = new Date(start);
+                    while (current <= end) {
+                        const key = current.getTime();
+                        counts.set(key, (counts.get(key) || 0) + guestCount);
+                        current.setDate(current.getDate() + 1);
+                    }
+                });
+                const reserved = Array.from(counts.entries())
+                    .filter(([, count]) => count >= 2)
+                    .map(([time]) => new Date(time));
+                setGuestReservedDates(reserved);
+            }
+        } catch (error) {
+            if (silent) {
+                console.error("Guest availability refresh error:", error);
+            } else {
                 console.error("Failed to load guest availability:", error);
             }
+        }
+    };
+
+    useEffect(() => {
+        if (!backendUrl) return undefined;
+
+        fetchGuestReservedDates({ silent: true });
+
+        const runVisibleRefresh = () => {
+            if (document.visibilityState === "visible") {
+                fetchGuestReservedDates({ silent: true });
+            }
         };
-        fetchGuestReservedDates();
+
+        const interval = setInterval(runVisibleRefresh, RETREAT_AVAILABILITY_REFRESH_INTERVAL_MS);
+        const handleFocus = () => fetchGuestReservedDates({ silent: true });
+        const handleVisibilityChange = () => runVisibleRefresh();
+
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
     }, [backendUrl]);
 
-    const fetchRoomUnavailableDates = async () => {
+    const fetchRoomUnavailableDates = async ({ silent = false } = {}) => {
 
-    if (selectedRooms.length === 0) return;
+    if (selectedRooms.length === 0) {
+        setRoomUnavailableDates([]);
+        return;
+    }
 
     try {
 
@@ -318,17 +375,53 @@ const RetreatBooking = () => {
         }
 
     } catch (error) {
-        console.error(error);
+        if (silent) {
+            console.error("Room availability refresh error:", error);
+        } else {
+            console.error(error);
+        }
     }
 
 };
 
-    const fetchUserBookedDates = async () => {
+    const fetchUserBookedDates = async ({ silent = false } = {}) => {
+        if (!token) {
+            setUserBookedDates([]);
+            return;
+        }
         try {
             const { data } = await axios.get(backendUrl + "/api/booking/user-dates", { headers: { token } });
             if (data.success) setUserBookedDates(data.userBusyDates.map(toDateObj));
-        } catch (error) { console.error(error); }
+        } catch (error) {
+            if (silent) {
+                console.error("User booked dates refresh error:", error);
+            } else {
+                console.error(error);
+            }
+        }
     };
+
+    useEffect(() => {
+        if (!backendUrl) return undefined;
+
+        const handleRealtimeUpdate = (event) => {
+            if (!matchesRealtimeEntity(event.detail, ["bookings"])) {
+                return;
+            }
+
+            fetchRoomUnavailableDates({ silent: true });
+            fetchGuestReservedDates({ silent: true });
+
+            if (token) {
+                fetchUserBookedDates({ silent: true });
+            }
+        };
+
+        window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+        return () => {
+            window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+        };
+    }, [backendUrl, token, selectedRooms]);
 
     const isSameDayBooking = startDate && endDate && toDateObj(startDate).getTime() === toDateObj(endDate).getTime();
 

@@ -1,10 +1,16 @@
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { io } from "socket.io-client";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  SOCKET_REALTIME_EVENT_NAME,
+} from "../utils/realtime";
 
 export const AppContext = createContext();
 
 const ROOM_REFRESH_INTERVAL_MS = 15000;
+const USER_PROFILE_REFRESH_INTERVAL_MS = 15000;
 const normalizeRoomRecord = (room) =>
   room
     ? {
@@ -21,6 +27,8 @@ const AppContextProvider = (props) => {
   const [rooms, setRooms] = useState([]);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [userData, setUserData] = useState(null);
+  const userProfileRefreshInProgressRef = useRef(false);
+  const realtimeSocketRef = useRef(null);
 
   const [selectedRooms, setSelectedRooms] = useState(() => {
     const savedRooms = localStorage.getItem("selectedRooms");
@@ -32,9 +40,10 @@ const AppContextProvider = (props) => {
   }, [selectedRooms]);
 
   // Load User Profile
-  const loadUserProfileData = async () => {
+  const loadUserProfileData = async ({ silent = false } = {}) => {
     try {
-      if (!token) return;
+      if (!token || !backendUrl || userProfileRefreshInProgressRef.current) return;
+      userProfileRefreshInProgressRef.current = true;
 
       const { data } = await axios.get(
         backendUrl + "/api/user/profile",
@@ -47,7 +56,13 @@ const AppContextProvider = (props) => {
         console.log("Failed to load profile:", data.message);
       }
     } catch (error) {
-      console.log("Profile Load Error:", error.message);
+      if (silent) {
+        console.error("Profile refresh error:", error.message);
+      } else {
+        console.log("Profile Load Error:", error.message);
+      }
+    } finally {
+      userProfileRefreshInProgressRef.current = false;
     }
   };
 
@@ -55,13 +70,43 @@ const AppContextProvider = (props) => {
   useEffect(() => {
     if (token) {
       localStorage.setItem("token", token);
-      loadUserProfileData();
+      loadUserProfileData({ silent: true });
     } else {
       setUserData(null);
       setSelectedRooms([]);
       localStorage.removeItem("token");
     }
-  }, [token]);
+  }, [token, backendUrl]);
+
+  useEffect(() => {
+    if (!token || !backendUrl) return undefined;
+
+    const refreshProfile = () => loadUserProfileData({ silent: true });
+
+    refreshProfile();
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refreshProfile();
+      }
+    }, USER_PROFILE_REFRESH_INTERVAL_MS);
+
+    const handleFocus = () => refreshProfile();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshProfile();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [token, backendUrl]);
 
   const getRoomsData = async ({ silent = false } = {}) => {
     try {
@@ -76,6 +121,45 @@ const AppContextProvider = (props) => {
       }
     }
   };
+
+  useEffect(() => {
+    if (!backendUrl) return undefined;
+
+    const socket = io(backendUrl, {
+      transports: ["websocket", "polling"],
+      auth: token ? { token } : {},
+    });
+
+    realtimeSocketRef.current = socket;
+
+    const handleRealtimeUpdate = (payload = {}) => {
+      const entity = String(payload?.entity || "").toLowerCase();
+
+      if (["rooms", "settings", "packages"].includes(entity)) {
+        getRoomsData({ silent: true });
+      }
+
+      if (token && ["profile", "account_status"].includes(entity)) {
+        loadUserProfileData({ silent: true });
+      }
+
+      window.dispatchEvent(
+        new CustomEvent(FRONTEND_REALTIME_EVENT_NAME, {
+          detail: payload,
+        })
+      );
+    };
+
+    socket.on(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+
+    return () => {
+      socket.off(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+      socket.disconnect();
+      if (realtimeSocketRef.current === socket) {
+        realtimeSocketRef.current = null;
+      }
+    };
+  }, [backendUrl, token]);
 
   useEffect(() => {
     const refreshRooms = () => getRoomsData({ silent: true });

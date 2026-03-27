@@ -22,6 +22,10 @@ import {
   ChevronRight,
   Trash2,
 } from "lucide-react";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../utils/realtime";
 
 const ROOMS_PER_PAGE = 8;
 const FILTER_OPTION_PREVIEW_COUNT = 4;
@@ -66,62 +70,6 @@ const Rooms = () => {
   const [rangeEnd] = useState(() => getStoredDate("draftEndDate"));
   const isLoggedIn = Boolean(token);
 
-  useEffect(() => {
-    getRoomsData();
-    fetchOccupiedRooms();
-    const interval = setInterval(fetchOccupiedRooms, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const fetchRangeBookedRooms = async () => {
-      if (!rangeStart || !rangeEnd < rangeStart) {
-        setRangeBookedRooms([]);
-        setRangeBookedReasons({});
-        return;
-      }
-      if (!rooms.length === 0) {
-        return;
-      }
-      try {
-        const { data } = await axios.post(`${backendUrl}/api/booking/booked-rooms`, {
-          roomIds: rooms.map((room) => room._id),
-          checkIn: rangeStart,
-          checkOut: rangeEnd,
-        });
-        if (data.success) {
-          const reasons = {};
-          const ids = new Set();
-
-          if (Array.isArray(data.bookedRooms)) {
-            data.bookedRooms.forEach((entry) => {
-              if (!entry?.roomId) return;
-              const id = String(entry.roomId);
-              ids.add(id);
-              reasons[id] = entry.reason || "booked";
-            });
-          }
-
-          (data.bookedRoomIds || []).forEach((id) => ids.add(String(id)));
-
-          setRangeBookedRooms(Array.from(ids));
-          setRangeBookedReasons(reasons);
-        }
-      } catch (error) {
-        console.error("Error fetching booked rooms for selected dates:", error);
-      }
-    };
-
-    fetchRangeBookedRooms();
-  }, [backendUrl, rooms, rangeStart, rangeEnd]);
-
-  useEffect(() => {
-    if (location.state?.selectedRoomType) {
-      setRoomType(location.state.selectedRoomType);
-      setCurrentPage(1);
-    }
-  }, [location.state?.selectedRoomType]);
-
   const fetchOccupiedRooms = async () => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/booking/occupied`);
@@ -134,6 +82,87 @@ const Rooms = () => {
       console.error("Error fetching occupied rooms:", error);
     }
   };
+
+  const fetchRangeBookedRooms = async ({ silent = false } = {}) => {
+    if (!rangeStart || !rangeEnd || rangeEnd < rangeStart) {
+      setRangeBookedRooms([]);
+      setRangeBookedReasons({});
+      return;
+    }
+
+    if (rooms.length === 0) {
+      return;
+    }
+
+    try {
+      const { data } = await axios.post(`${backendUrl}/api/booking/booked-rooms`, {
+        roomIds: rooms.map((room) => room._id),
+        checkIn: rangeStart,
+        checkOut: rangeEnd,
+      });
+
+      if (data.success) {
+        const reasons = {};
+        const ids = new Set();
+
+        if (Array.isArray(data.bookedRooms)) {
+          data.bookedRooms.forEach((entry) => {
+            if (!entry?.roomId) return;
+            const id = String(entry.roomId);
+            ids.add(id);
+            reasons[id] = entry.reason || "booked";
+          });
+        }
+
+        (data.bookedRoomIds || []).forEach((id) => ids.add(String(id)));
+
+        setRangeBookedRooms(Array.from(ids));
+        setRangeBookedReasons(reasons);
+      }
+    } catch (error) {
+      if (silent) {
+        console.error("Error refreshing booked rooms for selected dates:", error);
+      } else {
+        console.error("Error fetching booked rooms for selected dates:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    getRoomsData();
+    fetchOccupiedRooms();
+    const interval = setInterval(fetchOccupiedRooms, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    fetchRangeBookedRooms({ silent: true });
+  }, [backendUrl, rooms, rangeStart, rangeEnd]);
+
+  useEffect(() => {
+    if (location.state?.selectedRoomType) {
+      setRoomType(location.state.selectedRoomType);
+      setCurrentPage(1);
+    }
+  }, [location.state?.selectedRoomType]);
+
+  useEffect(() => {
+    if (!backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (!matchesRealtimeEntity(event.detail, ["bookings", "rooms", "settings"])) {
+        return;
+      }
+
+      fetchOccupiedRooms();
+      fetchRangeBookedRooms({ silent: true });
+    };
+
+    window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
+  }, [backendUrl, rooms, rangeStart, rangeEnd]);
 
   const normalize = (value = "") => value?.toString().toLowerCase().trim() || "";
 

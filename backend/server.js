@@ -7,10 +7,10 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 import express from "express";
 import cors from "cors";
 import cron from "node-cron";
+import http from "http";
 
 // MODELS
 import bookingModel from "./models/bookingModel.js";
-import userModel from "./models/userModel.js";
 
 // CONFIG
 import { connectCloudinary } from "./config/cloudinary.js";
@@ -27,12 +27,18 @@ import packageRouter from "./routes/packageRoute.js";
 import reviewRouter from "./routes/reviewRoute.js";
 import notificationRouter from "./routes/notificationRoute.js";
 import reportRouter from "./routes/reportRoute.js";
+import { dispatchRealtimeMutation } from "./utils/realtimeDispatch.js";
+import {
+  emitRealtimeUpdate,
+  initRealtimeServer,
+} from "./utils/realtimeServer.js";
 
 // =======================
 // 🚀 APP INIT
 // =======================
 const app = express();
 const PORT = process.env.PORT || 4000;
+const httpServer = http.createServer(app);
 const parseAllowedOrigins = () => {
   const configuredOrigins = String(process.env.CORS_ORIGINS || "")
     .split(",")
@@ -71,6 +77,28 @@ app.use(
 
 app.use("/uploads", express.static("uploads"));
 
+app.use((req, res, next) => {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return next();
+  }
+
+  const originalJson = res.json.bind(res);
+
+  res.json = (body) => {
+    if (body?.success && res.statusCode < 400) {
+      queueMicrotask(() => {
+        dispatchRealtimeMutation(req).catch((error) => {
+          console.error("Realtime dispatch error:", error.message);
+        });
+      });
+    }
+
+    return originalJson(body);
+  };
+
+  next();
+});
+
 // =======================
 // ✅ ROUTES
 // =======================
@@ -99,6 +127,14 @@ cron.schedule("0 * * * *", async () => {
 
     if (result.modifiedCount > 0) {
       console.log(`❌ CRON: Auto-declined ${result.modifiedCount} bookings.`);
+      emitRealtimeUpdate({
+        rooms: ["public", "admin", "staff"],
+        payload: {
+          entity: "bookings",
+          action: "cron-auto-decline",
+          path: "cron:auto-decline",
+        },
+      });
     }
   } catch (error) {
     console.error("❌ CRON ERROR:", error.message);
@@ -113,8 +149,9 @@ const startServer = async () => {
     await connectDB(); // ✅ Use centralized DB config
 
     await connectCloudinary();
-    
-    app.listen(PORT, () => {
+    initRealtimeServer(httpServer, { allowedOrigins });
+
+    httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
   } catch (err) {

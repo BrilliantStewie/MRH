@@ -373,7 +373,7 @@ const Packages = () => {
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                 Packages
               </h1>
               <p className="mt-1 text-xs text-slate-500">
@@ -386,7 +386,7 @@ const Packages = () => {
               <button
                 type="button"
                 onClick={handleOpenAddModal}
-                className="flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black md:w-auto"
               >
                 <Plus size={18} />
                 <span>Add Package</span>
@@ -406,7 +406,7 @@ const Packages = () => {
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 lg:ml-auto lg:justify-end">
+            <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:ml-auto lg:w-auto lg:justify-end">
               <FilterDropdown
                 label="Package Type"
                 options={packageFilterOptions}
@@ -415,8 +415,8 @@ const Packages = () => {
                 icon={Package}
                 neutralValue="All"
                 align="left"
-                triggerClassName="min-w-[192px] justify-between bg-slate-50 font-bold"
-                menuClassName="w-60"
+                triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[192px]"
+                menuClassName="w-full sm:w-60"
               />
 
               {showRoomTypeFilter && (
@@ -428,8 +428,8 @@ const Packages = () => {
                   icon={BedSingle}
                   neutralValue="All"
                   align="left"
-                  triggerClassName="min-w-[198px] justify-between bg-slate-50 font-bold"
-                  menuClassName="w-64"
+                  triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[198px]"
+                  menuClassName="w-full sm:w-64"
                 />
               )}
 
@@ -442,7 +442,7 @@ const Packages = () => {
                 }}
                 title="Reset filters"
                 aria-label="Reset filters"
-                className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-rose-500"
+                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-rose-500 sm:w-12"
               >
                 <RefreshCcw className="h-4 w-4" />
               </button>
@@ -485,7 +485,7 @@ const Packages = () => {
                   return (
                     <div
                       key={pkg._id}
-                      className="group relative flex h-full min-h-[212px] w-full max-w-[356px] justify-self-center flex-col overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-xl"
+                      className="group relative flex h-full min-h-[212px] w-full max-w-none justify-self-stretch flex-col overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-xl sm:max-w-[356px] sm:justify-self-center"
                     >
                       <div className="relative border-b border-slate-200 bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90 p-2.5">
                         <div className="absolute right-2.5 top-2.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">

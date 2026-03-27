@@ -5,6 +5,10 @@ import { StaffContext } from "../../context/StaffContext";
 import { User, LogOut, UserCircle, Bell, BellOff, MessageSquare, MoreHorizontal, Check, Trash2, AlertTriangle, Calendar, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
 import axios from "axios";
 import { formatDatePHT } from "../../utils/dateTime";
+import {
+  matchesRealtimeEntity,
+  STAFF_REALTIME_EVENT_NAME,
+} from "../../utils/realtime";
 
 const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
@@ -126,6 +130,21 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
       return () => clearInterval(interval);
     }
     setNotifications([]);
+  }, [sToken, backendUrl]);
+
+  useEffect(() => {
+    if (!sToken || !backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["notifications"])) {
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener(STAFF_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(STAFF_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
   }, [sToken, backendUrl]);
 
   const unreadCount = (notifications || []).filter((n) => !n.isRead).length;
@@ -290,14 +309,15 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   };
 
   // ✅ FIXED: Grabs your full first name (e.g., "Ken Melvin") but leaves out the last name
-  const firstName = staffData?.firstName || staffData?.name?.split('|')[0] || "Staff";
+  const firstName = staffData?.firstName || staffData?.name?.split("|")[0] || "Staff";
 
   if (!sToken) return null; 
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-[#f8fafc] py-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-3 sm:px-8">
+      <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-[#f8fafc] shadow-sm">
+      <div className="px-3 sm:px-6 lg:px-8">
+      <div className="flex h-16 items-center justify-between gap-3">
         
         {/* --- LEFT: BRANDING --- */}
         <div className="flex items-center gap-3">
@@ -311,18 +331,18 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
           </button>
           <div 
             className="group flex cursor-pointer items-center gap-3 select-none" 
-            onClick={() => navigate('/Staff-dashboard')}
+            onClick={() => navigate("/staff-dashboard")}
           >
           <img 
             src={assets.logo} 
             alt="Logo" 
-            className="h-10 w-10 object-contain transition-transform group-hover:scale-105 sm:h-11 sm:w-11" 
+            className="h-10 w-10 object-contain transition-transform group-hover:scale-105 sm:h-12 sm:w-12" 
           />
           <div className="flex flex-col justify-center">
-            <h1 className="text-[15px] font-black text-slate-800 tracking-tight leading-none">
+            <h1 className="text-base font-bold leading-tight text-gray-800 sm:text-lg">
               MRH
             </h1>
-            <span className="mt-1 hidden w-fit rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-700 sm:inline-flex">
+            <span className="mt-0.5 hidden w-fit rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex">
               Staff Panel
             </span>
           </div>
@@ -588,8 +608,15 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
           {/* Profile Circle Button */}
           <div className="relative">
             <button
-              onClick={() => setShowProfileMenu((prev) => !prev)}
-              className="w-10 h-10 rounded-full overflow-hidden border-2 border-slate-100 hover:border-slate-300 transition-colors flex items-center justify-center bg-slate-50"
+              type="button"
+              onClick={() => {
+                setShowProfileMenu((prev) => !prev);
+                setShowNotifications(false);
+                setShowAllNotifications(false);
+                setShowNotificationMenu(false);
+                setShowClearConfirm(false);
+              }}
+              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-slate-100 bg-slate-50 transition-colors hover:border-slate-300"
             >
               {staffData?.image && !imgError ? (
                 <img 
@@ -603,17 +630,13 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
               )}
             </button>
 
-            {/* --- DROPDOWN MENU --- */}
 {showProfileMenu && (
   <>
-    {/* Click-away backdrop */}
     <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
     
     <div className="absolute right-0 mt-3 w-[min(224px,calc(100vw-1rem))] bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 animate-in fade-in zoom-in-95 duration-200">
       
-      {/* "SIGNED IN AS" Header */}
       <div className="px-5 py-3 border-b border-slate-50 mb-1 bg-slate-50/50 rounded-t-2xl">
-          {/* Changed text to uppercase and added tracking for style */}
           <p className="text-[10px] text-slate-500 font-bold mb-0.5 uppercase tracking-wider">
             Signed In As
           </p>
@@ -623,7 +646,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
       </div>
 
       <button 
-        onClick={() => navigate("/Staff-profile")} 
+        onClick={() => navigate("/staff-profile")} 
         className="w-full text-left px-5 py-3 text-[12px] font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-3 transition-colors"
       >
         <UserCircle size={16} className="text-emerald-500"/> My Profile
@@ -643,6 +666,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
           </div>
         </div>
 
+      </div>
       </div>
       </nav>
 

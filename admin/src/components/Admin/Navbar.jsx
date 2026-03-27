@@ -3,25 +3,35 @@ import React, { useContext, useEffect, useState } from "react";
 import { assets } from "../../assets/assets.js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AdminContext } from "../../context/AdminContext.jsx";
-import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu } from "lucide-react";
+import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu, LogOut } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { formatDatePHT } from "../../utils/dateTime";
+import {
+  ADMIN_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../../utils/realtime";
 
 const Navbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { aToken, adminData, logoutAdmin, backendUrl } = useContext(AdminContext);
-
-  const isAdmin = !!aToken;
+  const { aToken, logoutAdmin, backendUrl } = useContext(AdminContext);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
 
-  const displayName = adminData?.name || "Administrator";
+  const displayName = "Administrator";
+  const adminInitials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
 
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showAllNotifications, setShowAllNotifications] = useState(false);
@@ -110,6 +120,22 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
   }, [aToken, backendUrl]);
 
   useEffect(() => {
+    if (!aToken || !backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["notifications"])) {
+        fetchNotifications();
+      }
+    };
+
+    window.addEventListener(ADMIN_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(ADMIN_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
+  }, [aToken, backendUrl]);
+
+  useEffect(() => {
+    setShowProfileMenu(false);
     setShowNotifications(false);
     setShowAllNotifications(false);
     setShowClearConfirm(false);
@@ -281,7 +307,7 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
             >
               <Menu size={18} />
             </button>
-            <div className="flex cursor-pointer items-center gap-3" onClick={() => navigate("/")}>
+            <div className="flex cursor-pointer items-center gap-3" onClick={() => navigate("/admin-dashboard")}>
             {/* Using your specific logo asset */}
             <img 
               src={assets.logo} 
@@ -292,57 +318,53 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
               <h1 className="text-base font-bold leading-tight text-gray-800 sm:text-lg">
                 MRH
               </h1>
-              <span className={`mt-0.5 hidden w-fit rounded-md px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${
-                isAdmin 
-                  ? "bg-indigo-50 text-indigo-700 border border-indigo-100" 
-                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-              }`}>
-                {isAdmin ? "Admin Panel" : "Staff Panel"}
+              <span className="mt-0.5 hidden w-fit rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 sm:inline-flex">
+                Admin Panel
               </span>
             </div>
             </div>
           </div>
 
-          {/* Right Side: Notifications + User Profile & Logout */}
+          {/* Right Side: Notifications + Profile */}
           <div className="flex items-center gap-2 sm:gap-4">
-            {isAdmin && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const willShow = !showNotifications;
-                    setShowNotifications(willShow);
-                    setShowNotificationMenu(false);
-                    setShowClearConfirm(false);
-                    if (!willShow) {
-                      setShowAllNotifications(false);
-                    }
-                  }}
-                  className={`relative rounded-full p-2 transition-colors ${
-                    showNotifications ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                  title="Notifications"
-                >
-                  <Bell size={18} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white ring-2 ring-white">
-                      {unreadBadgeText}
-                    </span>
-                  )}
-                </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  const willShow = !showNotifications;
+                  setShowNotifications(willShow);
+                  setShowProfileMenu(false);
+                  setShowNotificationMenu(false);
+                  setShowClearConfirm(false);
+                  if (!willShow) {
+                    setShowAllNotifications(false);
+                  }
+                }}
+                className={`relative rounded-full p-2 transition-colors ${
+                  showNotifications ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"
+                }`}
+                title="Notifications"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white ring-2 ring-white">
+                    {unreadBadgeText}
+                  </span>
+                )}
+              </button>
 
-                {showNotifications && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => {
-                        setShowNotifications(false);
-                        setShowAllNotifications(false);
-                        setShowClearConfirm(false);
-                        setShowNotificationMenu(false);
-                      }}
-                    ></div>
-                    <div className="absolute right-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
+              {showNotifications && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => {
+                      setShowNotifications(false);
+                      setShowAllNotifications(false);
+                      setShowClearConfirm(false);
+                      setShowNotificationMenu(false);
+                    }}
+                  ></div>
+                  <div className="absolute right-0 top-full z-50 mt-2 w-[min(320px,calc(100vw-1rem))] overflow-hidden rounded-md border border-slate-200 bg-white shadow-md animate-in fade-in zoom-in-95 duration-200">
                       <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
                         <div className="flex items-center gap-2 text-slate-700">
                           <Bell size={11} className="text-slate-400" />
@@ -551,33 +573,65 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
                         </div>
                       )}
                     </div>
-                  </>
-                )}
-              </div>
-            )}
-            <div className="hidden text-right sm:block">
-              <p className="text-sm font-semibold text-gray-700">{displayName}</p>
-              <p className="text-xs text-gray-500">Logged in</p>
+                </>
+              )}
             </div>
 
-            <div className="hidden h-8 w-px bg-gray-200 sm:block"></div>
-
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors duration-200 hover:bg-red-100 sm:px-4"
-            >
-              <span className="hidden sm:inline">Logout</span>
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                strokeWidth={2} 
-                stroke="currentColor" 
-                className="w-4 h-4"
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileMenu((current) => !current);
+                  setShowNotifications(false);
+                  setShowAllNotifications(false);
+                  setShowNotificationMenu(false);
+                  setShowClearConfirm(false);
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-indigo-100 bg-indigo-50 text-[11px] font-black uppercase tracking-[0.16em] text-indigo-700 transition-colors hover:border-indigo-200 hover:bg-indigo-100"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-              </svg>
-            </button>
+                {adminInitials || "AD"}
+              </button>
+
+              {showProfileMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowProfileMenu(false)}></div>
+                  <div className="absolute right-0 z-20 mt-3 w-[min(224px,calc(100vw-1rem))] overflow-hidden rounded-2xl border border-slate-100 bg-white py-2 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                    <div className="mb-1 rounded-t-2xl border-b border-slate-50 bg-slate-50/50 px-5 py-3">
+                      <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Signed In As
+                      </p>
+                      <p className="truncate text-sm font-bold text-slate-800">{displayName}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate("/admin-dashboard");
+                      }}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left text-[12px] font-bold text-slate-600 transition-colors hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      <Shield size={16} className="text-indigo-500" />
+                      Admin Dashboard
+                    </button>
+
+                    <div className="mx-3 my-1 h-px bg-slate-100"></div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left text-[12px] font-bold text-rose-500 transition-colors hover:bg-rose-50"
+                    >
+                      <LogOut size={16} />
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
         </div>
@@ -610,7 +664,7 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
                 type="button"
                 onClick={() => {
                   setShowLogoutConfirm(false);
-                  if (isAdmin) logoutAdmin();
+                  logoutAdmin();
                   navigate("/");
                 }}
                 className="rounded-full bg-rose-600 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-rose-700 transition-colors"

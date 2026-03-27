@@ -14,6 +14,10 @@ import { AppContext } from "../context/AppContext";
 import singleRoom from "../assets/singleRoom.svg";
 import singleRoomPullout from "../assets/singleRoomPullout.svg";
 import dormRoom from "../assets/dormRoom.svg";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../utils/realtime";
 
 const normalize = (value = "") => String(value).trim().toLowerCase();
 const ROOM_TYPE_REFRESH_INTERVAL_MS = 15000;
@@ -135,25 +139,27 @@ const RoomTypeMenu = () => {
   const [roomTypeNames, setRoomTypeNames] = useState([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchRoomTypes = async ({ silent = false } = {}) => {
-      try {
-        const { data } = await axios.get(`${backendUrl}/api/room/types`);
+  const fetchRoomTypes = async ({ silent = false } = {}) => {
+    if (!backendUrl) return;
 
-        if (data.success) {
-          setRoomTypeNames(
-            data.types
-              .map((type) => String(type?.name || "").trim())
-              .filter(Boolean)
-          );
-        }
-      } catch (error) {
-        if (!silent) {
-          console.error("Error fetching room types:", error);
-        }
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/room/types`);
+
+      if (data.success) {
+        setRoomTypeNames(
+          data.types
+            .map((type) => String(type?.name || "").trim())
+            .filter(Boolean)
+        );
       }
-    };
+    } catch (error) {
+      if (!silent) {
+        console.error("Error fetching room types:", error);
+      }
+    }
+  };
 
+  useEffect(() => {
     if (backendUrl) {
       fetchRoomTypes({ silent: true });
     }
@@ -178,6 +184,21 @@ const RoomTypeMenu = () => {
       clearInterval(interval);
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [backendUrl]);
+
+  useEffect(() => {
+    if (!backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["rooms", "settings"])) {
+        fetchRoomTypes({ silent: true });
+      }
+    };
+
+    window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
     };
   }, [backendUrl]);
 
@@ -271,21 +292,21 @@ const RoomTypeMenu = () => {
 
   return (
     <section
-      className="group/slider relative h-screen w-full overflow-hidden bg-slate-900 text-white"
+      className="group/slider relative min-h-[70svh] w-full overflow-hidden bg-slate-900 text-white sm:min-h-[700px] lg:h-screen"
       id="room-type"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       <button
         onClick={handlePrev}
-        className="absolute left-4 top-1/2 z-40 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 backdrop-blur-md transition-all duration-300 group hover:-translate-x-2 hover:bg-white hover:text-slate-900 md:left-8"
+        className="absolute bottom-6 left-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 backdrop-blur-md transition-all duration-300 group hover:bg-white hover:text-slate-900 sm:bottom-auto sm:top-1/2 sm:h-14 sm:w-14 sm:-translate-y-1/2 sm:hover:-translate-x-2 md:left-8"
       >
         <ChevronLeft size={28} />
       </button>
 
       <button
         onClick={handleNext}
-        className="absolute right-4 top-1/2 z-40 flex h-14 w-14 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 backdrop-blur-md transition-all duration-300 group hover:translate-x-2 hover:bg-white hover:text-slate-900 md:right-8"
+        className="absolute right-4 bottom-6 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 backdrop-blur-md transition-all duration-300 group hover:bg-white hover:text-slate-900 sm:bottom-auto sm:top-1/2 sm:h-14 sm:w-14 sm:-translate-y-1/2 sm:hover:translate-x-2 md:right-8"
       >
         <ChevronRight size={28} />
       </button>
@@ -300,7 +321,7 @@ const RoomTypeMenu = () => {
           <img
             src={room.image}
             alt={room.roomtype}
-            className={`h-full w-full object-cover transition-transform ease-linear ${
+            className={`h-full w-full object-cover object-center transition-transform ease-linear ${
               index === currentIndex && !isPaused ? "scale-110" : "scale-100"
             }`}
             style={{ transitionDuration: "10s" }}
@@ -312,28 +333,28 @@ const RoomTypeMenu = () => {
       ))}
 
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center">
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-1 items-end gap-12 px-16 pb-24 pointer-events-auto md:px-24 lg:grid-cols-12 lg:pb-0">
-          <div className="space-y-8 lg:col-span-7 lg:mb-12">
+        <div className="pointer-events-auto mx-auto grid w-full max-w-7xl grid-cols-1 items-end gap-8 px-4 pb-20 sm:gap-10 sm:px-8 sm:pb-24 md:px-16 lg:grid-cols-12 lg:gap-12 lg:pb-0 xl:px-24">
+          <div className="space-y-6 lg:col-span-7 lg:mb-12 lg:space-y-8">
             <div
               key={currentIndex}
               className="animate-in fade-in slide-in-from-left-8 duration-700"
             >
-              <div className="mb-6 flex items-center gap-3">
+              <div className="mb-4 flex items-center gap-3 sm:mb-6">
                 <span className="h-px w-12 bg-blue-400"></span>
                 <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-blue-400">
                   Room {currentIndex + 1} of {roomTypes.length}
                 </span>
               </div>
 
-              <h2 className="mb-6 whitespace-nowrap font-serif text-4xl leading-tight text-white drop-shadow-xl md:text-6xl lg:text-7xl">
+              <h2 className="mb-4 font-serif text-3xl leading-tight text-white drop-shadow-xl sm:mb-6 sm:text-5xl lg:text-7xl xl:whitespace-nowrap">
                 {currentRoom.roomtype}
               </h2>
 
-              <p className="mb-8 max-w-xl border-l-2 border-blue-500/50 pl-6 text-lg font-light leading-relaxed text-slate-200 drop-shadow-md">
+              <p className="mb-6 max-w-xl border-l-2 border-blue-500/50 pl-4 text-base font-light leading-relaxed text-slate-200 drop-shadow-md sm:mb-8 sm:pl-6 sm:text-lg">
                 {currentRoom.description}
               </p>
 
-              <div className="mb-10 flex gap-6 text-sm">
+              <div className="mb-8 flex flex-col gap-3 text-sm sm:mb-10 sm:flex-row sm:gap-6">
                 <div className="flex items-center gap-2 text-slate-100">
                   <Users size={18} className="text-blue-400" />
                   <span>{currentRoom.capacity}</span>
@@ -344,14 +365,14 @@ const RoomTypeMenu = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
                 <button
                   onClick={() =>
                     navigate("/rooms", {
                       state: { selectedRoomType: currentRoom.filterValue },
                     })
                   }
-                  className="z-50 flex cursor-pointer items-center gap-2 rounded-full bg-white px-8 py-4 text-xs font-bold uppercase tracking-widest text-slate-900 shadow-xl shadow-black/20 transition-all hover:scale-105 hover:bg-blue-50"
+                  className="z-50 flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-white px-6 py-3.5 text-xs font-bold uppercase tracking-widest text-slate-900 shadow-xl shadow-black/20 transition-all hover:scale-105 hover:bg-blue-50 sm:w-auto sm:px-8 sm:py-4"
                 >
                   View Details <ArrowRight size={14} />
                 </button>
@@ -361,7 +382,7 @@ const RoomTypeMenu = () => {
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                       Starting at
                     </span>
-                    <span className="font-serif text-2xl text-white">
+                    <span className="font-serif text-xl text-white sm:text-2xl">
                       {currentRoom.price}
                     </span>
                   </div>

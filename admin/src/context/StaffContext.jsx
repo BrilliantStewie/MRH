@@ -1,10 +1,15 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { io } from "socket.io-client";
 import {
   isAccountDisabledMessage,
   storeDisabledAccountNotice,
 } from "../utils/accountStatusNotice";
+import {
+  SOCKET_REALTIME_EVENT_NAME,
+  STAFF_REALTIME_EVENT_NAME,
+} from "../utils/realtime";
 
 export const StaffContext = createContext();
 
@@ -18,6 +23,7 @@ const StaffContextProvider = ({ children }) => {
   );
 
   const [staffData, setStaffData] = useState(null);
+  const staffRealtimeSocketRef = useRef(null);
 
   /* =====================================================
      STAFF LOGOUT
@@ -99,7 +105,7 @@ const StaffContextProvider = ({ children }) => {
   /* =====================================================
      ✅ CORRECTED: FETCH STAFF PROFILE DATA
   ===================================================== */
-  const loadStaffData = async () => {
+  const loadStaffData = async ({ silent = false } = {}) => {
     try {
       // THIS URL IS NOW CORRECTLY POINTING TO staffRoute.js
       const { data } = await axios.get(`${backendUrl}/api/staff/profile`, {
@@ -112,17 +118,56 @@ const StaffContextProvider = ({ children }) => {
         console.error(data.message);
       }
     } catch (error) {
-      console.error("Failed to load staff data", error);
+      if (silent) {
+        console.error("Failed to refresh staff data", error);
+      } else {
+        console.error("Failed to load staff data", error);
+      }
     }
   };
 
   useEffect(() => {
     if (sToken) {
-      loadStaffData();
+      loadStaffData({ silent: true });
     } else {
       setStaffData(null);
     }
   }, [sToken, backendUrl]);
+
+  useEffect(() => {
+    if (!backendUrl || !sToken) return undefined;
+
+    const socket = io(backendUrl, {
+      transports: ["websocket", "polling"],
+      auth: { token: sToken },
+    });
+
+    staffRealtimeSocketRef.current = socket;
+
+    const handleRealtimeUpdate = (payload = {}) => {
+      const entity = String(payload?.entity || "").toLowerCase();
+
+      if (["profile", "account_status"].includes(entity)) {
+        loadStaffData({ silent: true });
+      }
+
+      window.dispatchEvent(
+        new CustomEvent(STAFF_REALTIME_EVENT_NAME, {
+          detail: payload,
+        })
+      );
+    };
+
+    socket.on(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+
+    return () => {
+      socket.off(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+      socket.disconnect();
+      if (staffRealtimeSocketRef.current === socket) {
+        staffRealtimeSocketRef.current = null;
+      }
+    };
+  }, [backendUrl, sToken]);
 
   /* =====================================================
      STAFF LOGIN

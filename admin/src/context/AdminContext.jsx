@@ -1,14 +1,20 @@
-import { createContext, useState, useEffect, useMemo } from "react"; // Added useMemo
+import { createContext, useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { io } from "socket.io-client";
 import {
   isAccountDisabledMessage,
   storeDisabledAccountNotice,
 } from "../utils/accountStatusNotice";
+import {
+  ADMIN_REALTIME_EVENT_NAME,
+  SOCKET_REALTIME_EVENT_NAME,
+} from "../utils/realtime";
 
 export const AdminContext = createContext();
 
 const SESSION_REFRESH_INTERVAL_MS = 15000;
+const ADMIN_REALTIME_SYNC_INTERVAL_MS = 15000;
 const normalizeRoomRecord = (room) =>
   room
     ? {
@@ -18,6 +24,12 @@ const normalizeRoomRecord = (room) =>
       }
     : room;
 
+const deriveStaffUsers = (users = []) =>
+  users.filter((user) => user.role === "staff" || user.role === "admin");
+
+const getRequestErrorMessage = (error, fallbackMessage) =>
+  error?.response?.data?.message || error?.message || fallbackMessage;
+
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
@@ -26,6 +38,8 @@ const AdminContextProvider = ({ children }) => {
   const authHeader = {
     headers: { token: aToken }
   };
+  const adminRealtimeSyncInProgressRef = useRef(false);
+  const adminRealtimeSocketRef = useRef(null);
 
   const logoutAdmin = ({ silent = false, disabledMessage = "" } = {}) => {
     localStorage.removeItem("aToken");
@@ -33,6 +47,15 @@ const AdminContextProvider = ({ children }) => {
     if (disabledMessage) {
       storeDisabledAccountNotice(disabledMessage);
     }
+  };
+
+  const reportRequestError = (error, fallbackMessage, { silent = false } = {}) => {
+    const message = getRequestErrorMessage(error, fallbackMessage);
+    if (silent) {
+      console.error(fallbackMessage, message);
+      return;
+    }
+    toast.error(message);
   };
 
   // ============================================================
@@ -140,7 +163,7 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 📊 DASHBOARD
   // ============================================================
-  const getDashboardData = async () => {
+  const getDashboardData = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(
         `${backendUrl}/api/admin/dashboard`,
@@ -149,11 +172,11 @@ const AdminContextProvider = ({ children }) => {
 
       if (data.success) {
         setDashboardData(data.dashData);
-      } else {
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to fetch dashboard data", { silent });
     }
   };
 
@@ -161,36 +184,38 @@ const AdminContextProvider = ({ children }) => {
   // 👥 USERS & STAFF MANAGEMENT
   // ============================================================
   
+  const applyUserDirectoryState = (users = []) => {
+    setAllUsers(users);
+    setAllStaff(deriveStaffUsers(users));
+  };
+
   // Fetches Guests/Users
-  const getAllUsers = async () => {
+  const getAllUsers = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/users`, authHeader);
 
       if (data.success) {
-        setAllUsers(data.users);
-      } else {
+        applyUserDirectoryState(data.users || []);
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to fetch users", { silent });
     }
   };
 
   // ✅ FIXED: Fetches from the correct users endpoint and filters for staff
-  const getAllStaff = async () => {
+  const getAllStaff = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/users`, authHeader);
 
       if (data.success) {
-        // Filter by role to ensure only staff members are stored in allStaff state
-        const staffOnly = data.users.filter(user => user.role === "staff" || user.role === "admin");
-        setAllStaff(staffOnly);
-      } else {
+        applyUserDirectoryState(data.users || []);
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error("Failed to fetch staff list");
-      console.error(error.message);
+      reportRequestError(error, "Failed to fetch staff list", { silent });
     }
   };
 
@@ -204,13 +229,12 @@ const AdminContextProvider = ({ children }) => {
 
       if (data.success) {
         toast.success(data.message);
-        getAllUsers(); 
-        getAllStaff(); // Refresh both lists to keep UI in sync
+        getAllUsers();
       } else {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to update user status");
     }
   };
 
@@ -247,14 +271,14 @@ const AdminContextProvider = ({ children }) => {
 
       if (data.success) {
         toast.success(data.message);
-        getAllStaff(); // Refresh staff list
+        getAllUsers();
         return true; 
       } else {
         toast.error(data.message);
         return false;
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to create staff");
       return false;
     }
   };
@@ -279,14 +303,14 @@ const AdminContextProvider = ({ children }) => {
 
       if (data.success) {
         toast.success(data.message);
-        getAllStaff(); // Refresh staff list
+        getAllUsers();
         return true;
       } else {
         toast.error(data.message);
         return false;
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to update staff");
       return false;
     }
   };
@@ -294,47 +318,51 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // ⚙️ SETTINGS (BUILDINGS & ROOM TYPES)
   // ============================================================
-  const getBuildings = async () => {
+  const getBuildings = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/buildings`, {
         headers: { token: aToken },
       });
       if (data.success) {
         setBuildings(data.buildings);
+      } else if (!silent) {
+        toast.error(data.message);
       }
     } catch (error) {
-      console.error(error);
+      reportRequestError(error, "Failed to fetch buildings", { silent });
     }
   };
 
-  const getRoomTypes = async () => {
+  const getRoomTypes = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/room-types`, {
         headers: { token: aToken },
       });
       if (data.success) {
         setRoomTypes(data.types);
+      } else if (!silent) {
+        toast.error(data.message);
       }
     } catch (error) {
-      console.error(error);
+      reportRequestError(error, "Failed to fetch room types", { silent });
     }
   };
 
   // ============================================================
   // 🛏️ ROOM MANAGEMENT
   // ============================================================
-  const getAllRooms = async () => {
+  const getAllRooms = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/all-rooms`, {
         headers: { token: aToken },
       });
       if (data.success) {
         setAllRooms((data.rooms || []).map(normalizeRoomRecord));
-      } else {
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to fetch rooms", { silent });
     }
   };
 
@@ -377,18 +405,18 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 📅 BOOKING MANAGEMENT
   // ============================================================
-  const getAllBookings = async () => {
+  const getAllBookings = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/all-bookings`, {
         headers: { token: aToken },
       });
       if (data.success) {
         setAllBookings(data.bookings);
-      } else {
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to fetch bookings", { silent });
     }
   };
 
@@ -493,18 +521,18 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 📦 PACKAGES MANAGEMENT
   // ============================================================
-  const getAllPackages = async () => {
+  const getAllPackages = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/packages`, {
         headers: { token: aToken },
       });
       if (data.success) {
         setAllPackages(data.packages);
-      } else {
+      } else if (!silent) {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      reportRequestError(error, "Failed to fetch packages", { silent });
     }
   };
 
@@ -571,16 +599,87 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   const [allReviews, setAllReviews] = useState([]);
 
-  const getAllReviews = async () => {
+  const getAllReviews = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/reviews/all-reviews`);
       if (data.success) {
         setAllReviews(data.reviews);
+      } else if (!silent) {
+        toast.error(data.message);
       }
     } catch (error) {
-      toast.error("Failed to fetch reviews");
+      reportRequestError(error, "Failed to fetch reviews", { silent });
     }
   };
+
+  const syncAdminRealtimeData = async ({ silent = true } = {}) => {
+    if (!aToken || adminRealtimeSyncInProgressRef.current) {
+      return;
+    }
+
+    adminRealtimeSyncInProgressRef.current = true;
+
+    try {
+      await Promise.allSettled([
+        getDashboardData({ silent }),
+        getAllBookings({ silent }),
+        getAllReviews({ silent }),
+        getAllRooms({ silent }),
+        getAllUsers({ silent }),
+        getAllPackages({ silent }),
+        getBuildings({ silent }),
+        getRoomTypes({ silent }),
+      ]);
+    } finally {
+      adminRealtimeSyncInProgressRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!backendUrl || !aToken) return undefined;
+
+    const socket = io(backendUrl, {
+      transports: ["websocket", "polling"],
+      auth: { token: aToken },
+    });
+
+    adminRealtimeSocketRef.current = socket;
+
+    const handleRealtimeUpdate = (payload = {}) => {
+      const entity = String(payload?.entity || "").toLowerCase();
+
+      if (
+        [
+          "bookings",
+          "reviews",
+          "rooms",
+          "packages",
+          "settings",
+          "users",
+          "profile",
+          "account_status",
+        ].includes(entity)
+      ) {
+        syncAdminRealtimeData({ silent: true });
+      }
+
+      window.dispatchEvent(
+        new CustomEvent(ADMIN_REALTIME_EVENT_NAME, {
+          detail: payload,
+        })
+      );
+    };
+
+    socket.on(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+
+    return () => {
+      socket.off(SOCKET_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+      socket.disconnect();
+      if (adminRealtimeSocketRef.current === socket) {
+        adminRealtimeSocketRef.current = null;
+      }
+    };
+  }, [backendUrl, aToken]);
 
   const postReviewReply = async (reviewId, message) => {
   try {
@@ -613,7 +712,14 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // These use useMemo to only recalculate when the data lists change
   const hasNewBookings = useMemo(() => {
-    return allBookings.some(b => b.status === "Pending" || b.status === "Cancellation Requested");
+    return allBookings.some((booking) => {
+      const normalizedStatus = String(booking?.status || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
+
+      return normalizedStatus === "pending" || normalizedStatus === "cancellation_pending";
+    });
   }, [allBookings]);
 
   const pendingReviewsCount = useMemo(() => {
@@ -626,16 +732,30 @@ const AdminContextProvider = ({ children }) => {
     }).length;
   }, [allReviews]);
 
-  // AUTO-FETCH DATA ONCE ADMIN IS AUTHENTICATED
   useEffect(() => {
-    if (aToken) {
-      getAllBookings();
-      getAllReviews();
-      getAllRooms();
-      getAllUsers();
-      getAllStaff();
-    }
-  }, [aToken]);
+    if (!aToken) return undefined;
+
+    syncAdminRealtimeData({ silent: true });
+
+    const runVisibleSync = () => {
+      if (document.visibilityState === "visible") {
+        syncAdminRealtimeData({ silent: true });
+      }
+    };
+
+    const interval = setInterval(runVisibleSync, ADMIN_REALTIME_SYNC_INTERVAL_MS);
+    const handleFocus = () => syncAdminRealtimeData({ silent: true });
+    const handleVisibilityChange = () => runVisibleSync();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [aToken, backendUrl]);
 
   // ============================================================
   // 📤 EXPORT CONTEXT VALUE

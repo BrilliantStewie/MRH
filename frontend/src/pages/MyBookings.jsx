@@ -20,6 +20,12 @@ import {
   getPHMonthIndex,
   getPHYear,
 } from "../utils/dateTime";
+import {
+  FRONTEND_REALTIME_EVENT_NAME,
+  matchesRealtimeEntity,
+} from "../utils/realtime";
+
+const USER_BOOKINGS_REFRESH_INTERVAL_MS = 15000;
 
 // --- HELPER: Date Formatter ---
 const formatDate = (dateInput) => {
@@ -134,11 +140,23 @@ const MyBookings = () => {
   };
 
   // Fetch Data
-  const fetchUserBookings = async () => {
+  const fetchUserBookings = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(backendUrl + `/api/booking/user/bookings?t=${Date.now()}`, { headers: { token } });
-      if (data.success) setBookings(data.bookings);
-    } catch (error) { toast.error(error.message); } finally { setLoading(false); }
+      if (data.success) {
+        setBookings(data.bookings);
+      } else if (!silent) {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      if (!silent) {
+        toast.error(error.message);
+      } else {
+        console.error("Bookings refresh error:", error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Payment Verification
@@ -224,14 +242,52 @@ const MyBookings = () => {
   };
 
   useEffect(() => {
-    if (token) {
-      fetchUserBookings();
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('success') === 'true' && urlParams.get('bookingId')) {
-        verifyPaymentStatus(urlParams.get('bookingId'));
-      }
+    if (!token || !backendUrl) {
+      setBookings([]);
+      setLoading(false);
+      return undefined;
     }
-  }, [token]);
+
+    fetchUserBookings({ silent: true });
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('success') === 'true' && urlParams.get('bookingId')) {
+      verifyPaymentStatus(urlParams.get('bookingId'));
+    }
+
+    const runVisibleRefresh = () => {
+      if (document.visibilityState === "visible") {
+        fetchUserBookings({ silent: true });
+      }
+    };
+
+    const interval = setInterval(runVisibleRefresh, USER_BOOKINGS_REFRESH_INTERVAL_MS);
+    const handleFocus = () => fetchUserBookings({ silent: true });
+    const handleVisibilityChange = () => runVisibleRefresh();
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [token, backendUrl]);
+
+  useEffect(() => {
+    if (!token || !backendUrl) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["bookings", "reviews"])) {
+        fetchUserBookings({ silent: true });
+      }
+    };
+
+    window.addEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(FRONTEND_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
+  }, [token, backendUrl]);
 
   const triggerBookingFlash = (bookingId) => {
     if (!bookingId) return;

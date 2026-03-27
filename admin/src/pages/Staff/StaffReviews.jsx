@@ -29,6 +29,10 @@ import {
   getBookingCheckOutDateValue,
 } from "../../utils/bookingDateFields";
 import { formatDatePHT, formatDateRangePHT, formatDateTimePHT } from "../../utils/dateTime";
+import {
+  matchesRealtimeEntity,
+  STAFF_REALTIME_EVENT_NAME,
+} from "../../utils/realtime";
 
 const StaffReviews = () => {
   const { backendUrl, sToken } = useContext(StaffContext);
@@ -122,6 +126,21 @@ const StaffReviews = () => {
 
   useEffect(() => {
     fetchReviews();
+  }, [backendUrl, sToken]);
+
+  useEffect(() => {
+    if (!backendUrl || !sToken) return undefined;
+
+    const handleRealtimeUpdate = (event) => {
+      if (matchesRealtimeEntity(event.detail, ["reviews"])) {
+        fetchReviews();
+      }
+    };
+
+    window.addEventListener(STAFF_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    return () => {
+      window.removeEventListener(STAFF_REALTIME_EVENT_NAME, handleRealtimeUpdate);
+    };
   }, [backendUrl, sToken]);
 
   useEffect(() => {
@@ -360,7 +379,7 @@ const StaffReviews = () => {
   const hasNoReviews = !isLoading && reviews.length === 0;
 
   return (
-    <div className="reviews-page w-full min-h-screen text-slate-800 relative">
+    <div className="reviews-page w-full min-h-full text-slate-800 relative">
       <div className="pointer-events-none absolute inset-0 -z-10"></div>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -397,16 +416,16 @@ const StaffReviews = () => {
         }
       `}</style>
 
-      <div className="w-full max-w-none mx-auto px-4 lg:px-8 xl:px-10 2xl:px-12 pt-4 pb-20">
+      <div className="mx-auto w-full max-w-none px-3 pt-3 pb-20 sm:px-4 sm:pt-4 lg:px-8 xl:px-10 2xl:px-12">
       
-      <div className="mb-8 w-full max-w-[1200px] mx-0 sm:mb-10">
+      <div className="mb-5 w-full max-w-[1200px] mx-0 sm:mb-10">
         <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mt-2">Guest Reviews</h1>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-3xl">Guest Reviews</h1>
             <p className="text-slate-500 mt-2 max-w-2xl">
               Manage guest reviews and responses.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-5">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                 Rating
               </span>
@@ -445,7 +464,7 @@ const StaffReviews = () => {
         </div>
       </div>
 
-      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start"}`}>
+      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-4 sm:gap-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start"}`}>
         {!hasNoReviews && (
           <aside className="h-fit">
             <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -479,7 +498,7 @@ const StaffReviews = () => {
           </aside>
         )}
 
-        <div className={`flex w-full flex-col items-start space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "pl-0 lg:pl-4"}`}>
+        <div className={`flex w-full flex-col items-start space-y-5 sm:space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "pl-0 xl:pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (
@@ -513,14 +532,14 @@ const StaffReviews = () => {
               <div
                 id={`review-${review._id}`}
                 key={review._id}
-                className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
+                className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-none w-full sm:max-w-[700px] ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
               >
-                <div className="p-4 pl-5">
+                  <div className="p-4 sm:pl-5">
                   
                   {/* --- MAIN REVIEW HEADER --- */}
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-3">
+                    <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex flex-col gap-2">
-                      <div className="mt-6 flex items-center gap-3">
+                      <div className="mt-2 flex items-center gap-3 sm:mt-6">
                         <div className="h-14 w-14 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center">
                           {review.userId?.image ? (
                             <img src={review.userId.image.startsWith('http') ? review.userId.image : `${backendUrl}/${review.userId.image}`} alt="User" className="w-full h-full object-cover" />

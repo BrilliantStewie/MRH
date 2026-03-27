@@ -1,4 +1,5 @@
 import Notification from "../models/notificationModel.js";
+import { emitRealtimeUpdate } from "./realtimeServer.js";
 
 const normalizeLink = (link) => String(link || "").trim();
 
@@ -105,6 +106,15 @@ export const createOrRefreshNotifications = async (notifications = []) => {
       },
     }))
   );
+
+  emitRealtimeUpdate({
+    userIds: uniqueNotifications.map((notification) => notification.recipient),
+    payload: {
+      entity: "notifications",
+      action: "upsert",
+      path: "notification-utils",
+    },
+  });
 };
 
 export const createOrRefreshNotification = async (notification) => {

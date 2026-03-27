@@ -10,28 +10,20 @@ import {
   CircleDot,
   XCircle,
   RefreshCcw,
-  UserPlus,
-  Phone,
-  Lock,
-  X
+  Phone
 } from "lucide-react";
-import { toast } from "react-toastify";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const USERS_PER_PAGE = 5;
 const normalizeUserRole = (role) => (role === "user" ? "guest" : role || "guest");
 
 const Users = () => {
-  const { aToken, allUsers, getAllUsers, changeUserStatus, addGuestUser, updateStaff } = useContext(AdminContext);
+  const { aToken, allUsers, getAllUsers, changeUserStatus } = useContext(AdminContext);
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); 
   const [adminInfo, setAdminInfo] = useState({ id: "" });
-  
-  // Modal States
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editData, setEditData] = useState(null);
 
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -146,11 +138,6 @@ const Users = () => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const handleEdit = (user) => {
-    setEditData(user);
-    setShowAddModal(true);
-  };
-
   const roleOptions = [
     { value: "all", label: "All Roles" },
     { value: "staff", label: "Staff", icon: Shield },
@@ -167,32 +154,12 @@ const Users = () => {
     <div className="flex h-full min-h-0 flex-col bg-slate-50 font-sans text-slate-900">
       
       {/* TOP BAR */}
-      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="mb-5 flex flex-col items-start justify-between gap-3 sm:mb-6 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex items-center gap-3">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900">Users</h1>
+                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Users</h1>
                 <p className="text-slate-500 text-sm font-medium">Manage system access and roles.</p>
             </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
-            <button
-                onClick={() => {
-                  setEditData(null);
-                  setShowAddModal(true);
-                }}
-                className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-white transition-colors hover:bg-black shadow-sm"
-            >
-                <UserPlus size={16} />
-                <span className="text-sm font-semibold sm:inline hidden">Add Guest</span>
-            </button>
-            <button 
-                onClick={() => getAllUsers()} 
-                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm"
-            >
-                <RefreshCcw size={16} />
-                <span className="text-sm font-semibold sm:inline hidden">Refresh</span>
-            </button>
         </div>
       </div>
 
@@ -210,7 +177,7 @@ const Users = () => {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end z-10">
+          <div className="flex w-full flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto z-10">
             <FilterDropdown
               label="Role"
               options={roleOptions}
@@ -219,7 +186,8 @@ const Users = () => {
               icon={Shield}
               showLabelPrefix
               neutralValue="all"
-              menuClassName="w-52"
+              triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[152px]"
+              menuClassName="w-full sm:w-52"
             />
             <FilterDropdown
               label="Status"
@@ -229,12 +197,13 @@ const Users = () => {
               icon={CircleDot}
               showLabelPrefix
               neutralValue="all"
-              menuClassName="w-52"
+              triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[152px]"
+              menuClassName="w-full sm:w-52"
             />
             {(roleFilter !== "all" || statusFilter !== "all" || search) && (
               <button 
                 onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}
-                className="text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-2 rounded-full transition-colors"
+                className="w-full rounded-full bg-rose-50 px-3 py-2 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700 sm:w-auto"
               >
                 Clear Filters
               </button>
@@ -245,7 +214,119 @@ const Users = () => {
 
       {/* DATA TABLE */}
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="flex flex-col gap-3 p-4 md:hidden">
+          {displayedUsers.length > 0 ? (
+            displayedUsers.map((u) => {
+              const isAdminRow = u.role === "admin";
+              const displayPhone = getDisplayPhone(u.phone);
+
+              return (
+                <div
+                  key={u._id}
+                  className={`rounded-2xl border px-4 py-4 shadow-sm transition-colors ${
+                    u.disabled
+                      ? "border-slate-200 bg-slate-50/80"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 ${
+                        u.disabled ? "grayscale opacity-70" : ""
+                      }`}
+                    >
+                      {isAdminRow ? (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-900 text-white">
+                          <Shield size={18} />
+                        </div>
+                      ) : u.image ? (
+                        <img src={u.image} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
+                          <User size={18} />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className={`text-sm font-bold ${u.disabled ? "text-slate-400" : "text-slate-900"}`}>
+                          {isAdminRow ? "Administrator" : getFullName(u)}
+                        </p>
+                        {u.isYou && (
+                          <span className="rounded uppercase bg-indigo-50 px-1.5 py-0.5 text-[9px] tracking-wider text-indigo-600">
+                            You
+                          </span>
+                        )}
+                      </div>
+
+                      {!isAdminRow && (
+                        <div className="mt-2 space-y-1.5">
+                          <div className={`flex items-start gap-2 text-xs ${u.disabled ? "text-slate-400" : "text-slate-500"}`}>
+                            <Mail size={14} className="mt-0.5 shrink-0 text-slate-400 opacity-70" />
+                            <span className="break-all">{u.email || "No Email"}</span>
+                          </div>
+                          {displayPhone && (
+                            <div className={`flex items-start gap-2 text-xs ${u.disabled ? "text-slate-400" : "text-slate-500"}`}>
+                              <Phone size={14} className="mt-0.5 shrink-0 text-slate-400 opacity-70" />
+                              <span>{displayPhone}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+                      u.role === "admin"
+                        ? "border-rose-100 bg-rose-50 text-rose-600"
+                        : u.role === "staff"
+                          ? "border-indigo-100 bg-indigo-50 text-indigo-700"
+                          : "border-slate-200 bg-slate-100 text-slate-600"
+                    }`}>
+                      {u.role === "guest" ? "Guest" : u.role || "User"}
+                    </span>
+
+                    {!isAdminRow && (
+                      u.disabled ? (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                          <XCircle size={12} /> Disabled
+                        </div>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-emerald-600">
+                          <CircleDot size={12} className="animate-pulse" /> Active
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {!u.isYou && u.role !== "admin" && (
+                    <div className="mt-4">
+                      <button
+                        onClick={() => changeUserStatus(u._id)}
+                        className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-[11px] font-bold transition-all ${
+                          u.disabled
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                            : "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                        }`}
+                      >
+                        {u.disabled ? <RefreshCcw size={14} /> : <Shield size={14} />}
+                        {u.disabled ? "Enable Account" : "Disable Account"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-sm font-medium text-slate-500">
+              No users found match your criteria.
+            </div>
+          )}
+        </div>
+
+        <div className="hidden min-h-0 flex-1 overflow-auto md:block">
         <table className="w-full min-w-[800px] border-collapse text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
@@ -412,158 +493,8 @@ const Users = () => {
         )}
       </div>
 
-      {/* MODAL */}
-      {showAddModal && (
-        <AddGuestModal 
-            onClose={() => { setShowAddModal(false); setEditData(null); }} 
-            editData={editData} 
-            addGuestUser={addGuestUser}
-            updateStaff={updateStaff}
-            getAllUsers={getAllUsers}
-        />
-      )}
     </div>
   );
-};
-
-// --- AddGuestModal Component ---
-const AddGuestModal = ({ onClose, editData, addGuestUser, updateStaff, getAllUsers }) => {
-    const [loading, setLoading] = useState(false);
-    const [formData, setFormData] = useState({
-        firstName: editData?.firstName || "",
-        lastName: editData?.lastName || "",
-        middleName: editData?.middleName || "",
-        email: editData?.email || "",
-        phone: editData?.phone && editData.phone !== "0000000000" ? editData.phone : "",
-        password: ""
-    });
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            let success = false;
-            if (editData) {
-                success = await updateStaff(editData._id, formData);
-            } else {
-                success = await addGuestUser(formData);
-            }
-
-            if (success) {
-                getAllUsers();
-                onClose();
-            }
-        } catch (error) {
-            toast.error("An error occurred");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <UserPlus size={20} className="text-indigo-400" />
-                        <h2 className="text-xl font-bold">{editData ? "Edit Profile" : "Add Guest Profile"}</h2>
-                    </div>
-                    <button onClick={onClose} className="hover:bg-white/10 p-1 rounded-full transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-black uppercase text-slate-500 tracking-wider">First Name *</label>
-                            <input 
-                                required 
-                                type="text" 
-                                value={formData.firstName}
-                                onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" 
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Last Name *</label>
-                            <input 
-                                required 
-                                type="text" 
-                                value={formData.lastName}
-                                onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none text-sm" 
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs font-black uppercase text-slate-500 tracking-wider">Middle Name (Optional)</label>
-                        <input 
-                            type="text" 
-                            value={formData.middleName}
-                            onChange={(e) => setFormData({...formData, middleName: e.target.value})}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                        />
-                    </div>
-
-                    <div className="border-t border-slate-100 pt-4 space-y-3">
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                                type="email" 
-                                required={!editData}
-                                placeholder="Email" 
-                                value={formData.email}
-                                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                            />
-                        </div>
-                        <div className="relative">
-                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                                type="text" 
-                                placeholder="Phone (Optional)" 
-                                value={formData.phone}
-                                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                            />
-                        </div>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                                type="password" 
-                                required={!editData}
-                                minLength={editData ? undefined : 8}
-                                placeholder={editData ? "New Password (Leave blank to keep)" : "Password (Minimum 8 characters)"}
-                                value={formData.password}
-                                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                                className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                            />
-                        </div>
-                    </div>
-
-                    <div className="pt-4 flex gap-3">
-                        <button 
-                            type="button" 
-                            disabled={loading}
-                            onClick={onClose} 
-                            className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 transition-all disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            disabled={loading}
-                            className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200 disabled:bg-slate-400"
-                        >
-                            {loading ? "Processing..." : editData ? "Save Changes" : "Create Profile"}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
 };
 
 export default Users;
