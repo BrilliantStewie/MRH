@@ -910,14 +910,9 @@ const StaffBookings = () => {
                     </button>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                      {formatDatePHT(getBookingCheckInDateValue(b))} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(getBookingCheckOutDateValue(b))}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <StatusBadge status={b.status} />
-                      <StayStatusBadge booking={b} />
-                    </div>
+                  <div className="flex flex-col gap-2">
+                    <StatusBadge status={b.status} />
+                    <StayStatusBadge booking={b} />
                   </div>
 
                   <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
@@ -947,9 +942,6 @@ const StaffBookings = () => {
                 <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Profile</th>
                 <th className="pl-0 pr-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <span className="-ml-[63px] block">Booking Details</span>
-                </th>
-                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="-ml-4 inline-block">Stay Period</span>
                 </th>
                 <th className="pl-2 pr-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   <span className="-ml-[10px] block">Current Status</span>
@@ -1025,15 +1017,6 @@ const StaffBookings = () => {
                           <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-1 flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-tighter text-blue-600 hover:text-blue-700 hover:underline">
                             <Info size={10}/> View Full Details
                           </button>
-                        </div>
-                      </td>
-
-                      {/* STAY PERIOD */}
-                      <td className="px-6 py-5 align-top">
-                        <div className="-ml-4 flex justify-center">
-                          <div className="flex w-fit items-center gap-2 rounded-lg border border-slate-100 bg-slate-100/50 px-2 py-1 text-[11px] font-bold text-slate-600">
-                            {formatDatePHT(getBookingCheckInDateValue(b))} <ArrowRight size={10} className="text-slate-300" /> {formatDatePHT(getBookingCheckOutDateValue(b))}
-                          </div>
                         </div>
                       </td>
 

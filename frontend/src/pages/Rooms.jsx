@@ -447,6 +447,8 @@ const Rooms = () => {
             : isBookedForRange
               ? rangeReason === "cleaning"
                 ? "Cleaning Day"
+                : rangeReason === "daily_limit"
+                  ? "Fully Booked"
                 : "Booked"
               : "";
 

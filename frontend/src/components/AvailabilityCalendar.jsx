@@ -11,7 +11,7 @@ import { formatMonthYearPHT } from "../utils/dateTime";
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   const [viewDate, setViewDate] = useState(new Date());
 
-  const guestCountsByDate = useMemo(() => {
+  const bookingCountsByDate = useMemo(() => {
     const counts = new Map();
     if (!bookings) return counts;
     bookings.forEach(b => {
@@ -23,13 +23,13 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
         const end = new Date(getBookingCheckOutDateValue(b));
         start.setHours(0, 0, 0, 0);
         end.setHours(0, 0, 0, 0);
-        const guestCountRaw = Number(b.guestCount);
-        const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
+        const bookingCountRaw = Number(b.bookingCount);
+        const bookingCount = Number.isFinite(bookingCountRaw) && bookingCountRaw > 0 ? bookingCountRaw : 1;
 
         let current = new Date(start);
         while (current <= end) {
           const key = current.getTime();
-          counts.set(key, (counts.get(key) || 0) + guestCount);
+          counts.set(key, (counts.get(key) || 0) + bookingCount);
           current.setDate(current.getDate() + 1);
         }
       }
@@ -46,8 +46,8 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
     if (!isCurrentMonth || isPast) return "pro-day-locked";
     
     const time = date.getTime();
-    const guestCount = guestCountsByDate.get(time) || 0;
-    const isReserved = guestCount >= 2;
+    const bookingCount = bookingCountsByDate.get(time) || 0;
+    const isReserved = bookingCount >= 2;
     return isReserved ? "pro-day-amber" : "pro-day-open";
   };
 

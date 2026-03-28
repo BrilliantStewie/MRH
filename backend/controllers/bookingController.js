@@ -10,7 +10,11 @@ import {
   getBookingCheckInDate,
   getBookingCheckOutDate,
 } from "../utils/bookingDateFields.js";
-import { createValidatedBooking } from "../utils/bookingService.js";
+import {
+  createValidatedBooking,
+  DAILY_BOOKING_LIMIT_MESSAGE,
+  getDailyBookingLimitDates,
+} from "../utils/bookingService.js";
 import {
   addDays,
   getBookingReviewEligibility,
@@ -331,6 +335,11 @@ if (!roomIds.length || !requestedCheckIn || !requestedCheckOut) {
 const start=normalizeDate(requestedCheckIn);
 const end=normalizeDate(requestedCheckOut);
 
+const fullyBookedDates = await getDailyBookingLimitDates(start, end);
+
+if (fullyBookedDates.length)
+return res.json({success:false,message:DAILY_BOOKING_LIMIT_MESSAGE});
+
 const uniqueRooms = roomIds;
 
 const bookings = await bookingModel.find(
@@ -421,6 +430,7 @@ try {
   }
 
   const allowedIds = new Set(roomIds.map((id) => String(id)));
+  const fullyBookedDates = await getDailyBookingLimitDates(start, end);
 
   const bookings = await bookingModel.find(
     {
@@ -432,6 +442,14 @@ try {
 
   const bookedSet = new Set();
   const bookedReasons = new Map();
+
+  if (fullyBookedDates.length) {
+    allowedIds.forEach((id) => {
+      bookedSet.add(id);
+      bookedReasons.set(id, "daily_limit");
+    });
+  }
+
   bookings.forEach((booking) => {
     const existingStart = normalizeDate(getBookingCheckInDate(booking));
     const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
@@ -452,7 +470,7 @@ try {
         return;
       }
 
-      if (!bookedReasons.has(id)) {
+      if (bookedReasons.get(id) !== "booked") {
         bookedReasons.set(id, "cleaning");
       }
     });
@@ -495,6 +513,7 @@ try {
       checkOutDate: getBookingCheckOutDate(b),
       status: b.status,
       paymentStatus: b.paymentStatus,
+      bookingCount: 1,
       guestCount: roomGuests + venueGuests
     };
   });

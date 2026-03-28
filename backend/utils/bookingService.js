@@ -16,8 +16,26 @@ import {
 } from "./bookingDateFields.js";
 
 const ROOM_LOCK_WINDOW_MS = 30 * 1000;
+const ACTIVE_BOOKING_STATUSES = ["pending", "approved"];
+const MAX_ACTIVE_BOOKINGS_PER_DAY = 2;
+const DAILY_BOOKING_LIMIT_MESSAGE = `Only ${MAX_ACTIVE_BOOKINGS_PER_DAY} bookings are allowed per day. Please choose different dates.`;
 
 const toObjectIdString = (value) => String(value || "").trim();
+const buildDateKey = (date) => normalizeDate(date).getTime();
+
+const listDatesInRange = (start, end) => {
+  const dates = [];
+  const normalizedStart = normalizeDate(start);
+  const normalizedEnd = normalizeDate(end);
+  let current = new Date(normalizedStart);
+
+  while (current <= normalizedEnd) {
+    dates.push(new Date(current));
+    current = addDays(current, 1);
+  }
+
+  return dates;
+};
 
 const buildNormalizedBookingItems = (bookingItems = []) =>
   Array.isArray(bookingItems)
@@ -86,12 +104,60 @@ const releaseRoomBookingLocks = async (roomIds, lockToken) => {
       bookingLockToken: lockToken,
     },
     {
-      $set: {
-        bookingLockToken: null,
-        bookingLockExpiresAt: null,
+      $unset: {
+        bookingLockToken: 1,
+        bookingLockExpiresAt: 1,
       },
     }
   );
+};
+
+const findActiveBookingsForRange = async (start, end) => {
+  const bookings = await bookingModel.find(
+    {
+      status: { $in: ACTIVE_BOOKING_STATUSES },
+    },
+    BOOKING_DATE_SELECT
+  );
+
+  return bookings.filter((booking) => {
+    const existingStart = normalizeDate(getBookingCheckInDate(booking));
+    const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
+    return rangesOverlap(existingStart, existingEnd, start, end);
+  });
+};
+
+const getDailyBookingLimitDates = async (start, end) => {
+  const overlappingBookings = await findActiveBookingsForRange(start, end);
+  const bookingCountsByDate = new Map();
+
+  for (const booking of overlappingBookings) {
+    const existingStart = normalizeDate(getBookingCheckInDate(booking));
+    const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
+    const overlapStart = existingStart > start ? existingStart : start;
+    const overlapEnd = existingEnd < end ? existingEnd : end;
+
+    let current = new Date(overlapStart);
+    while (current <= overlapEnd) {
+      const key = buildDateKey(current);
+      bookingCountsByDate.set(key, (bookingCountsByDate.get(key) || 0) + 1);
+      current = addDays(current, 1);
+    }
+  }
+
+  return listDatesInRange(start, end).filter(
+    (date) =>
+      (bookingCountsByDate.get(buildDateKey(date)) || 0) >=
+      MAX_ACTIVE_BOOKINGS_PER_DAY
+  );
+};
+
+const ensureDailyBookingCapacity = async (start, end) => {
+  const fullyBookedDates = await getDailyBookingLimitDates(start, end);
+
+  if (fullyBookedDates.length) {
+    throw new Error(DAILY_BOOKING_LIMIT_MESSAGE);
+  }
 };
 
 const findConflictingBookings = async (roomIds, start, end) => {
@@ -100,7 +166,7 @@ const findConflictingBookings = async (roomIds, start, end) => {
   const bookings = await bookingModel.find(
     {
       "bookingItems.roomId": { $in: roomIds },
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ACTIVE_BOOKING_STATUSES },
     },
     `${BOOKING_DATE_SELECT} bookingItems`
   );
@@ -240,6 +306,8 @@ const createValidatedBooking = async ({
     throw new Error("Rooms are not available for same-day bookings");
   }
 
+  await ensureDailyBookingCapacity(start, end);
+
   const lockToken = new mongoose.Types.ObjectId().toString();
   const lockedRoomIds = await acquireRoomBookingLocks(uniqueRooms, lockToken);
 
@@ -301,4 +369,9 @@ const createValidatedBooking = async ({
   }
 };
 
-export { createValidatedBooking };
+export {
+  createValidatedBooking,
+  DAILY_BOOKING_LIMIT_MESSAGE,
+  getDailyBookingLimitDates,
+  MAX_ACTIVE_BOOKINGS_PER_DAY,
+};

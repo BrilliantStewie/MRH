@@ -303,13 +303,13 @@ const RetreatBooking = () => {
                 (data.bookings || []).forEach((b) => {
                     const start = toDateObj(getBookingCheckInDateValue(b));
                     const end = toDateObj(getBookingCheckOutDateValue(b));
-                    const guestCountRaw = Number(b.guestCount);
-                    const guestCount = Number.isFinite(guestCountRaw) && guestCountRaw > 0 ? guestCountRaw : 1;
+                    const bookingCountRaw = Number(b.bookingCount);
+                    const bookingCount = Number.isFinite(bookingCountRaw) && bookingCountRaw > 0 ? bookingCountRaw : 1;
 
                     let current = new Date(start);
                     while (current <= end) {
                         const key = current.getTime();
-                        counts.set(key, (counts.get(key) || 0) + guestCount);
+                        counts.set(key, (counts.get(key) || 0) + bookingCount);
                         current.setDate(current.getDate() + 1);
                     }
                 });
@@ -463,7 +463,7 @@ const RetreatBooking = () => {
         return "my-booking-date";
     }
 
-    // 🟨 Reserved (2+ guests already booked)
+    // 🟨 Reserved (2 bookings already scheduled)
     if (guestReservedDates.some(d => d.getTime() === time)) {
         return "guest-reserved-date";
     }
