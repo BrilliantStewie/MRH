@@ -391,9 +391,7 @@ const StaffReviews = () => {
     <div className="reviews-page w-full min-h-full text-slate-800 relative">
       <div className="pointer-events-none absolute inset-0 -z-10"></div>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
         .reviews-page {
-          font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
           background-color: #ffffff;
         }
         .review-card {

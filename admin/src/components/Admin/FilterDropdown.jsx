@@ -40,9 +40,10 @@ const FilterDropdown = ({
     neutralValue !== undefined ? neutralValue : options[0]?.value;
   const isActive = String(value) !== String(inactiveValue);
   const alignClass = align === "left" ? "left-0" : "right-0";
+  const dropdownTextClass = compact ? "text-[11px]" : "text-sm";
   const triggerBaseClass = compact
-    ? "group flex h-[34px] items-center gap-2 rounded-xl border px-2.5 text-[11px] font-semibold transition-all duration-200"
-    : "group flex h-[52px] items-center gap-3 rounded-[22px] border px-4 text-sm font-semibold transition-all duration-200";
+    ? "group flex h-[34px] items-center gap-2 rounded-xl border px-2.5 font-semibold transition-all duration-200"
+    : "group flex h-[52px] items-center gap-3 rounded-[22px] border px-4 font-semibold transition-all duration-200";
   const iconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-8 w-8 rounded-xl";
   const iconSize = compact ? 10 : 15;
   const chevronWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
@@ -55,8 +56,8 @@ const FilterDropdown = ({
     : "mb-2 flex items-center gap-3 rounded-2xl px-3.5 py-2.5";
   const optionListClass = compact ? "max-h-48 space-y-1 overflow-y-auto pr-1" : "max-h-64 space-y-1 overflow-y-auto pr-1";
   const optionButtonClass = compact
-    ? "flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold transition-all"
-    : "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left text-sm font-semibold transition-all";
+    ? "flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-left font-semibold transition-all"
+    : "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left font-semibold transition-all";
   const optionIconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-7 w-7 rounded-xl";
   const optionCheckWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
   const optionCheckSize = compact ? 10 : 14;
@@ -108,7 +109,7 @@ const FilterDropdown = ({
             <Icon size={iconSize} />
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate text-left">
+          <span className={`min-w-0 flex-1 truncate text-left ${dropdownTextClass}`}>
           {showLabelPrefix && (
             <span className="mr-1 hidden font-medium text-slate-400 sm:inline">
               {label}:
@@ -152,7 +153,7 @@ const FilterDropdown = ({
                   <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
                     {label}
                   </p>
-                  <p className="truncate text-sm font-black tracking-tight text-slate-700">
+                  <p className={`truncate font-black tracking-tight text-slate-700 ${dropdownTextClass}`}>
                     {selectedLabel}
                   </p>
                 </div>
@@ -180,7 +181,7 @@ const FilterDropdown = ({
                         : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
-                  <span className="flex min-w-0 items-center gap-2">
+                  <span className={`flex min-w-0 items-center gap-2 ${dropdownTextClass}`}>
                     {OptionIcon && (
                       <span
                         className={`flex shrink-0 items-center justify-center border ${optionIconWrapClass} ${

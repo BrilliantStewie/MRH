@@ -507,7 +507,6 @@ const AllReviews = () => {
       </div>
       <Navbar />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
         @keyframes flashPulse {
           0% {
             box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
@@ -526,7 +525,6 @@ const AllReviews = () => {
           animation: flashPulse 0.9s ease-in-out 0s 3;
         }
         .reviews-page {
-          font-family: 'Manrope', 'Segoe UI', system-ui, -apple-system, sans-serif;
           background-color: #f5f7fb;
         }
         .review-card {
