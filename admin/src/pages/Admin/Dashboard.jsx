@@ -25,6 +25,7 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../../utils/bookingDateFields";
+import FilterDropdown from "../../components/Admin/FilterDropdown";
 
 const MONTH_NAMES = [
   "January",
@@ -220,6 +221,20 @@ const Dashboard = () => {
     years.add(new Date().getFullYear());
     return Array.from(years).sort((a, b) => b - a);
   }, [allBookings]);
+  const reportTypeOptions = [
+    { value: "monthly", label: "Monthly Report", icon: CalendarDays },
+    { value: "yearly", label: "Yearly Report", icon: BarChart3 },
+  ];
+  const reportMonthOptions = MONTH_NAMES.map((month, index) => ({
+    value: index,
+    label: month,
+    icon: CalendarDays,
+  }));
+  const reportYearOptions = availableYears.map((year) => ({
+    value: year,
+    label: String(year),
+    icon: BarChart3,
+  }));
 
   const reportBookings = useMemo(() => {
     return (allBookings || []).filter((booking) => {
@@ -660,42 +675,43 @@ const Dashboard = () => {
 
               <div className="p-8">
                 <div className="mb-6 grid gap-3 sm:grid-cols-3">
-                  <select
+                  <FilterDropdown
+                    label="Report Type"
+                    options={reportTypeOptions}
                     value={reportType}
-                    onChange={(event) => setReportType(event.target.value)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-400"
-                  >
-                    <option value="monthly">Monthly</option>
-                    <option value="yearly">Yearly</option>
-                  </select>
+                    onChange={setReportType}
+                    icon={CalendarDays}
+                    align="left"
+                    neutralValue="monthly"
+                    triggerClassName="w-full"
+                    menuClassName="w-full min-w-[220px]"
+                  />
 
                   {reportType === "monthly" && (
-                    <select
+                    <FilterDropdown
+                      label="Month"
+                      options={reportMonthOptions}
                       value={reportMonth}
-                      onChange={(event) => setReportMonth(Number(event.target.value))}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-400"
-                    >
-                      {MONTH_NAMES.map((month, index) => (
-                        <option key={month} value={index}>
-                          {month}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(value) => setReportMonth(Number(value))}
+                      icon={CalendarDays}
+                      align="left"
+                      triggerClassName="w-full"
+                      menuClassName="w-full min-w-[220px]"
+                    />
                   )}
 
-                  <select
-                    value={reportYear}
-                    onChange={(event) => setReportYear(Number(event.target.value))}
-                    className={`rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-400 ${
-                      reportType === "monthly" ? "" : "sm:col-span-2"
-                    }`}
-                  >
-                    {availableYears.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
+                  <div className={reportType === "monthly" ? "" : "sm:col-span-2"}>
+                    <FilterDropdown
+                      label="Year"
+                      options={reportYearOptions}
+                      value={reportYear}
+                      onChange={(value) => setReportYear(Number(value))}
+                      icon={BarChart3}
+                      align="left"
+                      triggerClassName="w-full"
+                      menuClassName="w-full min-w-[220px]"
+                    />
+                  </div>
                 </div>
 
                 <div className="mb-6 grid grid-cols-2 gap-4">

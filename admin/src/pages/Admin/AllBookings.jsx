@@ -500,6 +500,14 @@ const AllBookings = () => {
     { value: "cancellation_pending", label: "Cancel Pending" },
     { value: "declined", label: "Declined" },
   ];
+  const monthOptions = [
+    { value: "All Months", label: "All Months" },
+    ...months.map((month) => ({ value: month, label: month })),
+  ];
+  const yearOptions = [
+    { value: "All Years", label: "All Years" },
+    ...years.map((year) => ({ value: year, label: String(year) })),
+  ];
 
   useEffect(() => { if (aToken) getAllBookings(); }, [aToken]);
   useEffect(() => { if (allBookings) setBookings(allBookings); }, [allBookings]);
@@ -859,14 +867,40 @@ const AllBookings = () => {
                   </div>
                   <div className="relative flex items-center"><div className="flex-grow border-t border-slate-100"></div><span className="px-3 text-[9px] font-black text-slate-300">OR QUICK SELECT</span><div className="flex-grow border-t border-slate-100"></div></div>
                   <div className="grid grid-cols-2 gap-2">
-                    <select className="bg-slate-50 border-none rounded-xl text-xs font-bold p-3 outline-none cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors" value={monthFilter} onChange={(e) => {setDateRangeError(""); setMonthFilter(e.target.value); setStartDate(""); setEndDate("");}}>
-                      <option>All Months</option>
-                      {months.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    <select className="bg-slate-50 border-none rounded-xl text-xs font-bold p-3 outline-none cursor-pointer hover:bg-blue-50 hover:text-blue-700 transition-colors" value={yearFilter} onChange={(e) => {setDateRangeError(""); setYearFilter(e.target.value); setStartDate(""); setEndDate("");}}>
-                      <option>All Years</option>
-                      {years.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    <FilterDropdown
+                      label="Month"
+                      options={monthOptions}
+                      value={monthFilter}
+                      onChange={(value) => {
+                        setDateRangeError("");
+                        setMonthFilter(value);
+                        setStartDate("");
+                        setEndDate("");
+                      }}
+                      icon={CalendarDays}
+                      neutralValue="All Months"
+                      align="left"
+                      showMenuHeader={false}
+                      triggerClassName="w-full"
+                      menuClassName="w-full min-w-[150px]"
+                    />
+                    <FilterDropdown
+                      label="Year"
+                      options={yearOptions}
+                      value={yearFilter}
+                      onChange={(value) => {
+                        setDateRangeError("");
+                        setYearFilter(value);
+                        setStartDate("");
+                        setEndDate("");
+                      }}
+                      icon={CalendarDays}
+                      neutralValue="All Years"
+                      align="left"
+                      showMenuHeader={false}
+                      triggerClassName="w-full"
+                      menuClassName="w-full min-w-[150px]"
+                    />
                   </div>
                   <button onClick={() => {setStartDate(""); setEndDate(""); setDateRangeError(""); setMonthFilter("All Months"); setYearFilter("All Years"); setIsDateFilterActive(false);}} className="w-full py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">Reset & Close</button>
                 </div>
@@ -961,7 +995,9 @@ const AllBookings = () => {
                 key={b._id}
                 className={`rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm ${flashBookingId === `booking-${b._id}` ? "booking-flash" : ""}`}
               >
-                <div className="flex items-start gap-3">
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1.3fr)_minmax(220px,0.95fr)] sm:items-start">
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-slate-400 shadow-sm">
                     {b.userId?.image ? (
                       <img
@@ -988,11 +1024,11 @@ const AllBookings = () => {
                       </div>
                     )}
                   </div>
-                </div>
+                    </div>
 
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
-                    <div className="flex w-full flex-col gap-1">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Booking Details</p>
+                      <div className="mt-2 flex w-full flex-col gap-1">
                       {b.bookingItems?.slice(0, 1).map((room, idx) => (
                         <div key={idx} className="flex items-center gap-1.5 rounded-lg border border-slate-100 bg-white px-2.5 py-1.5">
                           <Home size={10} className="text-slate-400" />
@@ -1017,16 +1053,21 @@ const AllBookings = () => {
                     </button>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    <StatusBadge status={b.status} />
-                    <StayStatusBadge booking={b} />
                   </div>
 
-                  <p className="text-[11px] font-semibold leading-relaxed text-slate-500">
-                    {getStayStatusDescription(b)}
-                  </p>
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-slate-100 bg-white px-3 py-3 shadow-sm shadow-slate-100/60">
+                      <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Current Status</p>
+                      <div className="mt-2 flex flex-col gap-2">
+                        <StatusBadge status={b.status} />
+                        <StayStatusBadge booking={b} />
+                      </div>
+                      <p className="mt-3 text-[11px] font-semibold leading-relaxed text-slate-500">
+                        {getStayStatusDescription(b)}
+                      </p>
+                    </div>
 
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-3 py-3">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Billing</p>
                     <p className="mt-1 text-sm font-black text-slate-800">â‚±{b.totalPrice?.toLocaleString()}</p>
                     <div className={`mt-1 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest ${(b.paymentStatus === 'paid' || b.payment === true) ? 'text-emerald-500' : 'text-amber-500'}`}>
@@ -1035,11 +1076,12 @@ const AllBookings = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {renderBookingActionButtons(b)}
-                  </div>
+                    <div className="flex flex-wrap gap-2 sm:justify-start">
+                      {renderBookingActionButtons(b)}
+                    </div>
                 </div>
               </div>
+            </div>
             ))
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-12 text-center text-slate-400">
@@ -1052,20 +1094,14 @@ const AllBookings = () => {
         </div>
 
         <div className="hidden min-h-0 flex-1 overflow-auto lg:block">
-          <table className="w-full min-w-[1080px] text-left">
+          <table className="w-full min-w-[1080px] table-fixed text-left">
             <thead className="bg-slate-50/50 border-b border-slate-100">
               <tr>
-                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest Profile</th>
-                <th className="pl-0 pr-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="-ml-[63px] block">Booking Details</span>
-                </th>
-                <th className="pl-2 pr-4 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="-ml-[10px] block">Current Status</span>
-                </th>
-                <th className="w-[220px] px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <span className="-ml-[25px] inline-block">Actions</span>
-                </th>
-                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Billing & Payment</th>
+                <th className="w-[28%] px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Guest Profile</th>
+                <th className="w-[24%] px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Booking Details</th>
+                <th className="w-[19%] px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Current Status</th>
+                <th className="w-[15%] px-6 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</th>
+                <th className="w-[14%] px-6 py-4 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Billing & Payment</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -1095,31 +1131,31 @@ const AllBookings = () => {
                       </div>
                     </div>
                   </td>
-                  <td className="pl-0 pr-4 py-5 align-top">
-                    <div className="-ml-[63px] flex flex-col items-start gap-2 text-left">
-                        <div className="flex w-full max-w-[220px] flex-col items-start gap-1">
-                            {b.bookingItems?.slice(0, 1).map((room, idx) => (
-                                <div key={idx} className="flex items-center justify-start gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">
-                                    <Home size={10} className="text-slate-400" />
-                                    <span className="text-[10px] font-black text-slate-600 truncate">
-  {room.roomId?.name || "Room"}
-</span>
-                                    {room.roomId?.capacity && <span className="text-[9px] text-slate-400 flex items-center gap-0.5 ml-auto border-l border-slate-200 pl-1.5"><Users size={8}/> {room.roomId?.capacity}</span>}
-                                </div>
-                            ))}
-                            {b.bookingItems?.length > 1 && (
-                                <span className="px-1 text-[9px] font-bold text-slate-400">
-                                    +{b.bookingItems.length - 1} more room{b.bookingItems.length - 1 > 1 ? 's' : ''}
-                                </span>
-                            )}
-                        </div>
-                        <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-1 flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-tighter text-blue-600 hover:text-blue-700 hover:underline">
-                          <Info size={10}/> View Full Details
-                        </button>
+                  <td className="px-6 py-5 align-top">
+                    <div className="flex flex-col items-start gap-2 text-left">
+                      <div className="flex w-full max-w-[260px] flex-col items-start gap-1">
+                        {b.bookingItems?.slice(0, 1).map((room, idx) => (
+                          <div key={idx} className="flex w-full items-center justify-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2 py-1">
+                            <Home size={10} className="text-slate-400" />
+                            <span className="truncate text-[10px] font-black text-slate-600">
+                              {room.roomId?.name || "Room"}
+                            </span>
+                            {room.roomId?.capacity && <span className="ml-auto flex items-center gap-0.5 border-l border-slate-200 pl-1.5 text-[9px] text-slate-400"><Users size={8}/> {room.roomId?.capacity}</span>}
+                          </div>
+                        ))}
+                        {b.bookingItems?.length > 1 && (
+                          <span className="px-1 text-[9px] font-bold text-slate-400">
+                            +{b.bookingItems.length - 1} more room{b.bookingItems.length - 1 > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-1 flex w-fit items-center gap-1 text-[9px] font-black uppercase tracking-tighter text-blue-600 hover:text-blue-700 hover:underline">
+                        <Info size={10}/> View Full Details
+                      </button>
                     </div>
                   </td>
-                  <td className="pl-2 pr-4 py-5 align-top">
-                    <div className="-ml-[10px] flex max-w-[190px] flex-col items-start gap-2">
+                  <td className="px-6 py-5 align-top">
+                    <div className="flex max-w-[220px] flex-col items-start gap-2">
                       <StatusBadge status={b.status} />
                       <StayStatusBadge booking={b} />
                       <p className="text-[10px] font-semibold leading-relaxed text-slate-500">
@@ -1127,8 +1163,8 @@ const AllBookings = () => {
                       </p>
                     </div>
                   </td>
-                  <td className="w-[220px] px-4 py-5 align-top">
-                    <div className="-ml-[25px] flex flex-wrap items-center justify-center gap-2">
+                  <td className="px-6 py-5 align-top">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
                       {renderBookingActionButtons(b)}
                     </div>
                   </td>
@@ -1144,7 +1180,7 @@ const AllBookings = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-16 text-center">
+                  <td colSpan="5" className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
                       <Search size={32} className="opacity-50" />
                       <p className="text-sm font-bold">No results found matching your filters.</p>

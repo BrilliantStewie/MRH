@@ -27,6 +27,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import EmptyReviewsState from "../../components/EmptyReviewsState";
+import FilterDropdown from "../../components/Admin/FilterDropdown";
 import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
@@ -84,12 +85,6 @@ const AdminReviews = () => {
       [reviewId]: !prev[reviewId],
     }));
   };
-  const handleToggleVisibilityFilter = (nextFilter) => {
-    setVisibilityFilter((currentFilter) =>
-      currentFilter === nextFilter ? "all" : nextFilter
-    );
-  };
-
   const visibilityFilteredReviews = useMemo(() => {
     if (visibilityFilter === "visible") {
       return reviews.filter((review) => !review.isHidden);
@@ -435,6 +430,19 @@ const AdminReviews = () => {
   };
 
   const ratingBuckets = [5, 4, 3, 2, 1];
+  const ratingFilterOptions = [
+    { value: "all", label: "All Ratings", icon: Star },
+    ...ratingBuckets.map((rating) => ({
+      value: String(rating),
+      label: `${rating} Star${rating === 1 ? "" : "s"}`,
+      icon: Star,
+    })),
+  ];
+  const visibilityFilterOptions = [
+    { value: "all", label: "All Reviews", icon: Eye },
+    { value: "visible", label: "Shown Reviews", icon: Eye },
+    { value: "hidden", label: "Hidden Reviews", icon: EyeOff },
+  ];
   const ratingCounts = ratingBuckets.reduce((acc, rating) => {
     acc[rating] = visibilityFilteredReviews.filter((review) => Number(review.rating || 0) === rating).length;
     return acc;
@@ -487,79 +495,35 @@ const AdminReviews = () => {
       <div className="mx-auto w-full max-w-none pt-0 pb-0">
        
       <div className="mb-5 w-full max-w-[1200px] mx-0 sm:mb-10">
-        <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0">
           <div className="min-w-0">
             <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-3xl">Guest Reviews</h1>
             <p className="text-slate-500 mt-2 max-w-2xl">
               Manage feedback and staff responses.
             </p>
-            <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-8">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Rating
-              </span>
-              <button
-                type="button"
-                onClick={() => setRatingFilter("all")}
-                className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                  ratingFilter === "all"
-                    ? "bg-slate-900 text-white"
-                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                All
-              </button>
-              {ratingBuckets.map((rating) => (
-                <button
-                  key={`rating-filter-${rating}`}
-                  type="button"
-                  onClick={() => setRatingFilter(String(rating))}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                    ratingFilter === String(rating)
-                      ? "bg-slate-900 text-white"
-                      : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
-                  }`}
-                >
-                  <Star
-                    size={11}
-                    fill="currentColor"
-                    className="text-amber-400"
-                  />
-                  {rating}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mt-1 w-full shrink-0 sm:mt-8 sm:mr-8 sm:w-auto">
-            <div className="flex w-full flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:w-auto sm:flex-row sm:items-center">
-              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Visibility
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleToggleVisibilityFilter("visible")}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                    visibilityFilter === "visible"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50"
-                  }`}
-                >
-                  <Eye size={11} />
-                  Shown
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleVisibilityFilter("hidden")}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
-                    visibilityFilter === "hidden"
-                      ? "bg-rose-600 text-white"
-                      : "border border-rose-200 bg-white text-rose-700 hover:bg-rose-50"
-                  }`}
-                >
-                  <EyeOff size={11} />
-                  Hidden
-                </button>
-              </div>
+            <div className="mt-5 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center">
+              <FilterDropdown
+                label="Rating"
+                options={ratingFilterOptions}
+                value={ratingFilter}
+                onChange={setRatingFilter}
+                icon={Star}
+                neutralValue="all"
+                align="left"
+                triggerClassName="w-full sm:w-[230px]"
+                menuClassName="w-full sm:w-[260px]"
+              />
+              <FilterDropdown
+                label="Visibility"
+                options={visibilityFilterOptions}
+                value={visibilityFilter}
+                onChange={setVisibilityFilter}
+                icon={Eye}
+                neutralValue="all"
+                align="left"
+                triggerClassName="w-full sm:w-[230px]"
+                menuClassName="w-full sm:w-[260px]"
+              />
             </div>
           </div>
         </div>

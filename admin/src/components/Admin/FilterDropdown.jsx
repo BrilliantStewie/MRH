@@ -41,52 +41,52 @@ const FilterDropdown = ({
   const isActive = String(value) !== String(inactiveValue);
   const alignClass = align === "left" ? "left-0" : "right-0";
   const triggerBaseClass = compact
-    ? "group flex h-[32px] items-center gap-1.5 rounded-lg border px-2 text-[11px] font-semibold transition-all duration-200"
-    : "group flex h-[50px] items-center gap-3 rounded-2xl border px-3.5 text-sm font-semibold transition-all duration-200";
+    ? "group flex h-[34px] items-center gap-2 rounded-xl border px-2.5 text-[11px] font-semibold transition-all duration-200"
+    : "group flex h-[52px] items-center gap-3 rounded-[22px] border px-4 text-sm font-semibold transition-all duration-200";
   const iconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-8 w-8 rounded-xl";
   const iconSize = compact ? 10 : 15;
   const chevronWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
   const chevronSize = compact ? 10 : 14;
   const menuBaseClass = compact
-    ? "absolute top-full z-[120] mt-1 overflow-hidden rounded-[16px] border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_16px_32px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm"
-    : "absolute top-full z-[120] mt-2 overflow-hidden rounded-[24px] border border-slate-200/90 bg-white/95 p-2.5 shadow-[0_24px_56px_-28px_rgba(15,23,42,0.4)] backdrop-blur-sm";
+    ? "absolute top-full z-[120] mt-1.5 overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]"
+    : "absolute top-full z-[120] mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.32)]";
   const menuHeaderClass = compact
-    ? "mb-1 flex items-center justify-between rounded-lg bg-slate-50 px-2 py-1"
-    : "mb-2 flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-2";
+    ? "mb-1 flex items-center gap-2 rounded-lg px-2 py-1"
+    : "mb-2 flex items-center gap-3 rounded-2xl px-3.5 py-2.5";
   const optionListClass = compact ? "max-h-48 space-y-1 overflow-y-auto pr-1" : "max-h-64 space-y-1 overflow-y-auto pr-1";
   const optionButtonClass = compact
     ? "flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-left text-[11px] font-semibold transition-all"
-    : "flex w-full items-center justify-between rounded-2xl border px-3.5 py-3 text-left text-sm font-semibold transition-all";
+    : "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left text-sm font-semibold transition-all";
   const optionIconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-7 w-7 rounded-xl";
   const optionCheckWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
   const optionCheckSize = compact ? 10 : 14;
   const triggerIconWrapClass = flatTriggerDecorations
     ? "shrink-0"
-    : `${iconWrapClass} border`;
+    : `shrink-0 ${iconWrapClass}`;
   const triggerChevronWrapClass = flatTriggerDecorations
     ? "shrink-0"
-    : `${chevronWrapClass} rounded-full border`;
+    : `shrink-0 ${chevronWrapClass}`;
   const triggerStateClass = isOpen
     ? disableTriggerShadow
-      ? "border-indigo-200 bg-[linear-gradient(135deg,rgba(238,242,255,0.98),rgba(255,255,255,0.98))] text-slate-800 ring-4 ring-indigo-500/10"
-      : "border-indigo-200 bg-[linear-gradient(135deg,rgba(238,242,255,0.98),rgba(255,255,255,0.98))] text-slate-800 shadow-[0_16px_36px_-24px_rgba(79,70,229,0.45)] ring-4 ring-indigo-500/10"
+      ? "border-slate-300 bg-white text-slate-800 ring-4 ring-slate-200/70"
+      : "border-slate-300 bg-white text-slate-800 shadow-[0_18px_42px_-30px_rgba(15,23,42,0.28)] ring-4 ring-slate-200/70"
     : disableTriggerShadow
-      ? "border-slate-200/90 bg-white/95 text-slate-700 hover:-translate-y-px hover:border-slate-300 hover:bg-white"
-      : "border-slate-200/90 bg-white/95 text-slate-700 shadow-[0_12px_28px_-22px_rgba(15,23,42,0.28)] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:shadow-[0_18px_34px_-24px_rgba(15,23,42,0.32)]";
+      ? "border-slate-200 bg-slate-50/90 text-slate-700 hover:-translate-y-px hover:border-slate-300 hover:bg-white"
+      : "border-slate-200 bg-slate-50/90 text-slate-700 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.2)] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:shadow-[0_20px_38px_-30px_rgba(15,23,42,0.26)]";
   const triggerIconStateClass = flatTriggerDecorations
     ? isOpen || isActive
-      ? "text-indigo-500"
+      ? "text-slate-600"
       : "text-slate-400 group-hover:text-slate-500"
     : isOpen || isActive
-      ? "border-indigo-100 bg-indigo-50 text-indigo-500"
-      : "border-slate-200 bg-slate-50 text-slate-400 group-hover:border-slate-300 group-hover:bg-slate-100";
+      ? "text-slate-600"
+      : "text-slate-400 group-hover:text-slate-500";
   const triggerChevronStateClass = flatTriggerDecorations
     ? isOpen
-      ? "text-indigo-600"
+      ? "text-slate-700"
       : "text-slate-400 group-hover:text-slate-500"
     : isOpen
-      ? "border-indigo-100 bg-indigo-100 text-indigo-600"
-      : "border-slate-200 bg-slate-50 text-slate-400 group-hover:border-slate-300 group-hover:bg-slate-100";
+      ? "text-slate-700"
+      : "text-slate-400 group-hover:text-slate-500";
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -141,21 +141,24 @@ const FilterDropdown = ({
             .join(" ")}
         >
           {showMenuHeader && (
-            <div className={menuHeaderClass}>
-              <div className="min-w-0">
-                <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
-                  {label}
-                </p>
-                <p className="truncate text-[11px] font-bold text-slate-500">
-                  {options.length} option{options.length === 1 ? "" : "s"}
-                </p>
+            <>
+              <div className={menuHeaderClass}>
+                {Icon && (
+                  <span className="flex shrink-0 items-center justify-center text-slate-400">
+                    <Icon size={compact ? 12 : 16} />
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    {label}
+                  </p>
+                  <p className="truncate text-sm font-black tracking-tight text-slate-700">
+                    {selectedLabel}
+                  </p>
+                </div>
               </div>
-              {Icon && (
-                <span className={`flex items-center justify-center border border-slate-200 bg-white text-slate-500 ${iconWrapClass}`}>
-                  <Icon size={iconSize} />
-                </span>
-              )}
-            </div>
+              <div className="mx-1 mb-2 h-px bg-slate-100" />
+            </>
           )}
 
           <div className={[optionListClass, optionListClassName].filter(Boolean).join(" ")}>
@@ -172,9 +175,9 @@ const FilterDropdown = ({
                     setIsOpen(false);
                   }}
                   className={`${optionButtonClass} ${
-                    selected
-                      ? "border-indigo-100 bg-[linear-gradient(135deg,rgba(238,242,255,0.98),rgba(255,255,255,1))] text-indigo-700 shadow-[0_12px_24px_-18px_rgba(79,70,229,0.45)]"
-                      : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                      selected
+                        ? "border-slate-200 bg-slate-100 text-slate-900 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.2)]"
+                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
                   <span className="flex min-w-0 items-center gap-2">
@@ -182,7 +185,7 @@ const FilterDropdown = ({
                       <span
                         className={`flex shrink-0 items-center justify-center border ${optionIconWrapClass} ${
                           selected
-                            ? "border-indigo-100 bg-white text-indigo-500"
+                            ? "border-slate-200 bg-white text-slate-700"
                             : "border-slate-200 bg-white text-slate-400"
                         }`}
                       >
@@ -192,7 +195,7 @@ const FilterDropdown = ({
                     <span className="truncate">{option.label}</span>
                   </span>
                   {selected && (
-                    <span className={`flex shrink-0 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 ${optionCheckWrapClass}`}>
+                    <span className={`flex shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-700 ${optionCheckWrapClass}`}>
                       <Check size={optionCheckSize} />
                     </span>
                   )}
