@@ -5,14 +5,17 @@ import {
   ChevronRight,
   Search, 
   User, 
+  UserPlus,
   Mail, 
   Shield,
   CircleDot,
   XCircle,
   RefreshCcw,
-  Phone
+  Phone,
+  PenBox
 } from "lucide-react";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
+import AddStaff from "./AddStaff";
 
 const USERS_PER_PAGE = 5;
 const normalizeUserRole = (role) => (role === "user" ? "guest" : role || "guest");
@@ -24,7 +27,8 @@ const Users = () => {
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); 
   const [adminInfo, setAdminInfo] = useState({ id: "" });
-
+  const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -53,6 +57,21 @@ const Users = () => {
   const getDisplayPhone = (value) => {
     const normalized = String(value || "").trim();
     return normalized && normalized !== "0000000000" ? normalized : "";
+  };
+
+  const handleOpenAddStaff = () => {
+    setEditingStaff(null);
+    setShowAddStaffModal(true);
+  };
+
+  const handleEditStaff = (staffMember) => {
+    setEditingStaff(staffMember);
+    setShowAddStaffModal(true);
+  };
+
+  const handleCloseStaffModal = () => {
+    setShowAddStaffModal(false);
+    setEditingStaff(null);
   };
 
   const filteredUsers = useMemo(() => {
@@ -161,12 +180,20 @@ const Users = () => {
                 <p className="text-slate-500 text-sm font-medium">Manage system access and roles.</p>
             </div>
         </div>
+        <button
+          type="button"
+          onClick={handleOpenAddStaff}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black sm:w-auto"
+        >
+          <UserPlus size={18} />
+          Add Staff
+        </button>
       </div>
 
       {/* CONTROL BAR */}
       <div className="mb-6">
         <div className="flex flex-col items-center justify-between gap-4 lg:flex-row">
-          <div className="relative w-full lg:w-96 group">
+          <div className="relative w-full lg:w-[30rem] xl:w-[34rem] group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
             <input
               type="text"
@@ -186,7 +213,7 @@ const Users = () => {
               icon={Shield}
               showLabelPrefix
               neutralValue="all"
-              triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[152px]"
+              triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[140px]"
               menuClassName="w-full sm:w-52"
             />
             <FilterDropdown
@@ -197,13 +224,13 @@ const Users = () => {
               icon={CircleDot}
               showLabelPrefix
               neutralValue="all"
-              triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[152px]"
+              triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[140px]"
               menuClassName="w-full sm:w-52"
             />
             {(roleFilter !== "all" || statusFilter !== "all" || search) && (
               <button 
                 onClick={() => {setSearch(""); setRoleFilter("all"); setStatusFilter("all");}}
-                className="w-full rounded-full bg-rose-50 px-3 py-2 text-xs font-bold text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700 sm:w-auto"
+                className="w-full rounded-[16px] bg-rose-50 px-3 py-2 text-[11px] font-normal text-rose-500 transition-colors hover:bg-rose-100 hover:text-rose-700 sm:w-auto"
               >
                 Clear Filters
               </button>
@@ -302,7 +329,7 @@ const Users = () => {
                   </div>
 
                   {!u.isYou && u.role !== "admin" && (
-                    <div className="mt-4">
+                    <div className={`mt-4 grid gap-2 ${u.role === "staff" ? "sm:grid-cols-2" : "grid-cols-1"}`}>
                       <button
                         onClick={() => changeUserStatus(u._id)}
                         className={`flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-[11px] font-bold transition-all ${
@@ -314,6 +341,15 @@ const Users = () => {
                         {u.disabled ? <RefreshCcw size={14} /> : <Shield size={14} />}
                         {u.disabled ? "Enable Account" : "Disable Account"}
                       </button>
+                      {u.role === "staff" && (
+                        <button
+                          onClick={() => handleEditStaff(u)}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] font-bold text-slate-900 shadow-sm transition-all hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                        >
+                          <PenBox size={14} />
+                          Edit Staff
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -330,7 +366,7 @@ const Users = () => {
         <table className="w-full min-w-[800px] border-collapse text-left">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Identity</th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Profile</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Contact Info</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Status</th>
@@ -374,7 +410,7 @@ const Users = () => {
     {/* Email */}
     <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
       <Mail size={14} className="text-slate-400 opacity-70"/> 
-      <span className="truncate max-w-[200px]">
+      <span className="truncate max-w-[280px]">
         {u.email || <span className="italic text-slate-300">No Email</span>}
       </span>
     </div>
@@ -382,7 +418,7 @@ const Users = () => {
     {displayPhone && (
       <div className={`flex items-center gap-2 text-sm ${u.disabled ? 'text-slate-400' : 'text-slate-500'}`}>
         <Phone size={14} className="text-slate-400 opacity-70"/> 
-        <span className="truncate max-w-[200px]">{displayPhone}</span>
+        <span className="truncate max-w-[280px]">{displayPhone}</span>
       </div>
     )}
   </div>
@@ -426,7 +462,15 @@ const Users = () => {
                                 {u.disabled ? <RefreshCcw size={14}/> : <Shield size={14}/>}
                                 {u.disabled ? "Enable" : "Disable"}
                             </button>
-
+                            {u.role === "staff" && (
+                              <button
+                                onClick={() => handleEditStaff(u)}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-900 shadow-sm transition-all hover:border-slate-900 hover:bg-slate-900 hover:text-white"
+                              >
+                                <PenBox size={14} />
+                                Edit
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -493,6 +537,13 @@ const Users = () => {
         )}
       </div>
 
+      {showAddStaffModal && (
+        <AddStaff
+          onClose={handleCloseStaffModal}
+          getAllUsers={getAllUsers}
+          editData={editingStaff}
+        />
+      )}
     </div>
   );
 };

@@ -20,12 +20,13 @@ const userSchema = new mongoose.Schema({
   otpExpires: { type: Date, default: null },
   role: { type: String, enum: ["guest", "staff", "admin"], default: "guest"},
   disabled: { type: Boolean, default: false },
+  disabledUntil: { type: Date, default: null },
+  disabledReason: { type: String, default: "" },
   pendingEmail: { type: String, default: "" },
   pendingPhone: { type: String, default: "" },
   emailVerified: { type: Boolean, default: false },
   phoneVerified: { type: Boolean, default: false },
-  sessionVersion: { type: Number, default: 0 },
-  tokenVersion: { type: Number, default: 0 }
+  sessionVersion: { type: Number, default: 0 }
 }, { minimize: false, toJSON: { virtuals: true }, toObject: { virtuals: true }, timestamps: true });
 
 userSchema.virtual("name").get(function () {
@@ -33,15 +34,6 @@ userSchema.virtual("name").get(function () {
 });
 
 userSchema.pre("save", function (next) {
-  if (
-    (this.sessionVersion === null || typeof this.sessionVersion === "undefined") &&
-    typeof this.tokenVersion !== "undefined"
-  ) {
-    this.sessionVersion = this.tokenVersion;
-  }
-
-  this.tokenVersion = this.sessionVersion || 0;
-
   if (typeof this.emailVerified === "undefined") {
     this.emailVerified =
       this.authProvider === "google" ||

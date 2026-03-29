@@ -47,6 +47,8 @@ const Navbar = () => {
   const [showNotificationMenu, setShowNotificationMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [notificationToDelete, setNotificationToDelete] = useState(null);
+  const navContainerClassName =
+    "mx-auto flex w-full items-center justify-between px-3 sm:px-4 lg:px-5 xl:px-6 2xl:px-8";
 
   /* ==========================================
      NAVBAR UI LOGIC
@@ -339,7 +341,7 @@ const Navbar = () => {
             : "bg-transparent py-6"
         }`}
       >
-        <div className="mx-auto flex max-w-[1750px] items-center justify-between px-4 lg:px-6 xl:px-[100px]">
+        <div className={navContainerClassName}>
           
           <div className="flex items-center gap-2 cursor-pointer select-none" onClick={() => navigate("/")}>
             <img src={assets.logo} alt="logo" className="w-10 object-contain" />
@@ -348,7 +350,7 @@ const Navbar = () => {
           <ul className="hidden lg:flex items-center gap-10">
             {navLinks.map((link) => (
               <li key={link.name}>
-                <NavLink to={link.path} className={({ isActive }) => `text-[11px] font-extrabold uppercase tracking-[0.15em] transition-colors duration-200 ${isActive ? "text-slate-900 border-b-2 border-slate-900 pb-1" : "text-slate-500 hover:text-slate-800"}`}>
+                <NavLink to={link.path} className={({ isActive }) => `text-[12px] font-extrabold uppercase tracking-[0.15em] transition-colors duration-200 ${isActive ? "text-slate-900 border-b-2 border-slate-900 pb-1" : "text-slate-500 hover:text-slate-800"}`}>
                   {link.name}
                 </NavLink>
               </li>
@@ -356,7 +358,6 @@ const Navbar = () => {
           </ul>
 
           <div className="flex items-center gap-3 md:gap-5">
-            
             {token && (
               <div className="relative">
                 <button 
@@ -595,7 +596,7 @@ const Navbar = () => {
             {token && (
               <button
                 onClick={() => navigate("/retreat-booking")}
-                className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] text-white text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all shadow-lg active:scale-95"
+                className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-[#0F172A] text-white text-[11px] font-black uppercase tracking-widest rounded-full hover:bg-black transition-all shadow-lg active:scale-95"
               >
                 Book Retreat <ArrowRight size={14} className="opacity-70" />
               </button>
@@ -633,7 +634,7 @@ const Navbar = () => {
                 )}
               </div>
             ) : (
-              <button onClick={() => navigate("/login")} className="px-6 py-2.5 bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-slate-50 transition-all">
+              <button onClick={() => navigate("/login")} className="px-6 py-2.5 bg-white border border-slate-200 text-slate-900 text-[11px] font-black uppercase tracking-widest rounded-full hover:bg-slate-50 transition-all">
                 Login / Sign Up
               </button>
             )}
@@ -651,19 +652,19 @@ const Navbar = () => {
                   key={link.name} 
                   to={link.path} 
                   onClick={() => setShowMobileMenu(false)} 
-                  className={({ isActive }) => `block px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest ${isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                  className={({ isActive }) => `block px-4 py-3 rounded-lg text-[13px] font-black uppercase tracking-widest ${isActive ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-50"}`}
                 >
                   {link.name}
                 </NavLink>
              ))}
              {token ? (
                <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-2">
-                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-profile'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Profile</button>
-                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-bookings'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Bookings</button>
-                 <button onClick={() => { setShowMobileMenu(false); openLogoutConfirm(); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-50">Log Out</button>
+                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-profile'); }} className="block w-full text-left px-4 py-3 rounded-lg text-[13px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Profile</button>
+                 <button onClick={() => { setShowMobileMenu(false); navigate('/my-bookings'); }} className="block w-full text-left px-4 py-3 rounded-lg text-[13px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50">My Bookings</button>
+                 <button onClick={() => { setShowMobileMenu(false); openLogoutConfirm(); }} className="block w-full text-left px-4 py-3 rounded-lg text-[13px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50">Log Out</button>
                </div>
              ) : (
-                <button onClick={() => { setShowMobileMenu(false); navigate('/login'); }} className="block w-full text-left px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 mt-2 border-t border-slate-100 pt-4">Login</button>
+                <button onClick={() => { setShowMobileMenu(false); navigate('/login'); }} className="block w-full text-left px-4 py-3 rounded-lg text-[13px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 mt-2 border-t border-slate-100 pt-4">Login</button>
              )}
           </div>
         )}

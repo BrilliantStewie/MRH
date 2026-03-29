@@ -368,12 +368,12 @@ const Packages = () => {
   const SelectedPackageTypeIcon = getPackageTypeIcon(formData.packageType);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-50 font-sans text-slate-900">
-      <div className="-mt-4 flex min-h-0 flex-1 flex-col lg:-mt-5">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 font-sans text-slate-900">
+      <div className="flex min-h-0 flex-1 flex-col pt-1 lg:pt-2">
         <div className="mb-5 flex flex-col gap-4">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div className="flex-1">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="text-[28px] font-bold tracking-tight text-slate-900 sm:text-[2rem]">
                 Packages
               </h1>
               <p className="mt-1 text-xs text-slate-500">
@@ -388,14 +388,14 @@ const Packages = () => {
                 onClick={handleOpenAddModal}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-black md:w-auto"
               >
-                <Plus size={18} />
+                <Plus size={20} />
                 <span>Add Package</span>
               </button>
             </div>
           </div>
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
-            <div className="inline-flex h-11 w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm lg:w-[290px]">
+            <div className="inline-flex h-[44px] w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 shadow-sm lg:w-[320px] xl:w-[360px]">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />
               <input
                 type="text"
@@ -415,7 +415,7 @@ const Packages = () => {
                 icon={Package}
                 neutralValue="All"
                 align="left"
-                triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[192px]"
+                triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[176px]"
                 menuClassName="w-full sm:w-60"
               />
 
@@ -428,7 +428,7 @@ const Packages = () => {
                   icon={BedSingle}
                   neutralValue="All"
                   align="left"
-                  triggerClassName="w-full justify-between bg-slate-50 font-bold sm:w-auto sm:min-w-[198px]"
+                  triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[182px]"
                   menuClassName="w-full sm:w-64"
                 />
               )}
@@ -442,7 +442,7 @@ const Packages = () => {
                 }}
                 title="Reset filters"
                 aria-label="Reset filters"
-                className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-rose-500 sm:w-12"
+                className="inline-flex h-9 w-full items-center justify-center rounded-[16px] border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-rose-500 sm:w-9"
               >
                 <RefreshCcw className="h-4 w-4" />
               </button>
@@ -477,56 +477,78 @@ const Packages = () => {
                   const pkgAmenities = Array.isArray(pkg.amenities)
                     ? pkg.amenities
                     : [];
+                  const PackageTypeIcon = getPackageTypeIcon(pkg.packageType);
                   const amenitiesExpanded = Boolean(expandedAmenities[pkg._id]);
                   const visibleAmenities = amenitiesExpanded
                     ? pkgAmenities
-                    : pkgAmenities.slice(0, 2);
+                    : pkgAmenities.slice(0, 3);
 
                   return (
                     <div
                       key={pkg._id}
-                      className="group relative flex h-full min-h-[212px] w-full max-w-none justify-self-stretch flex-col overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-xl sm:max-w-[356px] sm:justify-self-center"
+                      className="group relative flex h-full min-h-[200px] w-full max-w-none justify-self-stretch flex-col overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-[0_16px_34px_-30px_rgba(15,23,42,0.48)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_24px_46px_-30px_rgba(15,23,42,0.38)] sm:justify-self-stretch"
                     >
-                      <div className="relative border-b border-slate-200 bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90 p-2.5">
-                        <div className="absolute right-2.5 top-2.5 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="relative bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90 p-2.5">
+                        <div className="absolute right-3 top-3 z-10 flex gap-1">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(pkg)}
-                            className="rounded-md border border-slate-200 bg-white/90 p-0.5 text-slate-500 shadow-sm hover:text-blue-600"
+                            className="rounded-lg border border-slate-200 bg-white/90 p-1 text-slate-500 shadow-sm transition-colors hover:text-blue-600"
                           >
                             <Edit3 size={13} />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDeleteTrigger(pkg._id)}
-                            className="rounded-md border border-slate-200 bg-white/90 p-0.5 text-slate-500 shadow-sm hover:text-red-600"
+                            className="rounded-lg border border-slate-200 bg-white/90 p-1 text-slate-500 shadow-sm transition-colors hover:text-red-600"
                           >
                             <Trash2 size={13} />
                           </button>
                         </div>
 
-                        <div className="mb-1.5">
-                          <h3 className="line-clamp-1 pr-10 text-[15px] font-bold leading-tight text-slate-900">
-                            {pkg.name}
-                          </h3>
-                          <div className="mt-1 flex items-center justify-between gap-2">
-                            <span className="inline-flex rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.16em] text-slate-700">
-                              {pkg.packageType}
-                            </span>
-                            <div className="ml-auto flex items-baseline justify-end gap-1 text-right">
-                              <span className="text-[8px] font-bold uppercase text-slate-500">
-                                ₱
-                              </span>
-                              <span className="text-[14px] font-black tracking-tight text-slate-900">
-                                {Number(pkg.price || 0).toLocaleString()}
+                        <div className="relative">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
+                            <PackageTypeIcon size={10} />
+                            {pkg.packageType}
+                          </span>
+                          <div className="mt-2.5 flex items-start gap-3">
+                            <h3 className="min-w-0 flex-1 line-clamp-2 pr-2 text-[18px] font-black leading-tight tracking-tight text-slate-900">
+                              {pkg.name}
+                            </h3>
+                            <div className="ml-auto shrink-0 text-right">
+                              <span className="block pt-0.5 text-[18px] font-black tracking-tight text-slate-900">
+                                ₱{Number(pkg.price || 0).toLocaleString()}
                               </span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-grow flex-col p-2.5">
-                        <div className="mb-1.5 flex items-center gap-1.5">
+                      <div className="flex flex-grow flex-col gap-2 p-2.5">
+                        <div className="flex flex-wrap items-center gap-2 pb-2">
+                          <span
+                            className={`inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] ${
+                              roomName !== "No room assigned"
+                                ? "border-slate-200 bg-slate-50 text-slate-700"
+                                : "border-slate-100 bg-slate-50 text-slate-400"
+                            }`}
+                          >
+                            <BedSingle size={10} />
+                            <span className="truncate">{roomName}</span>
+                          </span>
+                        </div>
+
+                        <div className="rounded-[1rem] border border-slate-100 bg-slate-50/80 px-3 py-2">
+                          <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Description
+                          </p>
+                          <p className="mt-1.5 line-clamp-2 text-[10px] leading-relaxed text-slate-600">
+                            {pkg.description ||
+                              "No additional details provided."}
+                          </p>
+                        </div>
+
+                        <div className="hidden mb-1.5 items-center gap-1.5">
                           <BedSingle className="h-2.5 w-2.5 text-slate-400" />
                           <span
                             className={`truncate text-[9px] ${
@@ -539,35 +561,45 @@ const Packages = () => {
                           </span>
                         </div>
 
-                        <div className="mb-1.5 min-h-[56px] rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-1.5">
+                        <div className="hidden mb-1.5 min-h-[56px] rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-1.5">
                           <p className="line-clamp-2 text-[10px] leading-snug text-slate-500">
                             {pkg.description ||
                               "No additional details provided."}
                           </p>
                         </div>
 
-                        <div className="mt-1.5 flex min-h-[16px] flex-wrap content-start gap-0.5">
+                        <div className="mt-auto pt-2">
+                          <p className="mb-1.5 text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                            Amenities
+                          </p>
+                          <div className="flex min-h-[28px] flex-wrap content-start gap-1">
                           {visibleAmenities.map((amenity, index) => (
                             <div
                               key={`${amenity}-${index}`}
-                              className="flex items-center gap-0.5 rounded border border-slate-100 bg-slate-50 px-1 py-0.5 text-slate-600"
+                              className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-slate-600"
                             >
-                              <span className="text-[7px] font-bold uppercase tracking-tight">
+                              <span className="text-[8px] font-bold uppercase tracking-tight">
                                 {amenity}
                               </span>
                             </div>
                           ))}
-                          {pkgAmenities.length > 2 && (
+                          {pkgAmenities.length > 3 && (
                             <button
                               type="button"
                               onClick={() => toggleAmenitiesExpansion(pkg._id)}
-                              className="px-0.5 pt-0.5 text-[7px] font-bold text-slate-400 transition-colors hover:text-slate-700"
+                              className="rounded-full border border-dashed border-slate-200 px-1.5 py-0.5 text-[8px] font-black text-slate-400 transition-colors hover:border-slate-300 hover:text-slate-700"
                             >
                               {amenitiesExpanded
                                 ? "SHOW LESS"
-                                : `+${pkgAmenities.length - 2} MORE`}
+                                : `+${pkgAmenities.length - 3} MORE`}
                             </button>
                           )}
+                          {pkgAmenities.length === 0 && (
+                            <p className="text-[10px] font-medium italic text-slate-400">
+                              No amenities listed.
+                            </p>
+                          )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -976,7 +1008,7 @@ const Packages = () => {
                   <div className={`${panelClass} md:col-span-2`}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <label className={labelClass}>Included Amenities</label>
+                        <label className={labelClass}>Amenities</label>
                       </div>
                       <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
                         {formData.amenities.length} selected

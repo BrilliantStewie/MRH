@@ -120,7 +120,9 @@ const VerifyOtp = ({
         }
 
         setTimeout(() => {
-          if (typeof onClose === "function") onClose();
+          if (typeof onClose === "function") {
+            onClose({ preserveVerification: true });
+          }
         }, 1500);
       } else {
         setError(data.message || "Invalid security code");

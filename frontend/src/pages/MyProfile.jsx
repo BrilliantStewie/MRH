@@ -11,6 +11,9 @@ import {
   Eye, EyeOff, UserCircle, Settings, CheckCircle, BadgeCheck, Info, Loader2, Calendar
 } from "lucide-react";
 
+const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
+const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
+
 const MyProfile = () => {
   const { userData, setUserData, token, backendUrl, loadUserProfileData } = useContext(AppContext);
 
@@ -140,6 +143,14 @@ const MyProfile = () => {
     if (isRoman) return val.toUpperCase();
     return val.charAt(0).toUpperCase() + val.slice(1);
   };
+
+  const formatPersonName = (value) =>
+    String(value || "")
+      .replace(NAME_INPUT_REGEX, "")
+      .toLowerCase()
+      .replace(NAME_CAPITALIZE_REGEX, (_, separator, character) =>
+        `${separator}${character.toUpperCase()}`
+      );
 
   const handleRemoveImage = () => {
     setImage(null);          
@@ -530,7 +541,7 @@ const MyProfile = () => {
   const formattedFullName = `${localEditData.firstName} ${localEditData.middleName ? localEditData.middleName + ' ' : ''}${localEditData.lastName}${localEditData.suffix ? ' ' + localEditData.suffix : ''}`;
 
   return (
-    <div className="min-h-screen bg-slate-50/60 pt-24 pb-14 px-4 md:px-10">
+    <div className="min-h-screen bg-slate-50/60 px-4 pt-24 pb-14 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
       <div id="recaptcha-container" className="hidden"></div>
       {showPhoneOtpModal && (
         <VerifyFirebasePhoneOtp
@@ -549,7 +560,7 @@ const MyProfile = () => {
           onVerify={handleVerifyEmailOtp}
         />
       )}
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         
         {/* --- HEADER CARD --- */}
         <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -619,10 +630,10 @@ const MyProfile = () => {
         </div>
 
         {/* --- CONTENT GRID --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)] xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
           
           {/* LEFT: PERSONAL INFORMATION */}
-          <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 h-full flex flex-col">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-8 h-full flex flex-col">
             <div className="flex items-center gap-3 mb-8">
               <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl"><UserCircle size={22}/></div>
               <div>
@@ -651,7 +662,7 @@ const MyProfile = () => {
                       <div className={`group flex items-center gap-3 px-4 py-3 bg-white border rounded-xl transition-all shadow-sm ${
                         trimmedFirstName ? "border-slate-200 focus-within:border-blue-500" : "border-red-300 focus-within:border-red-400"
                       }`}>
-                          <input value={localEditData.firstName} onChange={(e) => setLocalEditData({ ...localEditData, firstName: e.target.value })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="First Name" />
+                          <input value={localEditData.firstName} onChange={(e) => setLocalEditData({ ...localEditData, firstName: formatPersonName(e.target.value) })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="First Name" />
                       </div>
                       {!trimmedFirstName && (
                         <p className="mt-2 text-[10px] font-bold text-red-500">First name is required.</p>
@@ -661,7 +672,7 @@ const MyProfile = () => {
                     <div>
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Middle Name (Optional)</label>
                       <div className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl focus-within:border-blue-500 transition-all shadow-sm">
-                          <input value={localEditData.middleName} onChange={(e) => setLocalEditData({ ...localEditData, middleName: e.target.value })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="Middle Name" />
+                          <input value={localEditData.middleName} onChange={(e) => setLocalEditData({ ...localEditData, middleName: formatPersonName(e.target.value) })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="Middle Name" />
                       </div>
                     </div>
 
@@ -671,7 +682,7 @@ const MyProfile = () => {
                         <div className={`group flex items-center gap-3 px-4 py-3 bg-white border rounded-xl transition-all shadow-sm ${
                           trimmedLastName ? "border-slate-200 focus-within:border-blue-500" : "border-red-300 focus-within:border-red-400"
                         }`}>
-                            <input value={localEditData.lastName} onChange={(e) => setLocalEditData({ ...localEditData, lastName: e.target.value })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="Last Name" />
+                            <input value={localEditData.lastName} onChange={(e) => setLocalEditData({ ...localEditData, lastName: formatPersonName(e.target.value) })} className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none" placeholder="Last Name" />
                         </div>
                         {!trimmedLastName && (
                           <p className="mt-2 text-[10px] font-bold text-red-500">Last name is required.</p>

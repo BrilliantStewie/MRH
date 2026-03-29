@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import { resolveUserDisableState } from "./accountStatus.js";
 import {
   getDecodedSessionVersion,
   getSessionVersion,
@@ -62,8 +63,13 @@ const resolveSocketIdentity = async (socket) => {
       };
     }
 
-    const user = await userModel.findById(decodedId).select("role disabled sessionVersion tokenVersion");
-    if (!user || user.disabled) {
+    const user = await userModel.findById(decodedId).select("role disabled disabledUntil disabledReason sessionVersion");
+    if (!user) {
+      return fallbackIdentity;
+    }
+
+    const accountStatus = await resolveUserDisableState(user);
+    if (accountStatus.isDisabled) {
       return fallbackIdentity;
     }
 

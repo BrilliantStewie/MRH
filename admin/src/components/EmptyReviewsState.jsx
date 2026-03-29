@@ -1,6 +1,6 @@
 import React from "react";
 
-const EmptyReviewsState = ({ message = "No reviews found yet.", className = "" }) => {
+const EmptyReviewsState = ({ message = "No feedback found yet.", className = "" }) => {
   return (
     <div
       className={`flex min-h-[220px] w-full max-w-[560px] items-center justify-center rounded-[24px] border border-dashed border-sky-200 bg-white px-8 text-center shadow-sm ${className}`}

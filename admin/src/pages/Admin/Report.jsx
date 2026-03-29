@@ -24,6 +24,7 @@ import reportLogo from "../../assets/logo.svg?inline";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
 import { AdminContext } from "../../context/AdminContext";
 import { getBookingCheckInDateValue } from "../../utils/bookingDateFields";
+import Analytics from "./Analytics";
 
 const MONTH_NAMES = [
   "January",
@@ -180,10 +181,10 @@ const getBookingRooms = (booking) =>
 
 const getBookingParticipants = (booking) => {
   const roomGuests = getBookingRooms(booking).reduce(
-    (sum, item) => sum + Number(item?.participants || 0),
+    (sum, item) => sum + Number(item?.roomGuests || 0),
     0
   );
-  const venueGuests = Number(booking?.venueParticipants || 0);
+  const venueGuests = Number(booking?.participants || 0);
 
   return roomGuests + venueGuests;
 };
@@ -1345,7 +1346,7 @@ const Report = () => {
               disableTriggerShadow
               flatTriggerDecorations
               neutralValue=""
-              triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[150px]"
+              triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[136px]"
               showMenuHeader={false}
               menuClassName="w-full sm:w-48"
             />
@@ -1361,7 +1362,7 @@ const Report = () => {
                 flatTriggerDecorations
                 neutralValue=""
                 align="left"
-                triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[140px]"
+                triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[128px]"
                 showMenuHeader={false}
                 menuClassName="w-full sm:w-[248px]"
                 optionListClassName={REPORT_MONTH_GRID_OPTION_LIST_CLASSNAME}
@@ -1377,7 +1378,7 @@ const Report = () => {
               disableTriggerShadow
               flatTriggerDecorations
               neutralValue=""
-              triggerClassName="w-full justify-between bg-slate-50 text-[12px] font-bold sm:w-auto sm:min-w-[128px]"
+              triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[120px]"
               showMenuHeader={false}
               menuClassName="w-full sm:w-40"
             />
@@ -1415,8 +1416,8 @@ const Report = () => {
 
         <div className="mt-[10px] px-3 pb-3 sm:px-4 sm:pb-4">
           <div className="rounded-[24px] border border-[#d8e2f0] bg-transparent px-2 py-3 sm:px-4 sm:py-4">
-            <div className="w-full min-w-0" style={{ height: 240 }}>
-              <ResponsiveContainer width="100%" height={240}>
+            <div className="w-full min-w-0" style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 10 }}>
                   <CartesianGrid vertical={false} stroke="#d9e5f4" strokeDasharray="4 4" />
                   <XAxis
@@ -1474,6 +1475,10 @@ const Report = () => {
             </p>
           </div>
         </div>
+      </section>
+
+      <section className="mt-8 border-t border-slate-200 pt-8 print:hidden">
+        <Analytics />
       </section>
 
       {isSummaryModalOpen && (
@@ -1535,7 +1540,7 @@ const Report = () => {
                     align="left"
                     showMenuHeader={false}
                     compact
-                    triggerClassName="w-full justify-between rounded-xl bg-white px-1.5 text-[10px] font-bold shadow-none"
+                    triggerClassName="w-full justify-between rounded-xl bg-white px-1.5 shadow-none"
                     menuClassName="w-full"
                   />
                 </label>
@@ -1565,7 +1570,7 @@ const Report = () => {
                     align="left"
                     showMenuHeader={false}
                     compact
-                    triggerClassName="w-full justify-between rounded-xl bg-white px-1.5 text-[10px] font-bold shadow-none"
+                    triggerClassName="w-full justify-between rounded-xl bg-white px-1.5 shadow-none"
                     menuClassName="w-full"
                   />
                 </label>

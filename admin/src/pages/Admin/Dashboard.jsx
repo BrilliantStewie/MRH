@@ -257,16 +257,9 @@ const Dashboard = () => {
 
     const totalParticipants = filteredBookings.reduce((sum, booking) => {
       const roomGuests = Array.isArray(booking.bookingItems)
-        ? booking.bookingItems.reduce((roomSum, item) => roomSum + Number(item?.participants || 0), 0)
+        ? booking.bookingItems.reduce((roomSum, item) => roomSum + Number(item?.roomGuests || 0), 0)
         : 0;
-      const venueGuests = Number(booking.venueParticipants || 0);
-
-      if (roomGuests === 0 && venueGuests === 0) {
-        const legacyCount = Array.isArray(booking.participants)
-          ? booking.participants.length
-          : Number(booking.participants) || 0;
-        return sum + legacyCount;
-      }
+      const venueGuests = Number(booking.participants || 0);
 
       return sum + roomGuests + venueGuests;
     }, 0);
@@ -831,8 +824,8 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-7">
-            <div className="flex h-full min-h-[300px] flex-col justify-between rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm sm:min-h-[320px] sm:rounded-[32px] sm:p-8">
+          <div className="lg:col-span-9">
+            <div className="flex h-full min-h-[340px] flex-col justify-between rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm sm:min-h-[390px] sm:rounded-[32px] sm:p-8">
               <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-black uppercase tracking-tight text-slate-800">
@@ -881,7 +874,7 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className="relative mt-auto flex h-44 items-end justify-between gap-2 pt-4 sm:h-56 sm:gap-4">
+              <div className="relative mt-auto flex h-60 items-end justify-between gap-2 pt-4 sm:h-72 sm:gap-4">
                 <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
                   {[...Array(5)].map((_, index) => (
                     <div key={index} className="h-0 w-full border-t border-dashed border-slate-100"></div>
@@ -929,36 +922,36 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="flex lg:col-span-5">
-            <div className="group relative flex min-h-[300px] w-full flex-col justify-between overflow-hidden rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm transition-colors duration-300 hover:border-indigo-200 sm:min-h-[320px] sm:rounded-[32px] sm:p-8">
+          <div className="flex lg:col-span-3 lg:justify-end lg:self-start">
+            <div className="group relative flex min-h-[190px] w-full flex-col overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm transition-colors duration-300 hover:border-indigo-200 sm:min-h-[210px] sm:max-w-[320px] sm:rounded-[28px] sm:p-5">
               <div className="pointer-events-none absolute right-0 top-0 h-64 w-64 translate-x-1/3 -translate-y-1/3 rounded-full bg-indigo-50/80 blur-3xl transition-transform duration-700 group-hover:scale-110"></div>
               <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-48 -translate-x-1/3 translate-y-1/3 rounded-full bg-emerald-50/60 blur-3xl"></div>
 
-              <div className="relative z-10 mb-6 flex items-start justify-between">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 shadow-sm">
-                  <CalendarDays size={28} className="text-indigo-600" />
+              <div className="relative z-10 mb-4 flex items-start justify-between">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 shadow-sm">
+                  <CalendarDays size={20} className="text-indigo-600" />
                 </div>
-                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-slate-500 shadow-sm">
+                <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[8px] font-bold uppercase tracking-[0.18em] text-slate-500 shadow-sm">
                   <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
                   Management
                 </span>
               </div>
 
-              <div className="relative z-10 mt-auto">
-                <h3 className="mb-2 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">Check Availability</h3>
-                <p className="mb-6 max-w-full text-sm font-medium leading-relaxed text-slate-500 sm:mb-8 sm:max-w-[90%]">
+              <div className="relative z-10 mt-2">
+                <h3 className="mb-1.5 text-lg font-black tracking-tight text-slate-900 sm:text-[22px]">Check Availability</h3>
+                <p className="mb-4 max-w-full text-[13px] font-medium leading-relaxed text-slate-500">
                   Check available dates and reservation schedules in one place.
                 </p>
 
                 <button
                   type="button"
                   onClick={() => setIsCalendarOpen(true)}
-                  className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-5 py-4 text-[11px] font-bold uppercase tracking-widest text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95 sm:px-6 sm:text-xs"
+                  className="group/btn flex w-full items-center justify-between rounded-2xl bg-indigo-600 px-4 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white shadow-[0_8px_20px_rgba(79,70,229,0.25)] transition-all hover:bg-indigo-700 active:scale-95 sm:text-[11px]"
                 >
                   <span>View Calendar</span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 transition-colors group-hover/btn:bg-white group-hover/btn:text-indigo-600">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 transition-colors group-hover/btn:bg-white group-hover/btn:text-indigo-600">
                     <ArrowUpRight
-                      size={16}
+                      size={14}
                       className="transition-transform group-hover/btn:-translate-y-0.5 group-hover/btn:translate-x-0.5"
                     />
                   </div>

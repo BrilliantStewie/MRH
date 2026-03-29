@@ -74,18 +74,18 @@ const RoomBooking = () => {
 
   if (!roomInfo) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="w-full px-4 py-10 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         <p className="text-sm text-gray-500">Loading room information...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
+    <div className="grid w-full grid-cols-1 gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.75fr)] lg:px-8 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)] xl:gap-10 xl:px-10 2xl:px-12">
       {/* LEFT: room preview */}
-      <div className="md:col-span-2 space-y-4">
+      <div className="space-y-4">
         {/* Image preview of the booked room */}
-        <div className="w-full h-60 md:h-72 bg-slate-100 rounded-xl overflow-hidden">
+        <div className="h-64 w-full overflow-hidden rounded-xl bg-slate-100 md:h-80 xl:h-[24rem]">
           <img
             src={roomInfo.imageUrl}
             alt={roomInfo.name}
@@ -115,7 +115,7 @@ const RoomBooking = () => {
       </div>
 
       {/* RIGHT: booking form */}
-      <div className="md:col-span-1">
+      <div className="lg:col-start-2">
         <div className="bg-white rounded-xl shadow-sm border p-5 space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">
             Book this room
@@ -172,7 +172,7 @@ const RoomBooking = () => {
       </div>
 
       {/* Optional: related rooms section */}
-      <div className="md:col-span-3 mt-10">
+      <div className="mt-10 lg:col-span-2">
         <RelatedRooms currentRoomId={roomId} />
       </div>
     </div>

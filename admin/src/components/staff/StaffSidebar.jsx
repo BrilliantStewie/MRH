@@ -11,7 +11,7 @@ const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
   const navItems = [
     { name: "Dashboard", path: "/staff-dashboard", icon: <LayoutDashboard size={18} /> },
     { name: "Bookings", path: "/staff-bookings", icon: <CalendarCheck size={18} /> },
-    { name: "Guest Reviews", path: "/staff-reviews", icon: <MessageSquare size={18} /> },
+    { name: "Feedback", path: "/staff-reviews", icon: <MessageSquare size={18} /> },
   ];
 
   const linkClass = ({ isActive }) =>
@@ -32,7 +32,7 @@ const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
         }`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-1 border-r border-slate-200 bg-[#f8fafc] px-4 pb-4 pt-20 shadow-xl transition-transform duration-300 md:static md:z-auto md:h-full md:w-64 md:max-w-none md:translate-x-0 md:px-4 md:py-4 md:shadow-[4px_0_24px_-15px_rgba(0,0,0,0.05)] ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col gap-1 border-r border-slate-200 bg-[#f8fafc] px-4 pb-4 pt-20 shadow-xl transition-transform duration-300 md:static md:z-auto md:h-full md:w-60 md:max-w-none md:translate-x-0 md:px-3.5 md:py-3.5 md:shadow-[4px_0_24px_-15px_rgba(0,0,0,0.05)] ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

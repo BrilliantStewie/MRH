@@ -4,15 +4,14 @@ const toFiniteSessionVersion = (value) => {
 };
 
 const getSessionVersion = (value) =>
-  toFiniteSessionVersion(value?.sessionVersion ?? value?.tokenVersion ?? 0);
+  toFiniteSessionVersion(value?.sessionVersion ?? 0);
 
 const getDecodedSessionVersion = (decoded) =>
-  toFiniteSessionVersion(decoded?.sessionVersion ?? decoded?.tokenVersion ?? 0);
+  toFiniteSessionVersion(decoded?.sessionVersion ?? 0);
 
 const setSessionVersion = (value, sessionVersion) => {
   const normalized = toFiniteSessionVersion(sessionVersion);
   value.sessionVersion = normalized;
-  value.tokenVersion = normalized;
   return normalized;
 };
 
@@ -32,7 +31,6 @@ const buildSessionTokenPayload = ({
     name,
     role,
     sessionVersion: normalized,
-    tokenVersion: normalized,
   };
 };
 

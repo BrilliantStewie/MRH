@@ -294,31 +294,31 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-[#f8fafc] shadow-sm">
-      <div className="px-3 sm:px-6 lg:px-8">
-        <div className="flex h-16 items-center justify-between gap-3">
+      <div className="px-3 sm:px-5 xl:px-6">
+        <div className="flex h-[72px] items-center justify-between gap-4 sm:h-20">
           
           {/* Left Side: Brand Logo & Title */}
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onMenuToggle}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
               aria-label="Open menu"
             >
-              <Menu size={18} />
+              <Menu size={19} />
             </button>
             <div className="flex cursor-pointer items-center gap-3" onClick={() => navigate("/admin-dashboard")}>
             {/* Using your specific logo asset */}
             <img 
               src={assets.logo} 
               alt="Logo" 
-              className="h-10 w-10 object-contain sm:h-12 sm:w-12" 
+              className="h-12 w-12 object-contain sm:h-14 sm:w-14" 
             />
             <div className="flex flex-col justify-center">
-              <h1 className="text-base font-bold leading-tight text-gray-800 sm:text-lg">
+              <h1 className="text-lg font-bold leading-tight text-gray-800 sm:text-xl">
                 MRH
               </h1>
-              <span className="mt-0.5 hidden w-fit rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700 sm:inline-flex">
+              <span className="mt-1 hidden w-fit rounded-md border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 sm:inline-flex">
                 Admin Panel
               </span>
             </div>
@@ -340,12 +340,12 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
                     setShowAllNotifications(false);
                   }
                 }}
-                className={`relative rounded-full p-2 transition-colors ${
+                className={`relative rounded-full p-2.5 transition-colors ${
                   showNotifications ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"
                 }`}
                 title="Notifications"
               >
-                <Bell size={18} />
+                <Bell size={20} />
                 {unreadCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white ring-2 ring-white">
                     {unreadBadgeText}
@@ -587,7 +587,7 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
                   setShowNotificationMenu(false);
                   setShowClearConfirm(false);
                 }}
-                className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-indigo-100 bg-indigo-50 text-[11px] font-black uppercase tracking-[0.16em] text-indigo-700 transition-colors hover:border-indigo-200 hover:bg-indigo-100"
+                className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-indigo-100 bg-indigo-50 text-xs font-black uppercase tracking-[0.16em] text-indigo-700 transition-colors hover:border-indigo-200 hover:bg-indigo-100"
               >
                 {adminInitials || "AD"}
               </button>

@@ -140,7 +140,7 @@ const StaffList = () => {
       </div>
 
       <div className="mb-7">
-        <div className="relative w-full max-w-lg">
+        <div className="relative w-full max-w-xl xl:max-w-2xl">
           <Search
             className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             size={18}

@@ -1,6 +1,11 @@
 import bookingModel from "../models/bookingModel.js";
+import userModel from "../models/userModel.js";
 import { createOrRefreshNotification } from "../utils/notificationUtils.js";
 import sendEmail from "../utils/sendEmail.js";
+import {
+  applyNoShowDisable,
+  formatDisableUntilLabel,
+} from "../utils/accountStatus.js";
 import {
   BOOKING_STAY_ACTIONS,
   normalizeBookingStayAction,
@@ -19,8 +24,9 @@ const getBookingLabel = (booking) =>
   booking?.bookingItems?.[0]?.roomId?.name ||
   "your reservation";
 
-const buildActionMessages = (action, booking) => {
+const buildActionMessages = (action, booking, options = {}) => {
   const bookingLabel = getBookingLabel(booking);
+  const disabledUntilLabel = options.disabledUntilLabel || "";
 
   if (action === BOOKING_STAY_ACTIONS.CHECK_IN) {
     return {
@@ -57,14 +63,23 @@ const buildActionMessages = (action, booking) => {
   }
 
   return {
-    successMessage: "Booking marked as no-show.",
+    successMessage: disabledUntilLabel
+      ? `Booking marked as no-show. Guest account disabled until ${disabledUntilLabel}.`
+      : "Booking marked as no-show.",
     notificationType: "stay_update",
-    notificationMessage: `Your booking for ${bookingLabel} was marked as no-show.`,
+    notificationMessage: disabledUntilLabel
+      ? `Your booking for ${bookingLabel} was marked as no-show. Your account is disabled until ${disabledUntilLabel}.`
+      : `Your booking for ${bookingLabel} was marked as no-show.`,
     emailSubject: "Booking marked as no-show - Mercedarian Retreat House",
     emailBody: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
         <p>Hello ${getGuestName(booking)},</p>
         <p>Your booking for <strong>${bookingLabel}</strong> has been marked as no-show.</p>
+        ${
+          disabledUntilLabel
+            ? `<p>Your guest account has been temporarily disabled until <strong>${disabledUntilLabel}</strong>.</p>`
+            : ""
+        }
         <p>If you believe this is a mistake, please contact Mercedarian Retreat House as soon as possible.</p>
         <p>Mercedarian Retreat House</p>
       </div>
@@ -89,6 +104,7 @@ export const updateBookingStayStatus = async (req, res) => {
     }
 
     const now = new Date();
+    let disabledUntilLabel = "";
 
     if (normalizedAction === BOOKING_STAY_ACTIONS.CHECK_IN) {
       booking.checkIn = true;
@@ -110,6 +126,16 @@ export const updateBookingStayStatus = async (req, res) => {
       booking.checkOut = false;
       booking.checkOutConfirmedAt = null;
       booking.checkOutConfirmedBy = null;
+
+      if (req.userRole === "admin" && booking.userId?._id) {
+        const guestUser = await userModel.findById(booking.userId._id);
+
+        if (guestUser && guestUser.role === "guest") {
+          const disabledUntil = applyNoShowDisable(guestUser, now);
+          await guestUser.save();
+          disabledUntilLabel = formatDisableUntilLabel(disabledUntil);
+        }
+      }
     }
 
     await booking.save();
@@ -120,7 +146,7 @@ export const updateBookingStayStatus = async (req, res) => {
       notificationMessage,
       emailSubject,
       emailBody,
-    } = buildActionMessages(normalizedAction, booking);
+    } = buildActionMessages(normalizedAction, booking, { disabledUntilLabel });
 
     if (booking.userId?._id) {
       await createOrRefreshNotification({

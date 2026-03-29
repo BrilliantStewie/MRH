@@ -23,6 +23,9 @@ import {
   Loader2,
 } from "lucide-react";
 
+const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
+const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
+
 const EMPTY_FORM = {
   firstName: "",
   middleName: "",
@@ -118,6 +121,14 @@ const StaffProfile = () => {
       ? val.toUpperCase()
       : val.charAt(0).toUpperCase() + val.slice(1);
   };
+
+  const formatPersonName = (value) =>
+    String(value || "")
+      .replace(NAME_INPUT_REGEX, "")
+      .toLowerCase()
+      .replace(NAME_CAPITALIZE_REGEX, (_, separator, character) =>
+        `${separator}${character.toUpperCase()}`
+      );
 
   const parseFullName = (fullName) => {
     const raw = String(fullName || "").trim();
@@ -528,7 +539,7 @@ const StaffProfile = () => {
     : "Staff";
 
   return (
-    <div className="min-h-full bg-slate-50/60 p-4 md:p-8">
+    <div className="min-h-full bg-slate-50/60 p-3 sm:p-4 xl:p-5">
       <div id="recaptcha-container" className="hidden"></div>
       {showPhoneOtpModal && (
         <VerifyFirebasePhoneOtp
@@ -539,7 +550,7 @@ const StaffProfile = () => {
         />
       )}
 
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="w-full space-y-6">
         <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
           <div className="relative h-32 bg-[#0F172A]">
             <div className="absolute inset-0 bg-gradient-to-r from-slate-900 to-[#1e1b4b] opacity-90"></div>
@@ -671,7 +682,7 @@ const StaffProfile = () => {
                         <input
                           value={localEditData.firstName}
                           onChange={(event) =>
-                            setLocalEditData((prev) => ({ ...prev, firstName: event.target.value }))
+                            setLocalEditData((prev) => ({ ...prev, firstName: formatPersonName(event.target.value) }))
                           }
                           className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
                           placeholder="First Name"
@@ -690,7 +701,7 @@ const StaffProfile = () => {
                         <input
                           value={localEditData.middleName}
                           onChange={(event) =>
-                            setLocalEditData((prev) => ({ ...prev, middleName: event.target.value }))
+                            setLocalEditData((prev) => ({ ...prev, middleName: formatPersonName(event.target.value) }))
                           }
                           className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
                           placeholder="Middle Name"
@@ -711,9 +722,9 @@ const StaffProfile = () => {
                           }`}
                         >
                           <input
-                            value={localEditData.lastName}
-                            onChange={(event) =>
-                              setLocalEditData((prev) => ({ ...prev, lastName: event.target.value }))
+                          value={localEditData.lastName}
+                          onChange={(event) =>
+                              setLocalEditData((prev) => ({ ...prev, lastName: formatPersonName(event.target.value) }))
                             }
                             className="w-full bg-transparent text-sm font-bold text-slate-800 outline-none"
                             placeholder="Last Name"

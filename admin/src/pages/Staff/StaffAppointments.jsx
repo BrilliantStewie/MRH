@@ -46,7 +46,7 @@ const StaffAppointments = () => {
             <p>{item.roomData?.name} ({item.roomData?.building})</p>
             
             {/* Participants */}
-            <p>{item.participants}</p>
+            <p>{item.roomGuests}</p>
             
             {/* Date */}
             <p>{slotDateFormat(getBookingCheckInDateValue(item))} - {slotDateFormat(getBookingCheckOutDateValue(item))}</p>

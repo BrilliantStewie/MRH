@@ -585,11 +585,11 @@ const RetreatBooking = () => {
                 roomIds: selectedRooms.map(r => r._id),
                 checkInDate: startDate,
                 checkOutDate: endDate,
-                venueParticipants: Number(venueParticipants) || 0,
+                participants: Number(venueParticipants) || 0,
 
                 bookingItems: selectedRooms.map(room => ({
                     roomId: room._id,
-                    participants: Number(roomParticipants[room._id]) || 1,
+                    roomGuests: Number(roomParticipants[room._id]) || 1,
                     packageId: roomPackages[room._id]
                 })),
 
@@ -731,7 +731,7 @@ const RetreatBooking = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 pt-8 pb-20 font-sans text-slate-900">
+        <div className="min-h-screen bg-slate-50 px-3 pt-8 pb-20 font-sans text-slate-900 sm:px-4 lg:px-6 xl:px-8 2xl:px-10">
             <style>{`
                 .react-datepicker-wrapper { width: 100%; }
                 .react-datepicker { font-family: inherit; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: none; overflow: hidden; }
@@ -844,14 +844,14 @@ const RetreatBooking = () => {
                 .custom-input:focus { border-color: #0f172a; box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05); }
             `}</style>
 
-            <div className="max-w-6xl mx-auto mb-8 px-4 flex items-center gap-4">
+            <div className="mb-8 flex w-full items-center gap-4">
                 <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                     <ArrowLeft size={20} className="text-slate-700" />
                 </button>
                 <h1 className="text-2xl font-bold tracking-tight">Complete Your Booking</h1>
             </div>
 
-            <div className="max-w-6xl mx-auto px-4 flex flex-col lg:flex-row gap-8">
+            <div className="flex w-full flex-col gap-8 lg:flex-row lg:items-start">
                 <div className="flex-1 space-y-6">
 
                     {/* 1. DATES & PEOPLE */}
@@ -1195,7 +1195,7 @@ const RetreatBooking = () => {
                 </div>
 
                 {/* --- RIGHT: SUMMARY --- */}
-                <div className="w-full lg:w-96">
+                <div className="w-full lg:w-[380px] xl:w-[400px] 2xl:w-[430px]">
                     <div className="sticky top-6 bg-white p-6 rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100">
                         <h3 className="text-lg font-bold text-slate-900 mb-6">Booking Summary</h3>
                         {bookingName && (

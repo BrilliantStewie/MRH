@@ -42,9 +42,38 @@ const sanitizeImageList = (list) =>
     ? list.filter((img) => typeof img === "string" && img.trim())
     : [];
 
+const normalizeId = (value) => {
+  const rawValue =
+    value && typeof value === "object" && "_id" in value
+      ? value._id
+      : value;
+
+  return rawValue ? String(rawValue) : "";
+};
+
+const viewerOwnsReview = (review, viewerUserId) => {
+  const normalizedViewerId = normalizeId(viewerUserId);
+  if (!normalizedViewerId) return false;
+
+  const reviewOwnerId = normalizeId(review?.userId);
+  if (reviewOwnerId) {
+    return reviewOwnerId === normalizedViewerId;
+  }
+
+  const bookingOwnerId = normalizeId(review?.bookingId?.userId);
+  return Boolean(bookingOwnerId) && bookingOwnerId === normalizedViewerId;
+};
+
+const replyOwnedByViewer = (reply, viewerUserId) => {
+  const normalizedViewerId = normalizeId(viewerUserId);
+  if (!normalizedViewerId) return false;
+  return normalizeId(reply?.senderId) === normalizedViewerId;
+};
+
 const fetchSerializedReviews = async ({
   includeHidden = false,
-  viewerUserId = null
+  viewerUserId = null,
+  viewerUserRole = null,
 } = {}) => {
   const query = includeHidden
     ? {}
@@ -66,7 +95,7 @@ const fetchSerializedReviews = async ({
     })
     .populate({
       path: "bookingId",
-      select: `${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus`,
+      select: `userId ${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages participants totalPrice status paymentStatus`,
       populate: [
         {
           path: "bookingItems.roomId",
@@ -84,7 +113,26 @@ const fetchSerializedReviews = async ({
     })
     .sort({ createdAt: -1 });
 
-  return reviews.map((review) => serializeReview(review));
+  return reviews.map((review) => {
+    const serializedReview = serializeReview(review);
+    const ownsReview = viewerOwnsReview(review, viewerUserId);
+    const canReply =
+      ownsReview ||
+      viewerUserRole === "admin" ||
+      viewerUserRole === "staff";
+
+    return {
+      ...serializedReview,
+      viewerOwnsReview: ownsReview,
+      viewerCanReply: canReply,
+      reviewChat: Array.isArray(serializedReview.reviewChat)
+        ? serializedReview.reviewChat.map((chat) => ({
+            ...chat,
+            viewerOwnsReply: replyOwnedByViewer(chat, viewerUserId),
+          }))
+        : [],
+    };
+  });
 };
 
 /* ============================================================
@@ -93,7 +141,8 @@ const fetchSerializedReviews = async ({
 export const getAllReviews = async (req, res) => {
   try {
     const reviews = await fetchSerializedReviews({
-      viewerUserId: req.userId || null
+      viewerUserId: req.userId || null,
+      viewerUserRole: req.userRole || null,
     });
 
     res.status(200).json({
@@ -112,7 +161,11 @@ export const getAllReviews = async (req, res) => {
 
 export const getAllReviewsAdmin = async (req, res) => {
   try {
-    const reviews = await fetchSerializedReviews({ includeHidden: true });
+    const reviews = await fetchSerializedReviews({
+      includeHidden: true,
+      viewerUserId: req.userId || null,
+      viewerUserRole: req.userRole || null,
+    });
 
     res.status(200).json({
       success: true,
@@ -324,7 +377,7 @@ export const editReview = async (req, res) => {
       });
     }
 
-    if (review.userId.toString() !== userId.toString()) {
+    if (!viewerOwnsReview(review, userId)) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized."
@@ -430,7 +483,7 @@ export const deleteReview = async (req, res) => {
       });
     }
 
-    if (review.userId.toString() !== userId.toString()) {
+    if (!viewerOwnsReview(review, userId)) {
       return res.status(403).json({
         success: false,
         message: "Unauthorized."
@@ -487,7 +540,7 @@ export const replyToReview = async (req, res) => {
     // Only restrict guests
 if (req.userRole === "guest") {
 
-  if (review.userId._id.toString() !== req.userId.toString()) {
+  if (!viewerOwnsReview(review, req.userId)) {
     return res.status(403).json({
       success: false,
       message: "Guests can only reply to their own reviews."

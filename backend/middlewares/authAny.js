@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import { resolveUserDisableState } from "../utils/accountStatus.js";
 import {
   getDecodedSessionVersion,
   getSessionVersion,
@@ -26,7 +27,8 @@ const authAny = async (req, _res, next) => {
       return next();
     }
 
-    if (user.disabled) {
+    const accountStatus = await resolveUserDisableState(user);
+    if (accountStatus.isDisabled) {
       return next();
     }
 

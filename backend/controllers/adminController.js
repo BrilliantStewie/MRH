@@ -20,6 +20,7 @@ import {
 // Utils
 import sendEmail from "../utils/sendEmail.js";
 import sendSMS from "../utils/sendSMS.js";
+import { clearUserDisableState } from "../utils/accountStatus.js";
 import {
   attachReviewDataToBookings,
   buildBookingPopulate,
@@ -459,6 +460,12 @@ const changeUserStatus = async (req, res) => {
 
     // Toggle status
     user.disabled = !user.disabled;
+    if (!user.disabled) {
+      clearUserDisableState(user);
+    } else {
+      user.disabledUntil = null;
+      user.disabledReason = "";
+    }
     await user.save();
 
 

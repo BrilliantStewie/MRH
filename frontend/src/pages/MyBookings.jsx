@@ -437,7 +437,7 @@ const MyBookings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 relative p-4 md:p-8 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="relative min-h-screen bg-slate-50 px-4 py-4 font-sans selection:bg-indigo-100 selection:text-indigo-900 sm:px-6 sm:py-6 lg:px-8 lg:py-8 xl:px-10 2xl:px-12">
       {cancelDialog.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
@@ -557,7 +557,7 @@ const MyBookings = () => {
         <div className="absolute -bottom-[10%] -right-[10%] w-[50%] h-[50%] bg-purple-100 rounded-full blur-[100px] opacity-60"></div>
       </div>
 
-      <div className="max-w-6xl mx-auto space-y-8 relative z-10">
+      <div className="relative z-10 mx-auto w-full max-w-[1480px] space-y-8">
         {/* HEADER */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
@@ -633,7 +633,7 @@ const MyBookings = () => {
         </div>
 
         {/* BOOKINGS LIST */}
-        <div className="space-y-5">
+        <div className="w-full space-y-5">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-32 text-slate-400">
               <Loader2 className="animate-spin mb-4" size={40} />
@@ -982,7 +982,7 @@ const MyBookings = () => {
                               {room?.building || "N/A"}
                             </p>
                             <p className="mt-1 text-xs font-semibold text-slate-600">
-                              {item.participants || 0} pax
+                              {item.roomGuests || 0} pax
                             </p>
                           </div>
                         </div>

@@ -5,7 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { 
   X, Building2, Calendar, Users, 
-  Sparkles, Star, ArrowLeft, ArrowRight, Check, BedDouble, MapPin, PenLine, Package, Home
+  Sparkles, Star, ArrowLeft, ArrowRight, Check, BedDouble, MapPin, PenLine, Package, Home, ChevronLeft, ChevronRight
 } from "lucide-react";
 import venueOnlyImage from "../assets/mrh_about.jpg";
 import {
@@ -35,6 +35,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   const [showAllRooms, setShowAllRooms] = useState(false);
   const [showAllPackages, setShowAllPackages] = useState(false);
   const [reviewImages, setReviewImages] = useState([]);
+  const [lightbox, setLightbox] = useState({ images: [], index: 0 });
 
   const MAX_REVIEW_IMAGES = 6;
   const MAX_REVIEW_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -88,6 +89,33 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     });
   };
 
+  const openLightbox = (images, index = 0) => {
+    if (!images.length) return;
+    const safeIndex = Math.max(0, Math.min(index, images.length - 1));
+    setLightbox({ images, index: safeIndex });
+  };
+
+  const closeLightbox = () => {
+    setLightbox({ images: [], index: 0 });
+  };
+
+  const showNextImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return { ...prev, index: (prev.index + 1) % prev.images.length };
+    });
+  };
+
+  const showPrevImage = () => {
+    setLightbox((prev) => {
+      if (!prev.images.length) return prev;
+      return {
+        ...prev,
+        index: (prev.index - 1 + prev.images.length) % prev.images.length
+      };
+    });
+  };
+
   // Data Mapping
   const bookingItems = Array.isArray(booking.bookingItems) ? booking.bookingItems : [];
   const rooms = bookingItems.map((item) => item.roomId).filter(Boolean);
@@ -100,8 +128,8 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
     bookingItems[0]?.packageId?.name ||
     booking.extraPackages?.[0]?.name ||
     "Venue-only package";
-  const guestCount = bookingItems.reduce((sum, item) => sum + Number(item.participants || 0), 0)
-    + Number(booking.venueParticipants || 0);
+  const guestCount = bookingItems.reduce((sum, item) => sum + Number(item.roomGuests || 0), 0)
+    + Number(booking.participants || 0);
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return null;
@@ -308,7 +336,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                                 {room?.building || "N/A"}
                               </p>
                               <p className="mt-1 text-xs font-semibold text-slate-600">
-                                {item.participants || 0} pax
+                                {item.roomGuests || 0} pax
                               </p>
                             </div>
                           </div>
@@ -508,17 +536,27 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
 
                     {reviewImages.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {reviewImages.map((image) => (
-                          <div key={image.id} className="relative group h-12 w-12 rounded-lg overflow-hidden border border-gray-100 bg-gray-50">
-                            <img
-                              src={image.preview}
-                              alt="Review"
-                              className="h-full w-full object-cover"
-                            />
+                        {reviewImages.map((image, index) => (
+                          <div key={image.id} className="relative group h-12 w-12">
                             <button
                               type="button"
-                              onClick={() => handleRemoveImage(image.id)}
-                              className="absolute top-1 right-1 rounded-full bg-black/70 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => openLightbox(reviewImages.map((item) => item.preview).filter(Boolean), index)}
+                              className="h-full w-full overflow-hidden rounded-lg border border-gray-100 bg-gray-50"
+                              title="View image"
+                            >
+                              <img
+                                src={image.preview}
+                                alt="Review"
+                                className="h-full w-full object-cover"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRemoveImage(image.id);
+                              }}
+                              className="absolute top-1 right-1 z-10 rounded-full bg-black/70 p-1 text-white shadow-sm opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                               title="Remove image"
                             >
                               <X size={12} />
@@ -605,6 +643,57 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
             </div>
         </div>
       </div>
+
+      {lightbox.images.length > 0 && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={closeLightbox}
+        >
+          <div
+            className="relative w-full max-w-3xl mx-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closeLightbox}
+              className="absolute -top-12 right-0 text-white/80 transition-colors hover:text-white"
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black">
+              <img
+                src={lightbox.images[lightbox.index]}
+                alt={`Review image ${lightbox.index + 1}`}
+                className="w-full max-h-[80vh] object-contain bg-black"
+              />
+              {lightbox.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={showPrevImage}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                    title="Previous"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextImage}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-white transition-colors hover:bg-black/70"
+                    title="Next"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white">
+                    {lightbox.index + 1} / {lightbox.images.length}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

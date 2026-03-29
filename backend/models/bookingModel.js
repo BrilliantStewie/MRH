@@ -16,7 +16,7 @@ const bookingItemSchema = new mongoose.Schema(
       required: true,
     },
 
-    participants: {
+    roomGuests: {
       type: Number,
       required: true,
       min: 1,
@@ -81,7 +81,7 @@ const bookingSchema = new mongoose.Schema(
       default: [],
     },
 
-    venueParticipants: {
+    participants: {
       type: Number,
       default: 0,
       min: 0,
@@ -241,9 +241,9 @@ bookingSchema.pre("save", function (next) {
 
   if (
     (!Array.isArray(this.bookingItems) || this.bookingItems.length === 0) &&
-    (!this.venueParticipants || this.venueParticipants <= 0)
+    (!this.participants || this.participants <= 0)
   ) {
-    return next(new Error("Booking must include rooms or venue participants"));
+    return next(new Error("Booking must include rooms or participants"));
   }
 
   next();

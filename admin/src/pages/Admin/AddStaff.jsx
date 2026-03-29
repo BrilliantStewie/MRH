@@ -16,6 +16,8 @@ import { toast } from "react-toastify";
 const TEXT_SUFFIXES = ["Jr.", "Sr.", "Jr", "Sr"];
 // Strictly matches Roman Numerals I through C (1-100)
 const ROMAN_REGEX = /^(X{0,3})(IX|IV|V?I{0,3})$|^XL[IXV]{0,3}$|^L[X]{0,3}[IXV]{0,3}$|^XC[IXV]{0,3}$|^C$/i;
+const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
+const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
 
 const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   const { createStaff, updateStaff, allStaff } = useContext(AdminContext);
@@ -63,12 +65,20 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
     }
   }, [editData]);
 
+  const formatPersonName = (value) =>
+    value
+      .replace(NAME_INPUT_REGEX, "")
+      .toLowerCase()
+      .replace(NAME_CAPITALIZE_REGEX, (_, separator, character) =>
+        `${separator}${character.toUpperCase()}`
+      );
+
   const generateUniqueEmail = (fName, lName) => {
   if (!fName || !lName) return "";
   
   // Clean names: lowercase and remove spaces/special characters
-  const cleanFirst = fName.toLowerCase().replace(/[^a-z]/g, "");
-  const cleanLast = lName.toLowerCase().replace(/[^a-z]/g, "");
+  const cleanFirst = fName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  const cleanLast = lName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
   
   // Requirement: firstname.lastname_staff@gmail.com
   const baseEmail = `${cleanFirst}.${cleanLast}_staff@gmail.com`;
@@ -117,7 +127,7 @@ const AddStaff = ({ onClose, getAllUsers, editData = null }) => {
   
   // --- NAME FORMATTING ---
   else {
-    formatted = value.replace(/[^a-zA-Z-\.\'\s]/g, "").replace(/\b\w/g, c => c.toUpperCase());
+    formatted = formatPersonName(value);
     if (name === "firstName") setFirstName(formatted);
     else if (name === "lastName") setLastName(formatted);
     else if (name === "middleName") setMiddleName(formatted);

@@ -5,7 +5,7 @@ import { MapPin, Phone, Mail, Clock } from 'lucide-react';
 const Contact = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20 pt-10">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         
         {/* --- HEADER SECTION --- */}
         <div className="text-center mb-16">
@@ -13,13 +13,13 @@ const Contact = () => {
             Contact <span className="text-blue-600">Us</span>
           </h1>
           <div className="w-20 h-1.5 bg-blue-600 mx-auto rounded-full mb-6"></div>
-          <p className="text-slate-500 max-w-2xl mx-auto text-sm md:text-base leading-relaxed">
+          <p className="mx-auto max-w-3xl text-sm leading-relaxed text-slate-500 md:text-base">
             We are here to assist you. Reach out to the Mercedarian Retreat House for any inquiries regarding our facilities and spiritual retreats.
           </p>
         </div>
 
         {/* --- MAIN CONTENT: Aligned Grid --- */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch justify-center max-w-6xl mx-auto">
+        <div className="grid w-full grid-cols-1 items-stretch gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] xl:gap-8">
           
           {/* Left Column: Centered Image */}
           <div className="relative group min-h-[500px]">

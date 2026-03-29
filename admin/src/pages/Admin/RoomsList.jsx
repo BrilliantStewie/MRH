@@ -358,7 +358,7 @@ const RoomsList = () => {
 };
 
   return (
-    <div className="min-h-full bg-slate-50 p-4 font-sans text-slate-900 sm:p-6">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 p-3 pb-6 font-sans text-slate-900 sm:p-4 xl:p-5">
       
       {viewingRoom && (
         <RoomDetailsModal room={viewingRoom} onClose={() => setViewingRoom(null)} handleEdit={handleEdit}/>
@@ -402,7 +402,7 @@ const RoomsList = () => {
       )}
 
       {/* --- HEADER --- */}
-      <div className="mb-5 flex flex-col items-start justify-between gap-4 md:flex-row">
+      <div className="mb-4 flex flex-col items-start justify-between gap-3 md:flex-row">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Room Management</h1>
           <p className="mt-1 text-xs text-slate-500">Manage your listings, availability, and details.</p>
@@ -420,36 +420,36 @@ const RoomsList = () => {
       </div>
 
      {/* --- DYNAMIC FILTER BAR --- */}
-       <div className="relative z-40 mb-6 flex flex-col items-stretch gap-4 md:flex-row md:items-center">
-        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center">
+       <div className="relative z-40 mb-4 flex flex-col items-stretch gap-2.5 md:flex-row md:items-center">
+        <div className="flex w-full flex-col items-stretch gap-2 md:w-auto md:flex-row md:items-center">
          
          {/* BUILDING FILTER */}
-         <div className="relative w-full md:w-48">
+         <div className="relative w-full md:w-44">
              <button 
                onClick={() => toggleDropdown('building')} 
-                className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
-                 filterBuilding ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
-               }`}
+                 className={`flex h-[38px] w-full items-center justify-between rounded-[18px] border px-3 text-[11px] font-normal transition-all ${
+                  filterBuilding ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
+                }`}
              >
                  <span className="flex items-center gap-2">
-                   <Building2 size={16} className="text-slate-400" />
+                   <Building2 size={14} className="text-slate-400" />
                    <span className="truncate">{filterBuilding || "All Buildings"}</span>
                  </span>
-                 <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'building' ? 'rotate-180' : ''}`} />
+                 <ChevronDown size={12} className={`transition-transform duration-300 ${activeDropdown === 'building' ? 'rotate-180' : ''}`} />
              </button>
              {activeDropdown === 'building' && (
-                 <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                      <div onClick={() => { setFilterBuilding(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
+                  <div className="absolute z-50 top-full left-0 mt-2 w-full overflow-hidden rounded-[22px] border border-slate-200 bg-white p-1.5 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.32)] animate-in fade-in zoom-in-95 duration-200">
+                       <div onClick={() => { setFilterBuilding(""); setActiveDropdown(null); }} className="flex cursor-pointer items-center gap-2.5 rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-400 hover:bg-slate-100">
                        <Building2 size={14} /> All Buildings
                      </div>
                      <div className="h-px bg-slate-100 my-1 mx-2" />
                      {buildings.slice(0, showMoreBuildings ? buildings.length : 3).map((b) => (
-                          <div key={b._id} onClick={() => { setFilterBuilding(b.name); setActiveDropdown(null); }} className="rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
+                           <div key={b._id} onClick={() => { setFilterBuilding(b.name); setActiveDropdown(null); }} className="cursor-pointer rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-700 transition-colors hover:bg-slate-100">
                            {b.name}
                          </div>
                      ))}
                      {buildings.length > 3 && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreBuildings(!showMoreBuildings); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100">
+                         <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreBuildings(!showMoreBuildings); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-normal uppercase tracking-[0.18em] text-slate-500 hover:bg-slate-100">
                          {showMoreBuildings ? "Show Less" : `+ ${buildings.length - 3} More`}
                        </button>
                      )}
@@ -458,32 +458,32 @@ const RoomsList = () => {
          </div>
 
          {/* ROOM TYPE FILTER */}
-         <div className="relative w-full md:w-60">
+         <div className="relative w-full md:w-56">
              <button 
                onClick={() => toggleDropdown('type')} 
-                className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
-                 filterType ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
-               }`}
+                 className={`flex h-[38px] w-full items-center justify-between rounded-[18px] border px-3 text-[11px] font-normal transition-all ${
+                  filterType ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
+                }`}
              >
                  <span className="flex items-center gap-2">
-                   <BedSingle size={16} className="text-slate-400" />
+                   <BedSingle size={14} className="text-slate-400" />
                    <span className="truncate">{filterType || "All Room Types"}</span>
                  </span>
-                 <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'type' ? 'rotate-180' : ''}`} />
+                 <ChevronDown size={12} className={`transition-transform duration-300 ${activeDropdown === 'type' ? 'rotate-180' : ''}`} />
              </button>
              {activeDropdown === 'type' && (
-                 <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                       <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
+                  <div className="absolute z-50 top-full left-0 mt-2 w-full overflow-hidden rounded-[22px] border border-slate-200 bg-white p-1.5 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.32)] animate-in fade-in zoom-in-95 duration-200">
+                        <div onClick={() => { setFilterType(""); setActiveDropdown(null); }} className="flex cursor-pointer items-center gap-2.5 rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-400 hover:bg-slate-100">
                         <BedSingle size={14} /> All Room Types
                       </div>
                      <div className="h-px bg-slate-100 my-1 mx-2" />
                      {roomTypes.slice(0, showMoreTypes ? roomTypes.length : 3).map((t) => (
-                          <div key={t._id} onClick={() => { setFilterType(t.name); setActiveDropdown(null); }} className="rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
+                           <div key={t._id} onClick={() => { setFilterType(t.name); setActiveDropdown(null); }} className="cursor-pointer rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-700 transition-colors hover:bg-slate-100">
                            {t.name}
                          </div>
                      ))}
                      {roomTypes.length > 3 && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreTypes(!showMoreTypes); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-black uppercase text-slate-500 hover:bg-slate-100">
+                         <button type="button" onClick={(e) => { e.stopPropagation(); setShowMoreTypes(!showMoreTypes); }} className="w-full border-t border-slate-50 py-2 text-[9px] font-normal uppercase tracking-[0.18em] text-slate-500 hover:bg-slate-100">
                          {showMoreTypes ? "Show Less" : `+ ${roomTypes.length - 3} More`}
                        </button>
                      )}
@@ -492,40 +492,40 @@ const RoomsList = () => {
          </div>
 
          {/* STATUS FILTER */}
-         <div className="relative w-full md:w-48">
+         <div className="relative w-full md:w-44">
            <button 
              onClick={() => toggleDropdown('status')} 
-              className={`flex w-full items-center justify-between rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
-               filterStatus ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
-             }`}
+               className={`flex h-[38px] w-full items-center justify-between rounded-[18px] border px-3 text-[11px] font-normal transition-all ${
+                filterStatus ? "border-slate-300 text-slate-900 bg-slate-50" : "border-slate-200 text-slate-600 bg-slate-50"
+              }`}
            >
              <span className="flex items-center gap-2">
-               {!filterStatus && <Filter size={16} className="text-slate-400" />}
-               {filterStatus === "Available" && <CheckCircle size={16} className="text-slate-400" />}
-               {filterStatus === "Unavailable" && <XCircle size={16} className="text-slate-400" />}
+               {!filterStatus && <Filter size={14} className="text-slate-400" />}
+               {filterStatus === "Available" && <CheckCircle size={14} className="text-slate-400" />}
+               {filterStatus === "Unavailable" && <XCircle size={14} className="text-slate-400" />}
                <span className="truncate">{filterStatus || "All Status"}</span>
              </span>
-             <ChevronDown size={14} className={`transition-transform duration-300 ${activeDropdown === 'status' ? 'rotate-180' : ''}`} />
+             <ChevronDown size={12} className={`transition-transform duration-300 ${activeDropdown === 'status' ? 'rotate-180' : ''}`} />
            </button>
            
            {activeDropdown === 'status' && (
-             <div className="absolute z-50 top-full left-0 w-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl p-1 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div onClick={() => { setFilterStatus(""); setActiveDropdown(null); }} className="flex items-center gap-3 rounded-lg px-4 py-2.5 text-[11px] font-bold text-slate-400 cursor-pointer hover:bg-slate-100">
+              <div className="absolute z-50 top-full left-0 mt-2 w-full overflow-hidden rounded-[22px] border border-slate-200 bg-white p-1.5 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.32)] animate-in fade-in zoom-in-95 duration-200">
+                 <div onClick={() => { setFilterStatus(""); setActiveDropdown(null); }} className="flex cursor-pointer items-center gap-2.5 rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-400 hover:bg-slate-100">
                  <Filter size={14} className="text-slate-400" /> All Status
                </div>
                <div className="h-px bg-slate-100 my-1 mx-2" />
-                <div onClick={() => { setFilterStatus("Available"); setActiveDropdown(null); }} className="flex items-center justify-between rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
-                 <span>Available</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                   {allRooms.filter(r => r.available).length}
-                 </span>
-               </div>
-                <div onClick={() => { setFilterStatus("Unavailable"); setActiveDropdown(null); }} className="flex items-center justify-between rounded-lg px-4 py-3 text-[11px] font-bold text-slate-700 cursor-pointer transition-colors hover:bg-slate-100">
-                 <span>Unavailable</span>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                   {allRooms.filter(r => !r.available).length}
-                 </span>
-               </div>
+                 <div onClick={() => { setFilterStatus("Available"); setActiveDropdown(null); }} className="flex cursor-pointer items-center justify-between rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-700 transition-colors hover:bg-slate-100">
+                  <span>Available</span>
+                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-normal text-slate-500">
+                    {allRooms.filter(r => r.available).length}
+                  </span>
+                </div>
+                 <div onClick={() => { setFilterStatus("Unavailable"); setActiveDropdown(null); }} className="flex cursor-pointer items-center justify-between rounded-[14px] px-3 py-2 text-[11px] font-normal text-slate-700 transition-colors hover:bg-slate-100">
+                  <span>Unavailable</span>
+                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-normal text-slate-500">
+                    {allRooms.filter(r => !r.available).length}
+                  </span>
+                </div>
              </div>
            )}
          </div>
@@ -534,9 +534,9 @@ const RoomsList = () => {
          {(filterType || filterBuilding || filterStatus) && (
              <button 
                onClick={clearFilters} 
-                className="ml-auto flex items-center gap-2 rounded-xl border border-transparent px-4 py-2.5 text-xs font-bold text-slate-500 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
+                 className="ml-auto flex h-[38px] items-center gap-1.5 rounded-[18px] border border-transparent px-3 text-[11px] font-normal text-slate-500 transition-all hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600"
              >
-               <RotateCcw size={16} />
+               <RotateCcw size={14} />
                <span>Reset Filters</span>
              </button>
          )}
@@ -544,11 +544,15 @@ const RoomsList = () => {
       </div>
 
       {/* --- ROOMS GRID --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {paginatedRooms.map((room) => (
-          <div key={room._id} className="bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-slate-300 flex flex-col">
+      <div className="grid grid-cols-1 gap-3 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-4">
+        {paginatedRooms.map((room) => {
+          const roomTypeLabel = room.roomType || room.type || "No type assigned";
+          const capacityLabel = `${room.capacity} ${Number(room.capacity) === 1 ? "Person" : "People"}`;
+
+          return (
+          <div key={room._id} className="group flex flex-col overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_20px_44px_-34px_rgba(15,23,42,0.5)] transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)]">
             <div 
-                className="relative h-28 bg-slate-200 overflow-hidden cursor-zoom-in group/image"
+                className="group/image relative h-32 overflow-hidden bg-slate-200 cursor-zoom-in xl:h-36"
                 onClick={() => setViewingRoom(room)}
             >
               <img 
@@ -556,85 +560,98 @@ const RoomsList = () => {
                 alt={room.name} 
                 className={`w-full h-full object-cover transition-transform duration-500 group-hover/image:scale-105 ${!room.available ? 'opacity-40 grayscale' : ''}`} 
               />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent"></div>
               
               {room.available && (
-                <div className="pointer-events-none absolute top-3 right-3 z-20 flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1 text-[9px] font-bold text-white shadow-lg">
+                <div className="pointer-events-none absolute right-2.5 top-2.5 z-20 flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-[8px] font-bold text-white shadow-lg">
                     <CheckCircle2 size={10} strokeWidth={3} className="text-emerald-400" /> AVAILABLE
                 </div>
               )}
 
               {!room.available && (
                 <div className="absolute inset-0 bg-slate-100/80 flex flex-col items-center justify-center text-slate-400 p-4 text-center z-10 pointer-events-none">
-                    <Ban size={28} className="mb-1" />
+                    <Ban size={24} className="mb-1" />
                     <span className="text-[9px] font-bold uppercase tracking-widest">Unavailable</span>
                 </div>
               )}
 
               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="rounded-full bg-white/90 px-3 py-1.5 text-[9px] font-bold uppercase text-slate-900 shadow-sm">
+                <span className="rounded-full bg-white/90 px-3 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-900 shadow-sm">
                     View Details
                 </span>
               </div>
             </div>
 
-            <div className="p-2 flex-1 flex flex-col">
-              <div className="mb-2">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                    <h3 className={`text-[11px] font-bold leading-tight ${room.available ? 'text-slate-800' : 'text-slate-400'}`}>
+            <div className="flex flex-1 flex-col gap-2.5 p-3.5">
+              <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`text-[14px] font-black leading-tight tracking-tight ${room.available ? 'text-slate-900' : 'text-slate-400'}`}>
                         {room.name}
                     </h3>
+                  </div>
                     {room.building && (
-                        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider ${
-                            room.available ? "bg-slate-100 text-slate-500 border-slate-200" : "bg-slate-50 text-slate-300 border-slate-100"
+                        <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 text-[7px] font-black uppercase tracking-[0.18em] ${
+                            room.available ? "border-slate-200 bg-slate-50 text-slate-600" : "border-slate-100 bg-slate-50 text-slate-300"
                         }`}>
-                            <Building2 size={8} /> {room.building}
+                            <Building2 size={11} /> {room.building}
                         </span>
                     )}
+              </div>
+
+              <div className="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    Room Type
+                  </p>
+                  <div className="mt-1 flex items-start gap-1.5">
+                    <BedSingle size={13} className={room.available ? "mt-0.5 text-slate-500" : "mt-0.5 text-slate-300"} />
+                    <p className={`line-clamp-2 text-[11px] font-bold leading-snug ${
+                      room.available ? "text-slate-700" : "text-slate-400"
+                    }`}>
+                      {roomTypeLabel}
+                    </p>
+                  </div>
                 </div>
 
-                <div className={`mt-2 flex items-start justify-between gap-2 text-[11px] font-medium ${!room.available ? "text-slate-300" : "text-slate-500"}`}>
-                  <p className={`min-w-0 flex-1 text-[9px] font-bold uppercase tracking-wide ${
-                    room.available ? "text-slate-400" : "text-slate-300"
-                  }`}>
-                    {room.roomType || room.type}
+                <div className="shrink-0 text-right">
+                  <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                    Capacity
                   </p>
-                  <span className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
-                    !room.available ? "text-slate-300" : "text-slate-500"
+                  <div className={`mt-1 inline-flex items-center justify-end gap-1.5 ${
+                    room.available ? "text-slate-700" : "text-slate-400"
                   }`}>
-                    <Users size={12} className={!room.available ? "text-slate-300" : "text-slate-900"} />
-                    <span className="pr-1.5 text-[10px] text-right">
-                      {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
-                    </span>
-                  </span>
+                    <Users size={13} className={room.available ? "text-slate-500" : "text-slate-300"} />
+                    <span className="text-[11px] font-black leading-none">{capacityLabel}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-auto pt-1 border-t border-slate-100 flex items-center justify-between">
+              <div className="mt-auto flex items-center justify-between pt-2">
                 <label className="flex items-center gap-2 cursor-pointer group/toggle">
-                  <div className={`w-8 h-4.5 rounded-full p-0.5 transition-colors duration-300 ${room.available ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                    <div className={`w-3.5 h-3.5 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${room.available ? 'translate-x-3.5' : ''}`}></div>
+                  <div className={`h-4.5 w-8 rounded-full p-0.5 transition-colors duration-300 ${room.available ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                    <div className={`h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform duration-300 ${room.available ? 'translate-x-3.5' : ''}`}></div>
                   </div>
                   <input type="checkbox" className="hidden" checked={room.available} onChange={() => changeAvailability(room._id)} />
-                   <span className={`text-[9px] font-bold uppercase tracking-tight transition-colors ${room.available ? "text-emerald-600" : "text-slate-400"}`}>
+                   <span className={`text-[8px] font-bold uppercase tracking-tight transition-colors ${room.available ? "text-emerald-600" : "text-slate-400"}`}>
                     {room.available ? "Available" : "Unavailable"}
                   </span>
                 </label>
 
-                <div className="flex gap-1">
-                  <button onClick={() => handleEdit(room)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                <div className="flex gap-1.5">
+                  <button onClick={() => handleEdit(room)} className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600" title="Edit">
                     <Edit3 size={13} />
                   </button>
-                  <button onClick={() => setDeletingRoom(room)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Delete">
+                  <button onClick={() => setDeletingRoom(room)} className="rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600" title="Delete">
                     <Trash2 size={13} />
                   </button>
                 </div>
               </div>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
-      <div className="pt-3">
+      <div className="sticky bottom-0 z-20 mt-4 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pt-4 pb-1">
         <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full text-left sm:w-auto">
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">

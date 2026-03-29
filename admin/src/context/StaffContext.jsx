@@ -209,7 +209,7 @@ const StaffContextProvider = ({ children }) => {
         return data.reviews;
       }
     } catch (error) {
-      toast.error("Failed to load reviews");
+      toast.error("Failed to load feedback");
       return [];
     }
   };

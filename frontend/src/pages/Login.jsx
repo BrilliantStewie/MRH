@@ -213,11 +213,12 @@ const Login = () => {
   }, [phone, state, backendUrl]);
 
   const formatName = (val) => {
-    const cleaned = val.replace(/[^a-zA-Z\s-]/g, ''); 
+    const cleaned = val.replace(/[^a-zA-Z\u00D1\u00F1\s-]/g, "");
     return cleaned
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ');
+      .toLowerCase()
+      .replace(/(^|[\s-])([a-z\u00f1])/g, (_, separator, character) =>
+        `${separator}${character.toUpperCase()}`
+      );
   };
 
   const handleSuffixChange = (val) => {
@@ -601,7 +602,7 @@ const Login = () => {
   };
 
   return (
-    <div className='min-h-[100svh] bg-[#F4F5F7] flex items-center justify-center p-3 sm:p-6 font-sans relative'>
+    <div className='relative flex min-h-[100svh] items-center justify-center bg-[#F4F5F7] px-3 py-4 font-sans sm:px-6 sm:py-6 lg:px-8 lg:py-8 xl:px-10'>
       <div id="login-recaptcha-container" className="hidden"></div>
       <AccountStatusModal
         open={Boolean(disabledModalMessage)}
@@ -639,9 +640,9 @@ const Login = () => {
           backendUrl={backendUrl} 
           isResetMode={isResetMode} 
           onResend={handleOtpResend}
-          onClose={() => {
+          onClose={({ preserveVerification = false } = {}) => {
             setShowOtpModal(false);
-            if (isResetMode && state !== 'Reset Password') {
+            if (!preserveVerification && isResetMode && state !== 'Reset Password') {
               setIsResetMode(false);
               setVerifiedOtp('');
             }
@@ -657,9 +658,9 @@ const Login = () => {
         />
       )}
 
-      <div className='bg-white w-full max-w-6xl rounded-[28px] sm:rounded-[40px] overflow-hidden flex flex-col lg:flex-row shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)]'>
-        <div className='w-full lg:w-[50%] p-6 sm:p-10 lg:p-14 flex flex-col justify-center bg-white'>
-          <div className='max-w-[400px] mx-auto w-full'>
+      <div className='flex w-full flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)] sm:rounded-[40px] lg:flex-row'>
+        <div className='flex w-full flex-col justify-center bg-white p-6 sm:p-10 lg:w-[46%] lg:p-14 xl:w-[44%]'>
+          <div className='mx-auto w-full max-w-[480px] xl:max-w-[520px]'>
             <div className='mb-6 lg:hidden'>
               <div className='relative overflow-hidden rounded-[24px] border border-slate-200 bg-slate-900 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.55)]'>
                 <img src={loginVisual} alt="Mercedarian Retreat House" className='h-44 w-full object-cover opacity-90' />
@@ -911,7 +912,7 @@ const Login = () => {
           </div>
         </div>
 
-        <div className='hidden lg:block lg:w-[50%] p-6'>
+        <div className='hidden p-6 lg:block lg:w-[54%] xl:w-[56%]'>
           <div className='relative h-full w-full overflow-hidden rounded-[35px] shadow-inner'>
              <img src={loginVisual} alt="Mercedarian Retreat House" className='absolute inset-0 h-full w-full object-cover' />
              <div className='absolute inset-0 bg-gradient-to-br from-slate-950/45 via-slate-900/15 to-transparent'></div>

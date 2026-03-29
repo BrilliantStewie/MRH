@@ -316,18 +316,18 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
   return (
     <>
       <nav className="sticky top-0 z-50 w-full border-b border-slate-200 bg-[#f8fafc] shadow-sm">
-      <div className="px-3 sm:px-6 lg:px-8">
-      <div className="flex h-16 items-center justify-between gap-3">
+      <div className="px-3 sm:px-5 xl:px-6">
+      <div className="flex h-[72px] items-center justify-between gap-4 sm:h-20">
         
         {/* --- LEFT: BRANDING --- */}
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onMenuToggle}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 md:hidden"
             aria-label="Open menu"
           >
-            <Menu size={18} />
+            <Menu size={19} />
           </button>
           <div 
             className="group flex cursor-pointer items-center gap-3 select-none" 
@@ -336,13 +336,13 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
           <img 
             src={assets.logo} 
             alt="Logo" 
-            className="h-10 w-10 object-contain transition-transform group-hover:scale-105 sm:h-12 sm:w-12" 
+            className="h-12 w-12 object-contain transition-transform group-hover:scale-105 sm:h-14 sm:w-14" 
           />
           <div className="flex flex-col justify-center">
-            <h1 className="text-base font-bold leading-tight text-gray-800 sm:text-lg">
+            <h1 className="text-lg font-bold leading-tight text-gray-800 sm:text-xl">
               MRH
             </h1>
-            <span className="mt-0.5 hidden w-fit rounded-md border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 sm:inline-flex">
+            <span className="mt-1 hidden w-fit rounded-md border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 sm:inline-flex">
               Staff Panel
             </span>
           </div>
@@ -364,12 +364,12 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
                   setShowAllNotifications(false);
                 }
               }}
-              className={`relative rounded-full p-2 transition-colors ${
+              className={`relative rounded-full p-2.5 transition-colors ${
                 showNotifications ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50"
               }`}
               title="Notifications"
             >
-              <Bell size={18} />
+              <Bell size={20} />
               {unreadCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white ring-2 ring-white">
                   {unreadBadgeText}
@@ -616,7 +616,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
                 setShowNotificationMenu(false);
                 setShowClearConfirm(false);
               }}
-              className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-slate-100 bg-slate-50 transition-colors hover:border-slate-300"
+              className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-slate-100 bg-slate-50 transition-colors hover:border-slate-300"
             >
               {staffData?.image && !imgError ? (
                 <img 
@@ -626,7 +626,7 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
                   onError={() => setImgError(true)} 
                 />
               ) : (
-                <User size={20} className="text-slate-400" />
+                <User size={21} className="text-slate-400" />
               )}
             </button>
 

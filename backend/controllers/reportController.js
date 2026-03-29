@@ -131,11 +131,11 @@ const getManilaDateParts = (value) => {
 const getBookingParticipants = (booking) => {
   const roomGuests = Array.isArray(booking?.bookingItems)
     ? booking.bookingItems.reduce(
-        (sum, item) => sum + Number(item?.participants || 0),
+        (sum, item) => sum + Number(item?.roomGuests || 0),
         0
       )
     : 0;
-  const venueGuests = Number(booking?.venueParticipants || 0);
+  const venueGuests = Number(booking?.participants || 0);
 
   return roomGuests + venueGuests;
 };
@@ -198,23 +198,45 @@ const serializeReport = (report, { includeBookingIds = false } = {}) => {
     label: report.label,
     periodMonth: report.periodMonth,
     periodYear: report.periodYear,
-    periodStart: report.periodStart,
+    bookingIds,
     periodEnd: report.periodEnd,
-    bookingCount: bookingIds.length,
+    periodStart: report.periodStart,
     totalBookings: report.totalBookings,
+    totalIncome: report.totalIncome,
     totalParticipants: report.totalParticipants,
     totalRoomsBooked: report.totalRoomsBooked,
-    totalIncome: report.totalIncome,
     createdAt: report.createdAt,
     updatedAt: report.updatedAt,
   };
 
-  if (includeBookingIds) {
-    serializedReport.bookingIds = bookingIds;
+  if (!includeBookingIds) {
+    delete serializedReport.bookingIds;
   }
 
+  serializedReport.bookingCount = bookingIds.length;
   return serializedReport;
 };
+
+const buildStoredReportDocument = ({
+  existingReport = null,
+  periodWindow,
+  bookingIds,
+  summary,
+}) => ({
+  ...(existingReport?._id ? { _id: existingReport._id } : {}),
+  reportType: periodWindow.reportType,
+  label: periodWindow.label,
+  periodMonth: periodWindow.periodMonth,
+  periodYear: periodWindow.periodYear,
+  bookingIds,
+  periodEnd: periodWindow.periodEnd,
+  periodStart: periodWindow.periodStart,
+  totalBookings: summary.totalBookings,
+  totalIncome: summary.totalIncome,
+  totalParticipants: summary.totalParticipants,
+  totalRoomsBooked: summary.totalRoomsBooked,
+  ...(existingReport?.createdAt ? { createdAt: existingReport.createdAt } : {}),
+});
 
 const buildQueryWindow = (startDate, endDate) => {
   const start = new Date(startDate);
@@ -236,7 +258,7 @@ const fetchBookingsWithinWindow = async (start, end) => {
     .find({
       ...buildLegacyBookingDateRangeQuery("checkIn", start, end),
     })
-    .select(`_id bookingItems venueParticipants totalPrice status payment paymentStatus ${BOOKING_DATE_SELECT}`)
+    .select(`_id bookingItems participants totalPrice status payment paymentStatus ${BOOKING_DATE_SELECT}`)
     .lean();
 
   return bookings.filter((booking) => {
@@ -417,23 +439,18 @@ const generateAndStoreReport = async ({
     periodMonth: reportType === "monthly" ? periodMonth : null,
   };
 
-  const report = await reportModel.findOneAndUpdate(filter, {
-    $set: {
+  const existingReport = await reportModel.findOne(filter).select("_id createdAt").lean();
+  const replacement = buildStoredReportDocument({
+    existingReport,
+    periodWindow: {
+      reportType,
       ...periodWindow,
-      bookingIds,
-      ...summary,
     },
-    $unset: {
-      approvedBookings: "",
-      approvedCount: "",
-      cancelledCount: "",
-      cancellationPendingCount: "",
-      declinedCount: "",
-      grossBookingValue: "",
-      pendingCount: "",
-      paidBookings: "",
-    },
-  }, {
+    bookingIds,
+    summary,
+  });
+
+  const report = await reportModel.findOneAndReplace(filter, replacement, {
     new: true,
     upsert: true,
     runValidators: true,

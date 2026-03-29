@@ -20,9 +20,7 @@ import Dashboard from "./pages/Admin/Dashboard";
 import RoomsList from "./pages/Admin/RoomsList";
 import AllBookings from "./pages/Admin/AllBookings";
 import Users from "./pages/Admin/Users";
-import StaffList from "./pages/Admin/StaffList";
 import Packages from "./pages/Admin/Packages";
-import Analytics from "./pages/Admin/Analytics";
 import Report from "./pages/Admin/Report";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
@@ -33,31 +31,29 @@ import StaffProtectedRoute from "./routes/StaffProtectedRoute";
 
 const PANEL_SHELL_VARIANTS = {
   contained: {
-    main: "overflow-y-auto p-3 sm:p-4 lg:p-8",
-    container: "mx-auto max-w-7xl pb-8",
+    main: "overflow-y-auto p-2.5 sm:p-4 xl:p-5",
+    container: "w-full max-w-none pb-5",
   },
   workspace: {
-    main: "overflow-hidden p-3 sm:p-4 lg:p-8",
-    container: "h-full mx-auto max-w-7xl pb-0",
+    main: "overflow-hidden p-2.5 sm:p-4 xl:p-5",
+    container: "h-full w-full max-w-none pb-0",
   },
   immersive: {
     main: "overflow-hidden p-0",
-    container: "h-full max-w-none pb-0",
+    container: "h-full w-full max-w-none pb-0",
   },
   selfPadded: {
     main: "overflow-y-auto p-0",
-    container: "h-full max-w-none pb-0",
+    container: "h-full w-full max-w-none pb-0",
   },
 };
 
 const ROUTE_SHELL_MAP = {
   "/admin-dashboard": "contained",
-  "/admin-analytics": "contained",
   "/admin-reports": "contained",
   "/staff-dashboard": "contained",
   "/admin-packages": "workspace",
   "/admin-users": "workspace",
-  "/admin-staff-list": "workspace",
   "/rooms-list": "immersive",
   "/all-bookings": "immersive",
   "/staff-bookings": "immersive",
@@ -107,11 +103,11 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/admin-dashboard" replace />} />
                   <Route path="/admin-dashboard" element={<Dashboard />} />
-                  <Route path="/admin-analytics" element={<Analytics />} />
+                  <Route path="/admin-analytics" element={<Navigate to="/admin-reports" replace />} />
                   <Route path="/rooms-list" element={<RoomsList />} />
                   <Route path="/all-bookings" element={<AllBookings />} />
                   <Route path="/admin-users" element={<Users />} />
-                  <Route path="/admin-staff-list" element={<StaffList />} />
+                  <Route path="/admin-staff-list" element={<Navigate to="/admin-users" replace />} />
                   <Route path="/admin-packages" element={<Packages />} />
                   <Route path="/admin-reviews" element={<AdminReviews />} />
                   <Route path="/admin-reports" element={<Report />} />

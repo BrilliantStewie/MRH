@@ -6,7 +6,7 @@ import { Ship, Sun, Feather, Cross } from 'lucide-react';
 const About = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 pt-10">
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">
         
         {/* --- HEADER SECTION --- */}
         <div className="text-center mb-16">
@@ -17,7 +17,7 @@ const About = () => {
         </div>
         
         {/* --- SECTION 1: THE SPLIT HERO --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-32 items-stretch">
+        <div className="mb-32 grid grid-cols-1 gap-6 lg:grid-cols-2 xl:gap-8 items-stretch">
           
           {/* Left Block: Image Container */}
           <div className="relative h-[500px] lg:h-auto rounded-[2.5rem] overflow-hidden shadow-2xl group bg-slate-200">
@@ -40,7 +40,7 @@ const About = () => {
           </div>
 
           {/* Right Block: Content Card */}
-          <div className="bg-white rounded-[2.5rem] p-10 md:p-16 flex flex-col justify-center border border-slate-100 shadow-sm">
+          <div className="flex flex-col justify-center rounded-[2.5rem] border border-slate-100 bg-white p-8 shadow-sm sm:p-10 md:p-12 xl:p-16">
             <div className="inline-flex items-center gap-2 mb-8 text-blue-600">
                 <Cross size={18} />
                 <span className="text-xs font-bold uppercase tracking-widest">Our Sacred Story</span>
@@ -63,33 +63,33 @@ const About = () => {
         </div>
 
         {/* --- SECTION 2: THE ATMOSPHERE --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
-          <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
-                <Sun size={24} strokeWidth={1.5} />
+        <div className="mb-20 grid grid-cols-1 gap-6 md:grid-cols-3 xl:gap-8">
+          <div className="group min-h-[360px] rounded-[2.25rem] border border-slate-100 bg-white p-10 transition-all hover:shadow-xl md:min-h-[390px] md:p-12">
+            <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-slate-50 text-slate-400 transition-all group-hover:bg-blue-600 group-hover:text-white">
+                <Sun size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Clarity</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
+            <h3 className="mb-4 text-base font-bold uppercase tracking-widest">Clarity</h3>
+            <p className="text-base leading-relaxed text-slate-500">
                 Spaces filled with natural light to illuminate your path toward spiritual renewal.
             </p>
           </div>
 
-          <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
-                <Feather size={24} strokeWidth={1.5} />
+          <div className="group min-h-[360px] rounded-[2.25rem] border border-slate-100 bg-white p-10 transition-all hover:shadow-xl md:min-h-[390px] md:p-12">
+            <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-slate-50 text-slate-400 transition-all group-hover:bg-blue-600 group-hover:text-white">
+                <Feather size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Softness</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
+            <h3 className="mb-4 text-base font-bold uppercase tracking-widest">Softness</h3>
+            <p className="text-base leading-relaxed text-slate-500">
                 An environment designed for quiet movements and gentle reflection.
             </p>
           </div>
 
-          <div className="p-10 bg-white rounded-[2rem] border border-slate-100 hover:shadow-xl transition-all group">
-            <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all mb-6">
-                <Ship size={24} strokeWidth={1.5} />
+          <div className="group min-h-[360px] rounded-[2.25rem] border border-slate-100 bg-white p-10 transition-all hover:shadow-xl md:min-h-[390px] md:p-12">
+            <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-[1.25rem] bg-slate-50 text-slate-400 transition-all group-hover:bg-blue-600 group-hover:text-white">
+                <Ship size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="font-bold text-sm uppercase tracking-widest mb-4">Anchor</h3>
-            <p className="text-slate-500 text-sm leading-relaxed">
+            <h3 className="mb-4 text-base font-bold uppercase tracking-widest">Anchor</h3>
+            <p className="text-base leading-relaxed text-slate-500">
                 A place to ground yourself and find stability amidst the storms of life.
             </p>
           </div>

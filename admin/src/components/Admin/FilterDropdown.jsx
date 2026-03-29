@@ -12,6 +12,7 @@ const FilterDropdown = ({
   showLabelPrefix = false,
   showMenuHeader = true,
   compact = false,
+  ultraCompact = false,
   disableTriggerShadow = false,
   flatTriggerDecorations = false,
   optionListClassName = "",
@@ -40,27 +41,47 @@ const FilterDropdown = ({
     neutralValue !== undefined ? neutralValue : options[0]?.value;
   const isActive = String(value) !== String(inactiveValue);
   const alignClass = align === "left" ? "left-0" : "right-0";
-  const dropdownTextClass = compact ? "text-[11px]" : "text-sm";
-  const triggerBaseClass = compact
-    ? "group flex h-[34px] items-center gap-2 rounded-xl border px-2.5 font-semibold transition-all duration-200"
-    : "group flex h-[52px] items-center gap-3 rounded-[22px] border px-4 font-semibold transition-all duration-200";
-  const iconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-8 w-8 rounded-xl";
-  const iconSize = compact ? 10 : 15;
-  const chevronWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
-  const chevronSize = compact ? 10 : 14;
-  const menuBaseClass = compact
-    ? "absolute top-full z-[120] mt-1.5 overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]"
+  const dropdownTextClass = ultraCompact
+    ? "text-[10px]"
+    : compact
+      ? "text-[11px]"
+      : "text-sm";
+  const triggerBaseClass = ultraCompact
+    ? "group flex h-8 items-center gap-1 rounded-[14px] border px-2 font-normal transition-all duration-200"
+    : compact
+    ? "group flex h-9 items-center gap-1.5 rounded-[16px] border px-2.5 font-normal transition-all duration-200"
+    : "group flex h-[52px] items-center gap-3 rounded-[22px] border px-4 font-normal transition-all duration-200";
+  const iconWrapClass = ultraCompact
+    ? "h-3.5 w-3.5 rounded-md"
+    : compact
+      ? "h-4 w-4 rounded-md"
+      : "h-8 w-8 rounded-xl";
+  const iconSize = ultraCompact ? 9 : compact ? 10 : 15;
+  const chevronWrapClass = ultraCompact ? "h-3.5 w-3.5" : compact ? "h-4 w-4" : "h-7 w-7";
+  const chevronSize = ultraCompact ? 9 : compact ? 10 : 14;
+  const menuBaseClass = ultraCompact
+    ? "absolute top-full z-[120] mt-1 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-1 shadow-[0_16px_32px_-28px_rgba(15,23,42,0.35)]"
+    : compact
+    ? "absolute top-full z-[120] mt-1.5 overflow-hidden rounded-[16px] border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.35)]"
     : "absolute top-full z-[120] mt-3 overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2 shadow-[0_28px_60px_-34px_rgba(15,23,42,0.32)]";
-  const menuHeaderClass = compact
+  const menuHeaderClass = ultraCompact
+    ? "mb-1 flex items-center gap-1.5 rounded-md px-1.5 py-1"
+    : compact
     ? "mb-1 flex items-center gap-2 rounded-lg px-2 py-1"
     : "mb-2 flex items-center gap-3 rounded-2xl px-3.5 py-2.5";
-  const optionListClass = compact ? "max-h-48 space-y-1 overflow-y-auto pr-1" : "max-h-64 space-y-1 overflow-y-auto pr-1";
-  const optionButtonClass = compact
-    ? "flex w-full items-center justify-between rounded-lg border px-2 py-1.5 text-left font-semibold transition-all"
-    : "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left font-semibold transition-all";
-  const optionIconWrapClass = compact ? "h-5 w-5 rounded-md" : "h-7 w-7 rounded-xl";
-  const optionCheckWrapClass = compact ? "h-5 w-5" : "h-7 w-7";
-  const optionCheckSize = compact ? 10 : 14;
+  const optionListClass = ultraCompact
+    ? "max-h-40 space-y-1 overflow-y-auto pr-1"
+    : compact
+      ? "max-h-44 space-y-1 overflow-y-auto pr-1"
+      : "max-h-64 space-y-1 overflow-y-auto pr-1";
+  const optionButtonClass = ultraCompact
+    ? "flex w-full items-center justify-between rounded-md border px-2 py-1.5 text-left font-normal transition-all"
+    : compact
+    ? "flex w-full items-center justify-between rounded-lg border px-2.5 py-2 text-left font-normal transition-all"
+    : "flex w-full items-center justify-between rounded-[18px] border px-4 py-3 text-left font-normal transition-all";
+  const optionIconWrapClass = ultraCompact ? "h-3.5 w-3.5 rounded-md" : compact ? "h-4 w-4 rounded-md" : "h-7 w-7 rounded-xl";
+  const optionCheckWrapClass = ultraCompact ? "h-3.5 w-3.5" : compact ? "h-4 w-4" : "h-7 w-7";
+  const optionCheckSize = ultraCompact ? 9 : compact ? 10 : 14;
   const triggerIconWrapClass = flatTriggerDecorations
     ? "shrink-0"
     : `shrink-0 ${iconWrapClass}`;
@@ -111,11 +132,11 @@ const FilterDropdown = ({
         )}
           <span className={`min-w-0 flex-1 truncate text-left ${dropdownTextClass}`}>
           {showLabelPrefix && (
-            <span className="mr-1 hidden font-medium text-slate-400 sm:inline">
+            <span className="mr-1 hidden font-normal text-slate-400 sm:inline">
               {label}:
             </span>
           )}
-          <span className="truncate font-black tracking-tight text-slate-800">
+          <span className="truncate font-normal tracking-tight text-slate-800">
             {selectedLabel}
           </span>
         </span>
@@ -146,19 +167,27 @@ const FilterDropdown = ({
               <div className={menuHeaderClass}>
                 {Icon && (
                   <span className="flex shrink-0 items-center justify-center text-slate-400">
-                    <Icon size={compact ? 12 : 16} />
+                    <Icon size={ultraCompact ? 10 : compact ? 11 : 16} />
                   </span>
                 )}
                 <div className="min-w-0">
-                  <p className="truncate text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  <p
+                    className={`truncate uppercase tracking-[0.18em] text-slate-400 ${
+                      ultraCompact
+                        ? "text-[8px] font-normal"
+                        : compact
+                          ? "text-[9px] font-normal"
+                          : "text-[10px] font-medium"
+                    }`}
+                  >
                     {label}
                   </p>
-                  <p className={`truncate font-black tracking-tight text-slate-700 ${dropdownTextClass}`}>
+                  <p className={`truncate font-normal tracking-tight text-slate-700 ${dropdownTextClass}`}>
                     {selectedLabel}
                   </p>
                 </div>
               </div>
-              <div className="mx-1 mb-2 h-px bg-slate-100" />
+              <div className={`${compact ? "mx-1 mb-1.5" : "mx-1 mb-2"} h-px bg-slate-100`} />
             </>
           )}
 
@@ -190,7 +219,7 @@ const FilterDropdown = ({
                             : "border-slate-200 bg-white text-slate-400"
                         }`}
                       >
-                        <OptionIcon size={compact ? 12 : 14} />
+                        <OptionIcon size={ultraCompact ? 10 : compact ? 12 : 14} />
                       </span>
                     )}
                     <span className="truncate">{option.label}</span>

@@ -37,7 +37,7 @@ const userId = req.userId;
   bookingItems: req.body.bookingItems || [],
   checkInDate: req.body.checkInDate || req.body.checkIn,
   checkOutDate: req.body.checkOutDate || req.body.checkOut,
-  venueParticipants: req.body.venueParticipants || 0,
+  participants: req.body.participants || 0,
   extraPackages: req.body.extraPackages || [],
  });
 
@@ -499,15 +499,15 @@ export const getCalendarAvailability = async (req, res) => {
 try {
   const bookings = await bookingModel.find(
     { status: { $in: ["pending", "approved"] } },
-    `${BOOKING_DATE_SELECT} bookingItems venueParticipants status paymentStatus`
+    `${BOOKING_DATE_SELECT} bookingItems participants status paymentStatus`
   );
 
   const availability = bookings.map((b) => {
     const roomGuests = (b.bookingItems || []).reduce(
-      (sum, item) => sum + Number(item.participants || 0),
+      (sum, item) => sum + Number(item.roomGuests || 0),
       0
     );
-    const venueGuests = Number(b.venueParticipants || 0);
+    const venueGuests = Number(b.participants || 0);
     return {
       checkInDate: getBookingCheckInDate(b),
       checkOutDate: getBookingCheckOutDate(b),

@@ -10,15 +10,31 @@ const REPORT_FIELDS = [
   "label",
   "periodMonth",
   "periodYear",
-  "periodStart",
-  "periodEnd",
   "bookingIds",
+  "periodEnd",
+  "periodStart",
   "totalBookings",
+  "totalIncome",
   "totalParticipants",
   "totalRoomsBooked",
-  "totalIncome",
 ];
 const REPORT_UPDATE_HOOKS = ["findOneAndUpdate", "updateOne"];
+const REPORT_OUTPUT_FIELDS = [
+  "_id",
+  "reportType",
+  "label",
+  "periodMonth",
+  "periodYear",
+  "bookingIds",
+  "periodEnd",
+  "periodStart",
+  "totalBookings",
+  "totalIncome",
+  "totalParticipants",
+  "totalRoomsBooked",
+  "createdAt",
+  "updatedAt",
+];
 
 const hasOwn = (value, key) =>
   Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
@@ -77,6 +93,24 @@ const pickReportState = (value = {}) =>
 
     return state;
   }, {});
+
+const buildOrderedReportOutput = (value = {}) => {
+  const orderedValue = {};
+
+  REPORT_OUTPUT_FIELDS.forEach((field) => {
+    if (hasOwn(value, field)) {
+      orderedValue[field] = value[field];
+    }
+  });
+
+  Object.keys(value).forEach((field) => {
+    if (!hasOwn(orderedValue, field)) {
+      orderedValue[field] = value[field];
+    }
+  });
+
+  return orderedValue;
+};
 
 const applyReportInvariants = (value = {}) => {
   const nextValue = { ...value };
@@ -369,14 +403,6 @@ const reportSchema = new mongoose.Schema(
       required: true,
       min: 2000,
     },
-    periodStart: {
-      type: Date,
-      required: true,
-    },
-    periodEnd: {
-      type: Date,
-      required: true,
-    },
     bookingIds: {
       type: [
         {
@@ -386,7 +412,21 @@ const reportSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    periodEnd: {
+      type: Date,
+      required: true,
+    },
+    periodStart: {
+      type: Date,
+      required: true,
+    },
     totalBookings: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+    totalIncome: {
       type: Number,
       required: true,
       default: 0,
@@ -404,16 +444,20 @@ const reportSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
-    totalIncome: {
-      type: Number,
-      required: true,
-      default: 0,
-      min: 0,
-    },
   },
   {
     collection: "reports",
     timestamps: true,
+    toJSON: {
+      transform(_doc, ret) {
+        return buildOrderedReportOutput(ret);
+      },
+    },
+    toObject: {
+      transform(_doc, ret) {
+        return buildOrderedReportOutput(ret);
+      },
+    },
     versionKey: false,
   }
 );

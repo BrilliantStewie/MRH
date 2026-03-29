@@ -134,6 +134,11 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
 
   const booking = toPlainObject(bookingDoc);
   const review = reviewDoc ? toPlainObject(reviewDoc) : null;
+  const {
+    bookingItems: rawBookingItems = [],
+    extraPackages: rawExtraPackages = [],
+    ...bookingRest
+  } = booking;
   const user = isPlainObject(booking.userId) ? serializeUser(booking.userId) : booking.userId;
   const checkInConfirmedBy = isPlainObject(booking.checkInConfirmedBy)
     ? serializeUser(booking.checkInConfirmedBy)
@@ -141,10 +146,10 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   const checkOutConfirmedBy = isPlainObject(booking.checkOutConfirmedBy)
     ? serializeUser(booking.checkOutConfirmedBy)
     : booking.checkOutConfirmedBy;
-  const extraPackages = (booking.extraPackages || []).map((pkg) =>
+  const extraPackages = (rawExtraPackages || []).map((pkg) =>
     isPlainObject(pkg) ? serializePackage(pkg) : pkg
   );
-  const bookingItems = (booking.bookingItems || []).map((item) => {
+  const bookingItems = (rawBookingItems || []).map((item) => {
     const roomValue = item.roomId || null;
     const packageValue = item.packageId || null;
     const serializedRoom = isPlainObject(roomValue) ? serializeRoom(roomValue) : roomValue;
@@ -156,6 +161,7 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
       ...item,
       roomId: serializedRoom,
       packageId: serializedPackage,
+      roomGuests: Number(item?.roomGuests || 0),
     };
   });
 
@@ -171,10 +177,11 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   const checkOutDate = getBookingCheckOutDate(booking);
 
   return {
-    ...booking,
+    ...bookingRest,
     userId: user,
     bookingItems,
     extraPackages,
+    participants: Number(booking.participants || 0),
     checkIn,
     checkInConfirmedAt: booking.checkInConfirmedAt || null,
     checkInConfirmedBy,

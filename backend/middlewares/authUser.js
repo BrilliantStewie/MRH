@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import { resolveUserDisableState } from "../utils/accountStatus.js";
 import {
   getDecodedSessionVersion,
   getSessionVersion,
@@ -30,22 +31,19 @@ const authUser = async (req, res, next) => {
       });
     }
 
+    const accountStatus = await resolveUserDisableState(user);
+    if (accountStatus.isDisabled) {
+      return res.status(403).json({
+        success: false,
+        isAccountDisabled: true,
+        message: accountStatus.message,
+      });
+    }
+
     if (getSessionVersion(user) !== getDecodedSessionVersion(decoded)) {
       return res.status(401).json({
         success: false,
         message: "Session expired due to security changes. Please login again."
-      });
-    }
-
-    /* ===============================
-       CHECK IF ACCOUNT IS DISABLED
-    =============================== */
-
-    if (user.disabled) {
-      return res.status(403).json({
-        success: false,
-        isAccountDisabled: true,
-        message: "Your account has been disabled. Please contact administration."
       });
     }
 

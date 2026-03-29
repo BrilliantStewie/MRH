@@ -27,7 +27,6 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import EmptyReviewsState from "../../components/EmptyReviewsState";
-import FilterDropdown from "../../components/Admin/FilterDropdown";
 import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
@@ -139,7 +138,7 @@ const AdminReviews = () => {
       }
     } catch (err) {
       console.error("Error fetching reviews:", err);
-      toast.error("Failed to load reviews");
+      toast.error("Failed to load feedback");
     } finally {
       setIsLoading(false);
     }
@@ -430,19 +429,6 @@ const AdminReviews = () => {
   };
 
   const ratingBuckets = [5, 4, 3, 2, 1];
-  const ratingFilterOptions = [
-    { value: "all", label: "All Ratings", icon: Star },
-    ...ratingBuckets.map((rating) => ({
-      value: String(rating),
-      label: `${rating} Star${rating === 1 ? "" : "s"}`,
-      icon: Star,
-    })),
-  ];
-  const visibilityFilterOptions = [
-    { value: "all", label: "All Reviews", icon: Eye },
-    { value: "visible", label: "Shown Reviews", icon: Eye },
-    { value: "hidden", label: "Hidden Reviews", icon: EyeOff },
-  ];
   const ratingCounts = ratingBuckets.reduce((acc, rating) => {
     acc[rating] = visibilityFilteredReviews.filter((review) => Number(review.rating || 0) === rating).length;
     return acc;
@@ -455,7 +441,7 @@ const AdminReviews = () => {
   const hasNoReviews = !isLoading && reviews.length === 0;
 
   return (
-    <div className="reviews-page w-full min-h-full text-slate-800 relative">
+    <div className="reviews-page relative min-h-full w-full px-3 pt-3 pb-6 text-slate-800 sm:px-4 sm:pt-4 xl:px-5">
       <div className="pointer-events-none absolute inset-0 -z-10"></div>
       <style>{`
         .reviews-page {
@@ -490,44 +476,85 @@ const AdminReviews = () => {
         }
       `}</style>
 
-      <div className="mx-auto w-full max-w-none pt-0 pb-0">
+      <div className="w-full pt-0 pb-0">
        
-      <div className="mb-5 w-full max-w-[1200px] mx-0 sm:mb-10">
-        <div className="flex w-full max-w-[1200px] flex-col gap-4 pb-0">
+      <div className="mb-5 w-full sm:mb-8">
+        <div className="flex w-full flex-col gap-4 pb-0">
           <div className="min-w-0">
-            <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-3xl">Guest Reviews</h1>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900 sm:mt-2 sm:text-3xl">Feedback</h1>
             <p className="text-slate-500 mt-2 max-w-2xl">
               Manage feedback and staff responses.
             </p>
-            <div className="mt-5 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center">
-              <FilterDropdown
-                label="Rating"
-                options={ratingFilterOptions}
-                value={ratingFilter}
-                onChange={setRatingFilter}
-                icon={Star}
-                neutralValue="all"
-                align="left"
-                triggerClassName="w-full sm:w-[230px]"
-                menuClassName="w-full sm:w-[260px]"
-              />
-              <FilterDropdown
-                label="Visibility"
-                options={visibilityFilterOptions}
-                value={visibilityFilter}
-                onChange={setVisibilityFilter}
-                icon={Eye}
-                neutralValue="all"
-                align="left"
-                triggerClassName="w-full sm:w-[230px]"
-                menuClassName="w-full sm:w-[260px]"
-              />
+            <div className="mt-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Rating
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRatingFilter("all")}
+                  className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    ratingFilter === "all"
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  All
+                </button>
+                {ratingBuckets.map((rating) => (
+                  <button
+                    key={`admin-rating-filter-${rating}`}
+                    type="button"
+                    onClick={() => setRatingFilter(String(rating))}
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                      ratingFilter === String(rating)
+                        ? "bg-slate-900 text-white"
+                        : "border border-amber-200 bg-white text-amber-700 hover:bg-amber-50"
+                    }`}
+                  >
+                    <Star size={11} fill="currentColor" className="text-amber-400" />
+                    {rating}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Visibility
+                </span>
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+                  {[
+                    { value: "all", label: "All", icon: Eye },
+                    { value: "visible", label: "Shown", icon: Eye },
+                    { value: "hidden", label: "Hidden", icon: EyeOff },
+                  ].map((option) => {
+                    const Icon = option.icon;
+                    const isActive = visibilityFilter === option.value;
+
+                    return (
+                      <button
+                        key={`admin-visibility-filter-${option.value}`}
+                        type="button"
+                        onClick={() => setVisibilityFilter(option.value)}
+                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                          isActive
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <Icon size={11} />
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className={`w-full max-w-[1200px] mx-0 ${hasNoReviews ? "flex justify-center" : "grid gap-4 sm:gap-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start"}`}>
+      <div className={`w-full ${hasNoReviews ? "flex justify-center" : "grid gap-4 sm:gap-6 xl:grid-cols-[280px_minmax(0,1fr)] xl:items-start"}`}>
         {!hasNoReviews && (
           <aside className="h-fit">
             <div className="w-full rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -538,7 +565,7 @@ const AdminReviews = () => {
                   <Star size={12} className="text-amber-400" fill="currentColor" />
                   <span className="text-[14px] font-bold text-slate-900">{averageRating}</span>
                 </div>
-                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} reviews</p>
+                <p className="text-[9px] text-slate-400 mt-1">{totalReviews} feedback entries</p>
               </div>
               <div className="space-y-2">
                 {ratingBuckets.map((rating) => (
@@ -561,7 +588,7 @@ const AdminReviews = () => {
           </aside>
         )}
 
-        <div className={`flex w-full flex-col items-start space-y-5 sm:space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "pl-0 xl:pl-4"}`}>
+        <div className={`flex w-full flex-col items-start space-y-5 sm:space-y-6 ${hasNoReviews ? "max-w-none pl-0" : "max-w-[900px] pl-0 xl:pl-4"}`}>
         {isLoading ? (
           <div className="text-center py-20 text-slate-400 animate-pulse font-medium">Loading feedback...</div>
         ) : visibleReviews.length === 0 ? (
@@ -573,10 +600,10 @@ const AdminReviews = () => {
             <div className="flex min-h-[220px] w-full items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center">
               <div>
                 <p className="text-sm font-semibold text-slate-700">
-                  No matching reviews found.
+                  No matching feedback found.
                 </p>
                 <p className="mt-2 text-sm text-slate-500">
-                  Change the visibility or star filters to view other reviews.
+                  Change the visibility or star filters to view other feedback.
                 </p>
               </div>
             </div>
@@ -595,7 +622,7 @@ const AdminReviews = () => {
               <div
                 id={`review-${review._id}`}
                 key={review._id}
-                className={`group review-card rounded-2xl border min-h-[180px] max-w-none w-full sm:max-w-[700px] ${review.isHidden ? "bg-slate-50 border-slate-300 opacity-90" : "bg-white border-slate-200"} ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
+                className={`group review-card w-full max-w-none min-h-[180px] rounded-2xl border ${review.isHidden ? "bg-slate-50 border-slate-300 opacity-90" : "bg-white border-slate-200"} ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}
               >
                   <div className="p-4 sm:pl-5">
                   
@@ -1110,7 +1137,7 @@ const AdminReviews = () => {
                 onClick={() => setVisibleReviewCount((prev) => Math.min(prev + REVIEW_PAGE_SIZE, visibleReviews.length))}
                 className="bg-white border border-slate-200 px-5 py-2 rounded-full text-[11px] font-bold text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
               >
-                Show more reviews
+                Show more feedback
               </button>
             </div>
           )}

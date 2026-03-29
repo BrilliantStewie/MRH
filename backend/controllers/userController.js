@@ -9,6 +9,7 @@ import cloudinary from "../config/cloudinary.js";
 import { admin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
 import sendEmail from "../utils/sendEmail.js";
 import sendSMS from "../utils/sendSMS.js";
+import { resolveUserDisableState } from "../utils/accountStatus.js";
 import {
     createOrRefreshNotification,
     createOrRefreshNotifications,
@@ -552,8 +553,9 @@ const googleAuth = async (req, res) => {
         let user = await userModel.findOne({ email });
 
         if (user) {
-            if (user.disabled) {
-                return res.json({ success: false, message: "Account disabled. Contact admin." });
+            const accountStatus = await resolveUserDisableState(user);
+            if (accountStatus.isDisabled) {
+                return res.json({ success: false, message: accountStatus.message });
             }
             if (normalizedIntent === "signup") {
                 if (user.authProvider === "google") {
@@ -770,7 +772,8 @@ const loginUser = async (req, res) => {
         const user = await userModel.findOne(query);
 
         if (!user) return res.json({ success: false, message: "User does not exist" });
-        if (user.disabled) return res.json({ success: false, message: "Account disabled. Contact admin." });
+        const accountStatus = await resolveUserDisableState(user);
+        if (accountStatus.isDisabled) return res.json({ success: false, message: accountStatus.message });
         if (!hasVerifiedEmail(user)) return res.json({ success: false, message: "Please verify your email first." });
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -1033,10 +1036,10 @@ const createBooking = async (req, res) => {
             bookingItems: roomId && packageId ? [{
                 roomId,
                 packageId,
-                participants: Number(participants) || 1
+                roomGuests: Number(participants) || 1
             }] : [],
             extraPackages: [],
-            venueParticipants: 0,
+            participants: 0,
             checkInDate: checkInDate || checkIn,
             checkOutDate: checkOutDate || checkOut
         });
@@ -1532,7 +1535,7 @@ const getAllPublicReviews = async (req, res) => {
             })
             .populate({
                 path: "bookingId",
-                select: `${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages venueParticipants totalPrice status paymentStatus`,
+                select: `${BOOKING_DATE_SELECT} bookingName bookingItems extraPackages participants totalPrice status paymentStatus`,
                 populate: [
                     {
                         path: "bookingItems.roomId",

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import { randomUUID } from "crypto";
 import bookingModel from "../models/bookingModel.js";
 import packageModel from "../models/packageModel.js";
 import roomModel from "../models/roomModel.js";
@@ -22,6 +22,7 @@ const DAILY_BOOKING_LIMIT_MESSAGE = `Only ${MAX_ACTIVE_BOOKINGS_PER_DAY} booking
 
 const toObjectIdString = (value) => String(value || "").trim();
 const buildDateKey = (date) => normalizeDate(date).getTime();
+const roomBookingLocks = new Map();
 
 const listDatesInRange = (start, end) => {
   const dates = [];
@@ -43,7 +44,7 @@ const buildNormalizedBookingItems = (bookingItems = []) =>
         ...item,
         roomId: item.roomId,
         packageId: item.packageId,
-        participants: Number(item.participants || 0),
+        roomGuests: Number(item.roomGuests || 0),
       }))
     : [];
 
@@ -51,65 +52,63 @@ const buildUniqueIdList = (values = []) => [
   ...new Set(values.map((value) => toObjectIdString(value)).filter(Boolean)),
 ];
 
-const acquireRoomBookingLocks = async (roomIds, lockToken) => {
+const clearExpiredRoomBookingLocks = (now = new Date()) => {
+  for (const [roomId, lock] of roomBookingLocks.entries()) {
+    if (!lock || lock.expiresAt < now) {
+      roomBookingLocks.delete(roomId);
+    }
+  }
+};
+
+const acquireRoomBookingLocks = (roomIds, lockToken) => {
   if (!roomIds.length) return [];
 
   const now = new Date();
   const lockExpiresAt = new Date(now.getTime() + ROOM_LOCK_WINDOW_MS);
   const acquiredRoomIds = [];
 
+  clearExpiredRoomBookingLocks(now);
+
   for (const roomId of [...roomIds].sort()) {
-    const result = await roomModel.updateOne(
-      {
-        _id: roomId,
-        $or: [
-          { bookingLockToken: null },
-          { bookingLockToken: { $exists: false } },
-          { bookingLockExpiresAt: null },
-          { bookingLockExpiresAt: { $exists: false } },
-          { bookingLockExpiresAt: { $lt: now } },
-          { bookingLockToken: lockToken },
-        ],
-      },
-      {
-        $set: {
-          bookingLockToken: lockToken,
-          bookingLockExpiresAt: lockExpiresAt,
-        },
-      }
-    );
+    const roomKey = toObjectIdString(roomId);
+    const existingLock = roomBookingLocks.get(roomKey);
 
-    if (result.modifiedCount !== 1) {
+    if (
+      existingLock &&
+      existingLock.token !== lockToken &&
+      existingLock.expiresAt >= now
+    ) {
       if (acquiredRoomIds.length) {
-        await releaseRoomBookingLocks(acquiredRoomIds, lockToken);
+        releaseRoomBookingLocks(acquiredRoomIds, lockToken);
       }
-
       throw new Error(
         "One or more selected rooms are currently being reserved. Please try again."
       );
     }
 
-    acquiredRoomIds.push(roomId);
+    roomBookingLocks.set(roomKey, {
+      token: lockToken,
+      expiresAt: lockExpiresAt,
+    });
+    acquiredRoomIds.push(roomKey);
   }
 
   return acquiredRoomIds;
 };
 
-const releaseRoomBookingLocks = async (roomIds, lockToken) => {
+const releaseRoomBookingLocks = (roomIds, lockToken) => {
   if (!roomIds.length) return;
 
-  await roomModel.updateMany(
-    {
-      _id: { $in: roomIds },
-      bookingLockToken: lockToken,
-    },
-    {
-      $unset: {
-        bookingLockToken: 1,
-        bookingLockExpiresAt: 1,
-      },
+  clearExpiredRoomBookingLocks();
+
+  for (const roomId of roomIds) {
+    const roomKey = toObjectIdString(roomId);
+    const existingLock = roomBookingLocks.get(roomKey);
+
+    if (existingLock?.token === lockToken) {
+      roomBookingLocks.delete(roomKey);
     }
-  );
+  }
 };
 
 const findActiveBookingsForRange = async (start, end) => {
@@ -185,13 +184,14 @@ const createValidatedBooking = async ({
   bookingItems = [],
   checkInDate,
   checkOutDate,
-  venueParticipants = 0,
+  participants = 0,
   extraPackages = [],
 }) => {
   const normalizedBookingItems = buildNormalizedBookingItems(bookingItems);
+  const normalizedParticipants = Number(participants || 0);
 
-  if (!normalizedBookingItems.length && Number(venueParticipants) <= 0) {
-    throw new Error("Please add room selection or venue participants");
+  if (!normalizedBookingItems.length && normalizedParticipants <= 0) {
+    throw new Error("Please add room selection or participants");
   }
 
   const uniqueRooms = buildUniqueIdList(
@@ -240,9 +240,9 @@ const createValidatedBooking = async ({
   const packageById = new Map(packageDocs.map((pkg) => [String(pkg._id), pkg]));
 
   for (const item of normalizedBookingItems) {
-    if (!item.roomId || !item.packageId || !item.participants) {
+    if (!item.roomId || !item.packageId || !item.roomGuests) {
       throw new Error(
-        "Each room selection must include a room, package, and participants"
+        "Each room selection must include a room, package, and room guests"
       );
     }
 
@@ -261,8 +261,8 @@ const createValidatedBooking = async ({
       throw new Error("Selected package does not match the room type");
     }
 
-    if (Number(item.participants) > Number(room.capacity || 0)) {
-      throw new Error("Selected participants exceed the room capacity");
+    if (Number(item.roomGuests) > Number(room.capacity || 0)) {
+      throw new Error("Selected room guests exceed the room capacity");
     }
   }
 
@@ -308,7 +308,7 @@ const createValidatedBooking = async ({
 
   await ensureDailyBookingCapacity(start, end);
 
-  const lockToken = new mongoose.Types.ObjectId().toString();
+  const lockToken = randomUUID();
   const lockedRoomIds = await acquireRoomBookingLocks(uniqueRooms, lockToken);
 
   try {
@@ -329,7 +329,7 @@ const createValidatedBooking = async ({
         throw new Error("Invalid package selected");
       }
 
-      const subtotal = Number(pkg.price || 0) * Number(item.participants || 0) * days;
+      const subtotal = Number(pkg.price || 0) * Number(item.roomGuests || 0) * days;
       item.subtotal = subtotal;
       totalPrice += subtotal;
     }
@@ -337,10 +337,10 @@ const createValidatedBooking = async ({
     if (extraPackageDocs.length) {
       const participantsForExtras = normalizedBookingItems.length
         ? normalizedBookingItems.reduce(
-            (sum, item) => sum + Number(item.participants || 0),
+            (sum, item) => sum + Number(item.roomGuests || 0),
             0
           )
-        : Number(venueParticipants) || 0;
+        : normalizedParticipants;
 
       for (const pkg of extraPackageDocs) {
         totalPrice += Number(pkg.price || 0) * participantsForExtras * days;
@@ -352,7 +352,7 @@ const createValidatedBooking = async ({
       bookingName: String(bookingName || "").trim() || "Reservation",
       bookingItems: normalizedBookingItems,
       extraPackages: uniqueExtraPackages,
-      venueParticipants: Number(venueParticipants) || 0,
+      participants: normalizedParticipants,
       checkInDate: start,
       checkOutDate: end,
       checkIn: false,

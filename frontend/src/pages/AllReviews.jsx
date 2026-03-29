@@ -452,7 +452,13 @@ const AllReviews = () => {
     return formatDateRangePHT(start, end) || "Dates not available";
   };
   const resolveReviewImage = (imagePath) => {
-    if (!imagePath || typeof imagePath !== "string") return "";
+    if (!imagePath) return "";
+    if (typeof imagePath === "object") {
+      if (typeof imagePath.preview === "string") return imagePath.preview;
+      if (typeof imagePath.url === "string") return imagePath.url;
+      return "";
+    }
+    if (typeof imagePath !== "string") return "";
     if (imagePath.startsWith("http")) return imagePath;
     return `${backendUrl}/${imagePath.replace(/\\/g, "/")}`;
   };
@@ -498,6 +504,7 @@ const AllReviews = () => {
   const hasNoReviews = !isLoading && reviews.length === 0;
   const totalEditImages = editReviewImages.length + editReviewNewImages.length;
   const remainingEditSlots = MAX_REVIEW_IMAGES - totalEditImages;
+  const editReviewPreviewImages = [...editReviewImages, ...editReviewNewImages];
 
 
   return (
@@ -656,11 +663,17 @@ const AllReviews = () => {
               
               // Identify if the logged-in user owns this main review
               const reviewOwnerId = String(review.userId?._id || review.userId || "");
-              const isMyReview = Boolean(reviewOwnerId) && String(loggedInUserId || "") === reviewOwnerId;
-              const canReply = isMyReview || userData?.role === "admin" || userData?.role === "staff";
+              const isMyReview =
+                typeof review.viewerOwnsReview === "boolean"
+                  ? review.viewerOwnsReview
+                  : Boolean(reviewOwnerId) && String(loggedInUserId || "") === reviewOwnerId;
+              const canReply =
+                typeof review.viewerCanReply === "boolean"
+                  ? review.viewerCanReply
+                  : isMyReview || userData?.role === "admin" || userData?.role === "staff";
 
               return (
-              <div id={`review-${review._id}`} key={review._id} className={`group review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}>
+              <div id={`review-${review._id}`} key={review._id} className={`group/review-card review-card bg-white rounded-2xl border border-slate-200 min-h-[180px] max-w-[700px] w-full ${flashTargetId === `review-${review._id}` ? "flash-highlight" : ""}`}>
                   <div className="p-4 pl-5">
                     
                     {/* --- MAIN REVIEW HEADER --- */}
@@ -724,7 +737,7 @@ const AllReviews = () => {
 
                         {/* OWNERSHIP ACTIONS FOR MAIN REVIEW */}
                         {isMyReview && (
-                          <div className="mt-3 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <div className="mt-3 flex justify-end overflow-hidden transition-all duration-200 sm:max-h-0 sm:translate-y-1 sm:opacity-0 sm:pointer-events-none sm:group-hover/review-card:max-h-12 sm:group-hover/review-card:translate-y-0 sm:group-hover/review-card:opacity-100 sm:group-hover/review-card:pointer-events-auto sm:group-focus-within/review-card:max-h-12 sm:group-focus-within/review-card:translate-y-0 sm:group-focus-within/review-card:opacity-100 sm:group-focus-within/review-card:pointer-events-auto">
                             <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md border border-slate-200 rounded-lg p-1 shadow-sm">
                               <button onClick={() => { 
                                 clearEditReviewNewImages();
@@ -806,21 +819,31 @@ const AllReviews = () => {
                               <span>{Math.max(0, totalEditImages)}/{MAX_REVIEW_IMAGES}</span>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-2">
-                              {editReviewImages.map((image) => {
+                              {editReviewImages.map((image, index) => {
                                 const resolvedImage = resolveReviewImage(image);
                                 if (!resolvedImage) return null;
                                 return (
-                                  <div key={image} className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
-                                    <img
-                                      src={resolvedImage}
-                                      alt="Review"
-                                      className="h-full w-full object-cover"
-                                      loading="lazy"
-                                    />
+                                  <div key={image} className="relative group h-12 w-12">
                                     <button
                                       type="button"
-                                      onClick={() => handleRemoveEditReviewImage(image)}
-                                      className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
+                                      onClick={() => openLightbox(editReviewPreviewImages, index)}
+                                      className="h-full w-full overflow-hidden rounded-lg border border-slate-100 bg-slate-50"
+                                      title="View image"
+                                    >
+                                      <img
+                                        src={resolvedImage}
+                                        alt="Review"
+                                        className="h-full w-full object-cover"
+                                        loading="lazy"
+                                      />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleRemoveEditReviewImage(image);
+                                      }}
+                                      className="absolute top-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white shadow-sm opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                                       title="Remove image"
                                     >
                                       <X size={10} />
@@ -828,17 +851,27 @@ const AllReviews = () => {
                                   </div>
                                 );
                               })}
-                              {editReviewNewImages.map((image) => (
-                                <div key={image.id} className="relative h-12 w-12 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
-                                  <img
-                                    src={image.preview}
-                                    alt="New upload"
-                                    className="h-full w-full object-cover"
-                                  />
+                              {editReviewNewImages.map((image, index) => (
+                                <div key={image.id} className="relative group h-12 w-12">
                                   <button
                                     type="button"
-                                    onClick={() => handleRemoveEditReviewNewImage(image.id)}
-                                    className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-500 flex items-center justify-center shadow-sm"
+                                    onClick={() => openLightbox(editReviewPreviewImages, editReviewImages.length + index)}
+                                    className="h-full w-full overflow-hidden rounded-lg border border-slate-100 bg-slate-50"
+                                    title="View image"
+                                  >
+                                    <img
+                                      src={image.preview}
+                                      alt="New upload"
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleRemoveEditReviewNewImage(image.id);
+                                    }}
+                                    className="absolute top-1 right-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white shadow-sm opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
                                     title="Remove image"
                                   >
                                     <X size={10} />
@@ -929,18 +962,63 @@ const AllReviews = () => {
                    
 
 
+                    {canReply && (
+                      <div className="mb-4 flex flex-col items-start gap-3">
+                        {activeReplyId !== review._id && (
+                          <button
+                            onClick={() => setActiveReplyId(review._id)}
+                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <Reply size={14} /> Reply
+                          </button>
+                        )}
+                        {activeReplyId === review._id && (
+                          <div className="w-full animate-in fade-in duration-200">
+                            <textarea
+                              className="w-full rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm focus:border-blue-500 focus:outline-none resize-none"
+                              rows="2"
+                              placeholder="Write a reply..."
+                              value={replyText[review._id] || ""}
+                              onChange={(e) => setReplyText({ ...replyText, [review._id]: e.target.value })}
+                              autoFocus
+                            />
+                            <div className="mt-3 flex justify-end gap-3">
+                              <button
+                                onClick={() => setActiveReplyId(null)}
+                                className="px-4 py-2 text-xs font-bold text-slate-500 transition-colors hover:text-slate-800"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={() => handleSendReply(review._id)}
+                                className="flex items-center gap-2 rounded-lg bg-slate-900 px-6 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-slate-800"
+                              >
+                                <Send size={12} /> Send
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* --- REPLIES THREAD --- */}
                     {parentChats.length > 0 && (
                       <div className="mb-2 space-y-4">
                         {(isThreadExpanded ? parentChats : []).map((parentChat) => {
-                          const childReplies = review.reviewChat.filter(child => child.parentReplyId === parentChat._id);
+                          const childReplies = review.reviewChat.filter(
+                            (child) => String(child.parentReplyId || "") === String(parentChat._id)
+                          );
                           const isExpanded = expandedReplies[parentChat._id];
                           const parentMessage = parentChat.message || "";
                           const isParentMessageExpanded = !!expandedReplyMessages[parentChat._id];
                           const shouldTruncateParentMessage = parentMessage.length > 300;
                           
-                          const replyOwnerId = parentChat.senderId?._id || parentChat.senderId;
-                          const isMyReply = replyOwnerId === loggedInUserId && parentChat.senderRole === "guest";
+                          const replyOwnerId = String(parentChat.senderId?._id || parentChat.senderId || "");
+                          const isMyReply =
+                            typeof parentChat.viewerOwnsReply === "boolean"
+                              ? parentChat.viewerOwnsReply && parentChat.senderRole === "guest"
+                              : replyOwnerId === String(loggedInUserId || "") &&
+                                parentChat.senderRole === "guest";
 
                           return (
                             <div key={parentChat._id} className="space-y-3">
@@ -1000,8 +1078,8 @@ const AllReviews = () => {
                                       </button>
                                     )}
                                     {isMyReply && (
-                                      <div className="mt-1 flex justify-end">
-                                        <div className="opacity-0 group-hover/reply:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm pointer-events-none group-hover/reply:pointer-events-auto">
+                                      <div className="mt-1 flex justify-end overflow-hidden transition-all duration-200 sm:max-h-0 sm:translate-y-1 sm:opacity-0 sm:pointer-events-none sm:group-hover/reply:max-h-12 sm:group-hover/reply:translate-y-0 sm:group-hover/reply:opacity-100 sm:group-hover/reply:pointer-events-auto sm:group-focus-within/reply:max-h-12 sm:group-focus-within/reply:translate-y-0 sm:group-focus-within/reply:opacity-100 sm:group-focus-within/reply:pointer-events-auto">
+                                        <div className="transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm">
                                           <button onClick={() => { setEditingReplyId(parentChat._id); setEditReplyText(parentChat.message); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Reply"><Pencil size={12} /></button>
                                           <div className="w-px h-3 bg-slate-200"></div>
                                           <button onClick={() => setItemToDelete({ type: 'reply', id: parentChat._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Reply"><Trash2 size={12} /></button>
@@ -1029,7 +1107,7 @@ const AllReviews = () => {
                                 )}
 
                                 <div className="mt-2 flex justify-start items-center">
-                                  {canReply && (!activeReplyId !== parentChat._id) && (
+                                  {canReply && activeReplyId !== parentChat._id && (
   <button
     onClick={() => {
       setActiveReplyId(parentChat._id);
@@ -1052,8 +1130,12 @@ const AllReviews = () => {
                               {isExpanded && childReplies.length > 0 && (
                                 <div className="ml-12 space-y-3 border-l-2 border-slate-100 pl-4 mt-2">
                                   {childReplies.map((childChat) => {
-                                    const childOwnerId = childChat.senderId?._id || childChat.senderId;
-                                    const isMyChildReply = childOwnerId === loggedInUserId && childChat.senderRole === "guest";
+                                    const childOwnerId = String(childChat.senderId?._id || childChat.senderId || "");
+                                    const isMyChildReply =
+                                      typeof childChat.viewerOwnsReply === "boolean"
+                                        ? childChat.viewerOwnsReply && childChat.senderRole === "guest"
+                                        : childOwnerId === String(loggedInUserId || "") &&
+                                          childChat.senderRole === "guest";
                                     const childMessage = childChat.message || "";
                                     const isChildMessageExpanded = !!expandedReplyMessages[childChat._id];
                                     const shouldTruncateChildMessage = childMessage.length > 300;
@@ -1114,8 +1196,8 @@ const AllReviews = () => {
                                               </button>
                                             )}
                                             {isMyChildReply && (
-                                              <div className="mt-1 flex justify-end">
-                                                <div className="opacity-0 group-hover/child:opacity-100 transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm pointer-events-none group-hover/child:pointer-events-auto">
+                                              <div className="mt-1 flex justify-end overflow-hidden transition-all duration-200 sm:max-h-0 sm:translate-y-1 sm:opacity-0 sm:pointer-events-none sm:group-hover/child:max-h-12 sm:group-hover/child:translate-y-0 sm:group-hover/child:opacity-100 sm:group-hover/child:pointer-events-auto sm:group-focus-within/child:max-h-12 sm:group-focus-within/child:translate-y-0 sm:group-focus-within/child:opacity-100 sm:group-focus-within/child:pointer-events-auto">
+                                                <div className="transition-opacity duration-200 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg p-1 shadow-sm">
                                                   <button onClick={() => { setEditingReplyId(childChat._id); setEditReplyText(childChat.message); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Reply"><Pencil size={12} /></button>
                                                   <div className="w-px h-3 bg-slate-200"></div>
                                                   <button onClick={() => setItemToDelete({ type: 'reply', id: childChat._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Reply"><Trash2 size={12} /></button>
@@ -1143,7 +1225,7 @@ const AllReviews = () => {
                                         )}
 
                                         <div className="mt-1 flex justify-start items-center">
-                                          {canReply && (!activeReplyId !== parentChat._id) && (
+                                          {canReply && activeReplyId !== parentChat._id && (
                                             <button onClick={() => { setActiveReplyId(parentChat._id); setExpandedReplies(prev => ({ ...prev, [parentChat._id]: true })); }} className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest px-2 py-1 rounded-md -ml-2 transition-colors hover:bg-blue-50">
                                               <Reply size={14} /> Reply
                                             </button>

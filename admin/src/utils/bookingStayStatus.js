@@ -1,3 +1,6 @@
+import { getBookingCheckInDateValue } from "./bookingDateFields";
+import { getPHDateValue } from "./dateTime";
+
 const STAY_STATUS_META = {
   notReady: {
     label: "Not Ready",
@@ -7,7 +10,7 @@ const STAY_STATUS_META = {
   awaitingCheckIn: {
     label: "Awaiting Check-In",
     className: "bg-amber-50 text-amber-700 border-amber-100",
-    description: "Waiting for on-site arrival confirmation.",
+    description: "",
   },
   checkedIn: {
     label: "Checked In",
@@ -24,6 +27,12 @@ const STAY_STATUS_META = {
     className: "bg-rose-50 text-rose-700 border-rose-100",
     description: "Guest did not arrive for the booking.",
   },
+};
+
+const PAYMENT_PENDING_META = {
+  label: "Payment Pending",
+  className: "bg-amber-50 text-amber-700 border-amber-100",
+  description: "",
 };
 
 const normalizeToken = (value) =>
@@ -85,9 +94,25 @@ const getBookingStayFlags = (booking = {}) => {
   return { checkIn, checkOut, noShow };
 };
 
+const hasReachedCheckInDate = (booking = {}) => {
+  const checkInDateValue = getPHDateValue(getBookingCheckInDateValue(booking));
+  if (!checkInDateValue) return false;
+
+  const todayValue = getPHDateValue(new Date());
+  return Boolean(todayValue) && todayValue >= checkInDateValue;
+};
+
+const isPaymentConfirmed = (booking = {}) =>
+  String(booking?.paymentStatus || "").trim().toLowerCase() === "paid" ||
+  booking?.payment === true;
+
 export const getBookingStayStatus = (booking = {}) => {
   if (booking?.stayStatus) {
-    return normalizeStayStatus(booking.stayStatus);
+    const normalizedStayStatus = normalizeStayStatus(booking.stayStatus);
+    if (normalizedStayStatus === "awaitingCheckIn" && !hasReachedCheckInDate(booking)) {
+      return "notReady";
+    }
+    return normalizedStayStatus;
   }
 
   const bookingStatus = String(booking?.status || "").trim().toLowerCase();
@@ -96,12 +121,21 @@ export const getBookingStayStatus = (booking = {}) => {
   if (noShow) return "noShow";
   if (checkOut) return "checkedOut";
   if (checkIn) return "checkedIn";
-  if (bookingStatus === "approved") return "awaitingCheckIn";
+  if (bookingStatus === "approved" && hasReachedCheckInDate(booking)) {
+    return "awaitingCheckIn";
+  }
   return "notReady";
 };
 
-export const getStayStatusMeta = (booking = {}) =>
-  STAY_STATUS_META[getBookingStayStatus(booking)] || STAY_STATUS_META.notReady;
+export const getStayStatusMeta = (booking = {}) => {
+  const stayStatus = getBookingStayStatus(booking);
+
+  if (stayStatus === "awaitingCheckIn" && !isPaymentConfirmed(booking)) {
+    return PAYMENT_PENDING_META;
+  }
+
+  return STAY_STATUS_META[stayStatus] || STAY_STATUS_META.notReady;
+};
 
 export const getStayStatusDescription = (booking = {}) => {
   const stayStatus = getBookingStayStatus(booking);
@@ -116,21 +150,11 @@ export const getStayStatusDescription = (booking = {}) => {
   }
 
   if (stayStatus === "checkedOut") {
-    const actorName = buildActorName(booking.checkOutConfirmedBy);
-    const timestamp = formatDateTimePHT(booking.checkOutConfirmedAt);
-    if (!timestamp) return "Guest departure has been confirmed.";
-    return actorName
-      ? `Checked out ${timestamp} by ${actorName}.`
-      : `Checked out ${timestamp}.`;
+    return "";
   }
 
   if (stayStatus === "noShow") {
-    const actorName = buildActorName(booking.checkInConfirmedBy);
-    const timestamp = formatDateTimePHT(booking.checkInConfirmedAt);
-    if (!timestamp) return "Marked as no-show.";
-    return actorName
-      ? `Marked ${timestamp} by ${actorName}.`
-      : `Marked ${timestamp}.`;
+    return "";
   }
 
   return getStayStatusMeta(booking).description;
@@ -165,12 +189,54 @@ export const getStayConfirmationDetails = (booking = {}) => {
 export const getAvailableStayActions = (booking = {}) => {
   const bookingStatus = String(booking?.status || "").trim().toLowerCase();
   const stayStatus = getBookingStayStatus(booking);
+  const paymentConfirmed = isPaymentConfirmed(booking);
 
   return {
-    canConfirmCheckIn: bookingStatus === "approved" && stayStatus === "awaitingCheckIn",
-    canMarkNoShow: bookingStatus === "approved" && stayStatus === "awaitingCheckIn",
+    canConfirmCheckIn:
+      bookingStatus === "approved" &&
+      stayStatus === "awaitingCheckIn" &&
+      paymentConfirmed,
+    canMarkNoShow:
+      bookingStatus === "approved" &&
+      stayStatus === "awaitingCheckIn" &&
+      paymentConfirmed,
     canConfirmCheckOut: bookingStatus === "approved" && stayStatus === "checkedIn",
   };
+};
+
+export const shouldShowStayStatus = (booking = {}) =>
+  getBookingStayStatus(booking) !== "notReady";
+
+export const shouldShowBookingStatus = (booking = {}) => {
+  const stayStatus = getBookingStayStatus(booking);
+  return !["awaitingCheckIn", "checkedIn", "checkedOut", "noShow"].includes(stayStatus);
+};
+
+export const getBookingArchiveStatus = (booking = {}) => {
+  const stayStatus = getBookingStayStatus(booking);
+  const bookingStatus = String(booking?.status || "").trim().toLowerCase();
+
+  return stayStatus === "checkedOut" || stayStatus === "noShow" || bookingStatus === "cancelled"
+    ? "archived"
+    : "active";
+};
+
+export const matchesBookingArchiveFilter = (booking = {}, filterValue = "") => {
+  const normalizedFilter = String(filterValue || "").trim().toLowerCase();
+
+  if (!normalizedFilter || normalizedFilter === "all bookings") {
+    return true;
+  }
+
+  if (normalizedFilter === "archived") {
+    return getBookingArchiveStatus(booking) === "archived";
+  }
+
+  if (normalizedFilter === "active") {
+    return getBookingArchiveStatus(booking) === "active";
+  }
+
+  return true;
 };
 
 export const matchesBookingStatusFilter = (booking = {}, filterValue = "") => {

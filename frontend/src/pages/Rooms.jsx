@@ -16,6 +16,7 @@ import {
   Ban,
   CalendarX,
   Sun,
+  Search,
   CheckCircle,
   Sparkles,
   ChevronLeft,
@@ -56,7 +57,7 @@ const Rooms = () => {
   const [filterStatus, setFilterStatus] = useState(() => (token ? "available" : "all"));
   const [roomType, setRoomType] = useState(() => location.state?.selectedRoomType || "all");
   const [building, setBuilding] = useState("all");
-  const [search] = useState("");
+  const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [showAllRoomTypes, setShowAllRoomTypes] = useState(false);
   const [showAllBuildings, setShowAllBuildings] = useState(false);
@@ -384,7 +385,7 @@ const Rooms = () => {
 
   const getFilterButtonClass = (isActive) =>
     `group mb-1 flex w-full items-center text-left font-bold uppercase transition-all duration-300 ${
-      "gap-1.5 rounded-md px-2 py-1.5 text-[9px] leading-[1.35]"
+      "gap-2.5 rounded-lg px-3 py-2.5 text-[11px] leading-[1.35]"
     } ${
       isActive
         ? isLoggedIn
@@ -394,30 +395,30 @@ const Rooms = () => {
           ? "text-slate-500 hover:bg-slate-100 hover:pl-3 hover:text-slate-900"
           : "text-slate-600 hover:bg-slate-100 hover:pl-4 hover:text-slate-900"
      }`;
-  const filterIconSize = 10;
-  const filterLabelIconSize = 8;
+  const filterIconSize = 13;
+  const filterLabelIconSize = 12;
   const pageRootClassName = isLoggedIn
-    ? "relative flex h-screen flex-col overflow-hidden bg-slate-50 pt-3"
-    : "relative bg-slate-50 pt-3";
+    ? "relative bg-slate-50 pt-2"
+    : "relative bg-slate-50 pt-2";
   const pageShellClassName = isLoggedIn
-    ? "mx-auto flex h-full w-full max-w-[1750px] flex-col gap-5 overflow-hidden px-[14px] pb-[14px] lg:flex-row lg:gap-5 lg:px-[14px]"
-    : "mx-auto flex w-full max-w-[1750px] flex-col gap-5 px-[14px] pb-[14px] lg:flex-row lg:gap-5 lg:px-[14px]";
+    ? "mx-auto flex w-full flex-col gap-4 px-3 pb-[14px] sm:px-4 lg:flex-row lg:gap-4 lg:px-5"
+    : "mx-auto flex w-full flex-col gap-4 px-3 pb-[14px] sm:px-4 lg:flex-row lg:gap-4 lg:px-5";
   const sidebarClassName = isLoggedIn
-    ? "h-full w-full overflow-y-auto pb-6 pr-2 lg:w-56"
-    : "w-full pb-6 pr-2 lg:w-56";
+    ? "w-full pb-5 pr-2 lg:w-[340px] xl:w-[360px]"
+    : "w-full pb-5 pr-2 lg:w-[340px] xl:w-[360px]";
   const filterPanelClassName = isLoggedIn
-    ? "rounded-lg border bg-white p-3 shadow-sm"
-    : "rounded-lg border bg-white p-3 shadow-sm";
-  const roomContentClassName = "flex min-h-full flex-col gap-5";
+    ? "rounded-xl border bg-white p-3 shadow-sm sm:p-4"
+    : "rounded-xl border bg-white p-3 shadow-sm sm:p-4";
+  const roomContentClassName = "flex flex-col gap-4";
   const roomGridClassName = isLoggedIn
     ? "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4"
     : "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4";
   const directoryBarClassName = isLoggedIn
-    ? "sticky bottom-20 z-20 mt-auto bg-gradient-to-t from-slate-50 via-slate-50 pt-1"
+    ? "pt-1"
     : "pt-1";
   const roomMainClassName = isLoggedIn
-    ? "flex-1 h-full overflow-y-auto pt-1 pb-6 pr-1 pl-1"
-    : "flex-1 pt-1 pb-6 pr-1 pl-1";
+    ? "flex-1 px-0.5 pt-0 pb-5"
+    : "flex-1 px-0.5 pt-0 pb-5";
 
   const getRoomAvailabilityState = (room) => {
     const roomId = String(room?._id || "");
@@ -708,19 +709,19 @@ const Rooms = () => {
               <h2
                 className={`flex items-center font-bold uppercase leading-none text-slate-900 ${
                   isLoggedIn
-                    ? "mb-3 gap-1.5 text-[10px] tracking-wider"
-                    : "mb-3 gap-1.5 text-[10px] tracking-wider"
+                    ? "mb-4 gap-2 text-[13px] tracking-[0.16em]"
+                    : "mb-4 gap-2 text-[13px] tracking-[0.16em]"
                 }`}
               >
-                <Filter size={11} className="text-slate-400" /> Room Filter
+                <Filter size={14} className="text-slate-400" /> Room Filter
               </h2>
 
               <div className="mb-3">
                 <p
                   className={`flex items-center font-bold uppercase leading-[1.25] text-slate-400 ${
                     isLoggedIn
-                      ? "mb-1.5 gap-1 text-[8px] tracking-widest"
-                      : "mb-1.5 gap-1 text-[8px] tracking-widest"
+                      ? "mb-2 gap-1.5 text-[11px] tracking-[0.16em]"
+                      : "mb-2 gap-1.5 text-[11px] tracking-[0.16em]"
                   }`}
                 >
                   <BedDouble size={filterLabelIconSize} /> Room Type
@@ -749,7 +750,7 @@ const Rooms = () => {
                     type="button"
                     onClick={() => setShowAllRoomTypes((value) => !value)}
                     className={`mt-1 block w-full text-center font-bold uppercase leading-[1.25] text-slate-400 transition hover:text-slate-700 ${
-                      isLoggedIn ? "text-[8px] tracking-[0.14em]" : "text-[8px] tracking-[0.14em]"
+                      isLoggedIn ? "text-[10px] tracking-[0.14em]" : "text-[10px] tracking-[0.14em]"
                     }`}
                   >
                     {showAllRoomTypes
@@ -763,8 +764,8 @@ const Rooms = () => {
                 <p
                   className={`flex items-center font-bold uppercase leading-[1.25] text-slate-400 ${
                     isLoggedIn
-                      ? "mb-1.5 gap-1 text-[8px] tracking-widest"
-                      : "mb-1.5 gap-1 text-[8px] tracking-widest"
+                      ? "mb-2 gap-1.5 text-[11px] tracking-[0.16em]"
+                      : "mb-2 gap-1.5 text-[11px] tracking-[0.16em]"
                   }`}
                 >
                   <Building2 size={filterLabelIconSize} /> Building
@@ -792,7 +793,7 @@ const Rooms = () => {
                     type="button"
                     onClick={() => setShowAllBuildings((value) => !value)}
                     className={`mt-1 block w-full text-center font-bold uppercase leading-[1.25] text-slate-400 transition hover:text-slate-700 ${
-                      isLoggedIn ? "text-[8px] tracking-[0.14em]" : "text-[8px] tracking-[0.14em]"
+                      isLoggedIn ? "text-[10px] tracking-[0.14em]" : "text-[10px] tracking-[0.14em]"
                     }`}
                   >
                     {showAllBuildings
@@ -803,9 +804,9 @@ const Rooms = () => {
               </div>
 
               {isLoggedIn && (
-                <div className="mb-3 border-t border-slate-100 pt-3">
-                  <p className="mb-1.5 flex items-center gap-1 text-[8px] font-bold uppercase tracking-widest leading-[1.25] text-slate-400">
-                    <CheckCircle size={8} /> Availability
+                <div className="mb-3 border-t border-slate-100 pt-3.5">
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] leading-[1.25] text-slate-400">
+                    <CheckCircle size={12} /> Availability
                   </p>
                   {[
                     { val: "all", label: "Show All", icon: Layers },
@@ -820,7 +821,7 @@ const Rooms = () => {
                       className={getFilterButtonClass(filterStatus === status.val)}
                     >
                       <status.icon
-                        size={10}
+                        size={filterIconSize}
                         className={
                           filterStatus === status.val
                             ? "text-blue-400"
@@ -875,19 +876,19 @@ const Rooms = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-3 shadow-sm">
-                    <h2 className="mb-2 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-blue-900">
-                      <Sun size={10} className="text-orange-500" /> No rooms selected
+                  <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm">
+                    <h2 className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-blue-900">
+                      <Sun size={12} className="text-orange-500" /> No rooms selected
                     </h2>
-                    <p className="mb-2.5 text-[9px] leading-relaxed text-slate-500">
+                    <p className="mb-3.5 text-[11px] leading-relaxed text-slate-500">
                       Choose a room to add it to your booking, or continue with a venue-only
                       reservation.
                     </p>
                     <button
                       onClick={() => navigate("/retreat-booking")}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white py-2 text-[9px] font-bold uppercase text-blue-700 hover:bg-blue-50"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white py-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-blue-700 hover:bg-blue-50"
                     >
-                      Book Venue Only <ArrowRight size={11} />
+                      Book Venue Only <ArrowRight size={13} />
                     </button>
                   </div>
                 )}
@@ -897,6 +898,21 @@ const Rooms = () => {
         </aside>
 
         <main className={roomMainClassName}>
+          <div className="mb-4 pt-3">
+            <div className="relative max-w-2xl">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search rooms or buildings..."
+                className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-14 pr-5 text-[14px] font-medium text-slate-700 shadow-sm outline-none transition focus:border-slate-300 focus:ring-4 focus:ring-slate-200/60"
+              />
+            </div>
+          </div>
           {filteredRooms.length === 0 ? (
             <div className="mt-20 flex flex-col items-center justify-center text-slate-400">
               <Wind size={48} className="mb-4 opacity-20" />
@@ -931,19 +947,19 @@ const Rooms = () => {
                         if (!canSelectRoom) return;
                         selected ? removeRoom(room._id) : addRoom(room);
                       }}
-                      className={`relative overflow-hidden border-2 bg-white transition-all duration-300 ${
+                      className={`group flex flex-col overflow-hidden border bg-white transition-all duration-300 ${
                         !isLoggedIn
-                          ? "cursor-pointer rounded-xl border-transparent hover:border-slate-200 hover:shadow-lg"
+                          ? "cursor-pointer rounded-[26px] border-slate-200 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.5)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)]"
                           : isUnavailable
-                            ? "rounded-xl border-slate-100 shadow-none"
+                            ? "rounded-[26px] border-slate-100 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.18)]"
                             : selected
-                              ? "cursor-pointer rounded-xl border-slate-900 shadow-xl ring-4 ring-blue-600/10"
-                              : "cursor-pointer rounded-xl border-transparent hover:border-slate-200 hover:shadow-lg"
+                              ? "cursor-pointer rounded-[26px] border-slate-900 shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)] ring-4 ring-blue-600/10"
+                              : "cursor-pointer rounded-[26px] border-slate-200 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.5)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)]"
                       }`}
                     >
                       <div
-                        className={`group relative cursor-zoom-in overflow-hidden bg-slate-200 ${
-                          isLoggedIn ? "h-[146px]" : "h-[146px]"
+                        className={`group/image relative cursor-zoom-in overflow-hidden bg-slate-200 ${
+                          isLoggedIn ? "h-32 xl:h-36" : "h-32 xl:h-36"
                         }`}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -953,13 +969,14 @@ const Rooms = () => {
                         <img
                           src={getImageUrl(getRoomImage(room))}
                           alt={room.name}
-                          className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                          className={`h-full w-full object-cover transition-transform duration-500 group-hover/image:scale-105 ${
                             isUnavailable ? "opacity-40" : "opacity-100"
                           }`}
                           onError={(event) => {
                             event.target.src = "https://via.placeholder.com/400x300?text=No+Image";
                           }}
                         />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-slate-900/55 via-slate-900/10 to-transparent" />
 
                         {isAdminUnavailable && (
                           <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-100/85">
@@ -1006,101 +1023,99 @@ const Rooms = () => {
                           </div>
                         )}
                         {selected && !isUnavailable && (
-                          <div className="pointer-events-none absolute right-2 top-2 z-20 flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[8px] font-bold text-white shadow-lg">
-                            <CheckCircle size={9} strokeWidth={3} /> SELECTED
+                          <div className="pointer-events-none absolute right-2.5 top-2.5 z-20 flex items-center gap-1 rounded-full bg-slate-900 px-2.5 py-1 text-[8px] font-bold text-white shadow-lg">
+                            <CheckCircle size={10} strokeWidth={3} /> SELECTED
                           </div>
                         )}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover:opacity-100">
-                          <span className="rounded-full bg-white/90 px-2.5 py-1 text-[8px] font-bold uppercase text-slate-900 shadow-sm">
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity group-hover/image:opacity-100">
+                          <span className="rounded-full bg-white/90 px-3 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-900 shadow-sm">
                             View Details
                           </span>
                         </div>
                       </div>
 
-                      <div className="p-3">
-                        <div className="mb-3">
-                          <div className="mb-1 flex items-center justify-between gap-1.5">
+                      <div className="flex flex-1 flex-col gap-2.5 p-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
                             <h3
-                              className={`font-bold leading-tight ${
-                                isLoggedIn ? "text-[12px]" : "text-[12px]"
-                              } ${isUnavailable ? "text-slate-400" : "text-slate-800"}`}
+                              className={`text-[14px] font-black leading-tight tracking-tight ${
+                                isUnavailable ? "text-slate-400" : "text-slate-900"
+                              }`}
                             >
                               {room.name}
                             </h3>
-                            {room.building && (
-                              <span
-                                className={`inline-flex items-center gap-1 whitespace-nowrap border font-bold uppercase ${
-                                  isLoggedIn
-                                    ? "rounded-md px-1.5 py-0.5 text-[7px] tracking-wider"
-                                    : "rounded-md px-1.5 py-0.5 text-[7px] tracking-wider"
-                                } ${
-                                  isUnavailable
-                                    ? "border-slate-100 bg-slate-50 text-slate-300"
-                                    : "border-slate-200 bg-slate-100 text-slate-500"
+                          </div>
+                          {room.building && (
+                            <span
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-1 text-[7px] font-black uppercase tracking-[0.18em] ${
+                                isUnavailable
+                                  ? "border-slate-100 bg-slate-50 text-slate-300"
+                                  : "border-slate-200 bg-slate-50 text-slate-600"
+                              }`}
+                            >
+                              <Building2 size={11} /> {room.building}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-start justify-between gap-3 border-t border-slate-100 pt-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                              Room Type
+                            </p>
+                            <div className="mt-1 flex items-start gap-1.5">
+                              <BedDouble
+                                size={13}
+                                className={isUnavailable ? "mt-0.5 text-slate-300" : "mt-0.5 text-slate-500"}
+                              />
+                              <p
+                                className={`line-clamp-2 text-[11px] font-bold leading-snug ${
+                                  isUnavailable ? "text-slate-400" : "text-slate-700"
                                 }`}
                               >
-                                <Building2 size={isLoggedIn ? 8 : 12} /> {room.building}
+                                {roomTypeLabel}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-right">
+                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                              Capacity
+                            </p>
+                            <div
+                              className={`mt-1 inline-flex items-center justify-end gap-1.5 ${
+                                isUnavailable ? "text-slate-400" : "text-slate-700"
+                              }`}
+                            >
+                              <Users size={13} className={isUnavailable ? "text-slate-300" : "text-slate-500"} />
+                              <span className="text-[11px] font-black leading-none">
+                                {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
                               </span>
-                            )}
+                            </div>
                           </div>
                         </div>
 
-                        <div
-                          className={`flex items-start justify-between gap-2 font-semibold ${
-                            isLoggedIn ? "mb-3 text-[10px]" : "mb-3 text-[10px]"
-                          } ${isUnavailable ? "text-slate-300" : "text-slate-600"}`}
-                        >
-                          {roomTypeLabel && (
-                            <span
-                              className={`flex min-w-0 flex-1 items-center gap-1.5 border ${
-                                isLoggedIn
-                                  ? "rounded-md px-2 py-1"
-                                  : "rounded-md px-2 py-1"
-                              } ${
-                                isUnavailable ? "border-slate-100 bg-white" : "border-slate-100 bg-slate-50"
+                        {isLoggedIn && (
+                          <div className="mt-auto pt-2">
+                            <button
+                              disabled={isUnavailable}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (!isUnavailable) {
+                                  selected ? removeRoom(room._id) : addRoom(room);
+                                }
+                              }}
+                              className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[10px] font-black uppercase tracking-[0.12em] transition-all ${
+                                isUnavailable
+                                  ? "cursor-not-allowed border border-slate-100 bg-slate-50 text-slate-300"
+                                  : selected
+                                    ? "border border-red-100 bg-red-50 text-red-600 hover:bg-red-100"
+                                    : "bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 hover:shadow-xl"
                               }`}
                             >
-                              <BedDouble
-                                size={12}
-                                className={isUnavailable ? "text-slate-300" : "text-slate-500"}
-                              />
-                              <span className="capitalize">{roomTypeLabel}</span>
-                            </span>
-                          )}
-                          <span
-                            className={`ml-auto flex shrink-0 items-center justify-end gap-1.5 text-right ${
-                              isUnavailable ? "text-slate-300" : "text-slate-600"
-                            }`}
-                          >
-                            <Users
-                              size={12}
-                              className={isUnavailable ? "text-slate-300" : "text-slate-500"}
-                            />
-                            <span className="pr-1.5 text-[9px] text-right">
-                              {room.capacity} {Number(room.capacity) === 1 ? "Person" : "People"}
-                            </span>
-                          </span>
-                        </div>
-
-                        {isLoggedIn && (
-                          <button
-                            disabled={isUnavailable}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (!isUnavailable) {
-                                selected ? removeRoom(room._id) : addRoom(room);
-                              }
-                            }}
-                            className={`flex w-full items-center justify-center gap-1.5 rounded-lg py-2 text-[10px] font-bold uppercase transition-all ${
-                              isUnavailable
-                                ? "cursor-not-allowed border border-slate-100 bg-slate-50 text-slate-300"
-                                : selected
-                                  ? "border border-red-50 bg-red-50 text-red-600 hover:bg-red-100"
-                                  : "bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 hover:shadow-xl"
-                            }`}
-                          >
-                            {isUnavailable ? unavailableLabel : selected ? "Remove" : "Select"}
-                          </button>
+                              {isUnavailable ? unavailableLabel : selected ? "Remove" : "Select"}
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1108,33 +1123,33 @@ const Rooms = () => {
                 })}
               </div>
               <div className={directoryBarClassName}>
-                <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="w-full text-left sm:w-auto">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">
+                    <p className="text-[12px] font-bold uppercase tracking-[0.28em] text-slate-400">
                       Room Directory
                     </p>
-                    <p className="mt-0.5 text-xs font-semibold text-slate-800">
+                    <p className="mt-1 text-[15px] font-semibold text-slate-800">
                       Showing {visibleRoomStart}-{visibleRoomEnd} of {filteredRooms.length} rooms
                     </p>
                   </div>
 
                   {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 sm:justify-end">
+                    <div className="flex items-center justify-center gap-2.5 sm:justify-end">
                       <button
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
                         disabled={currentPageSafe === 1}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
                       >
-                        <ChevronLeft size={14} />
+                        <ChevronLeft size={16} />
                       </button>
-                      <div className="flex flex-wrap items-center justify-center gap-2">
+                      <div className="flex flex-wrap items-center justify-center gap-2.5">
                         {visiblePageNumbers.map((page) => (
                           <button
                             key={page}
                             type="button"
                             onClick={() => setCurrentPage(page)}
-                            className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[10px] font-bold transition ${
+                            className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg px-3 text-[12px] font-bold transition ${
                               currentPageSafe === page
                                 ? "bg-slate-900 text-white shadow-md"
                                 : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
@@ -1148,9 +1163,9 @@ const Rooms = () => {
                         type="button"
                         onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                         disabled={currentPageSafe === totalPages}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
                       >
-                        <ChevronRight size={14} />
+                        <ChevronRight size={16} />
                       </button>
                     </div>
                   )}
