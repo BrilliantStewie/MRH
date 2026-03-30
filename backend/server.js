@@ -27,6 +27,7 @@ import packageRouter from "./routes/packageRoute.js";
 import reviewRouter from "./routes/reviewRoute.js";
 import notificationRouter from "./routes/notificationRoute.js";
 import reportRouter from "./routes/reportRoute.js";
+import { createCorsOriginHandler, resolveCorsConfig } from "./utils/corsConfig.js";
 import { dispatchRealtimeMutation } from "./utils/realtimeDispatch.js";
 import {
   emitRealtimeUpdate,
@@ -39,23 +40,7 @@ import {
 const app = express();
 const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
-const parseAllowedOrigins = () => {
-  const configuredOrigins = String(process.env.CORS_ORIGINS || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  const fallbackOrigins = [
-    process.env.FRONTEND_URL,
-    process.env.ADMIN_URL,
-    "http://localhost:5173",
-    "http://localhost:5174",
-  ]
-    .map((origin) => String(origin || "").trim())
-    .filter(Boolean);
-
-  return [...new Set(configuredOrigins.length ? configuredOrigins : fallbackOrigins)];
-};
-const allowedOrigins = parseAllowedOrigins();
+const corsConfig = resolveCorsConfig();
 
 // =======================
 // ✅ GLOBAL MIDDLEWARE
@@ -65,12 +50,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(
   cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error(`CORS origin not allowed: ${origin}`));
-    },
+    origin: createCorsOriginHandler(corsConfig, "CORS"),
     credentials: true,
   })
 );
@@ -149,7 +129,7 @@ const startServer = async () => {
     await connectDB(); // ✅ Use centralized DB config
 
     await connectCloudinary();
-    initRealtimeServer(httpServer, { allowedOrigins });
+    initRealtimeServer(httpServer, { corsConfig });
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);

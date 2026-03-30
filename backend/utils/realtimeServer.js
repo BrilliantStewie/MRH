@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import userModel from "../models/userModel.js";
+import { createCorsOriginHandler } from "./corsConfig.js";
 import { resolveUserDisableState } from "./accountStatus.js";
 import {
   getDecodedSessionVersion,
@@ -28,13 +29,6 @@ const parseTokenFromHandshake = (socket) =>
   socket.handshake.headers?.token ||
   socket.handshake.query?.token ||
   "";
-
-const buildCorsOriginMatcher = (allowedOrigins = []) => (origin, callback) => {
-  if (!origin || allowedOrigins.includes(origin)) {
-    return callback(null, true);
-  }
-  return callback(new Error(`Realtime origin not allowed: ${origin}`));
-};
 
 const resolveSocketIdentity = async (socket) => {
   const fallbackIdentity = {
@@ -103,14 +97,17 @@ const joinRealtimeRooms = (socket, identity) => {
   }
 };
 
-export const initRealtimeServer = (httpServer, { allowedOrigins = [] } = {}) => {
+export const initRealtimeServer = (
+  httpServer,
+  { corsConfig = {} } = {}
+) => {
   if (ioInstance) {
     return ioInstance;
   }
 
   ioInstance = new Server(httpServer, {
     cors: {
-      origin: buildCorsOriginMatcher(allowedOrigins),
+      origin: createCorsOriginHandler(corsConfig, "Realtime"),
       credentials: true,
     },
   });
