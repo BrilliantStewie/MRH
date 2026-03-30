@@ -1225,7 +1225,7 @@ const Report = () => {
                 <p className="mt-1 text-[9px] font-semibold text-slate-500">Paid bookings only</p>
               </div>
               <div className="rounded-[20px] border border-[#ebe5f8] bg-[#fff9f1] px-3.5 py-3">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#c1892c]">Guests</p>
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#c1892c]">Participants</p>
                 <p className="mt-1.5 text-[20px] font-black tracking-tight text-[#8f6115]">
                   {formatCount(activeReportSummary.totalParticipants)}
                 </p>
@@ -1310,7 +1310,7 @@ const Report = () => {
           />
           <StatCard
             icon={Users}
-            label="Guests"
+            label="Participants"
             value={formatCount(activeReportSummary.totalParticipants)}
             detail="Included bookings"
             accent="amber"
@@ -1588,7 +1588,7 @@ const Report = () => {
                   detail="Paid bookings only"
                 />
                 <SummaryMetric
-                  label="Guests"
+                  label="Participants"
                   value={formatCount(activeReportSummary.totalParticipants)}
                   detail="Estimated participants"
                 />

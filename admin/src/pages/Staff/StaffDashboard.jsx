@@ -34,7 +34,6 @@ const StaffDashboard = () => {
 
   const [allBookings, setAllBookings] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
-  const [allUsers, setAllUsers] = useState([]);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const syncInProgressRef = useRef(false);
 
@@ -45,15 +44,13 @@ const StaffDashboard = () => {
 
     try {
       const headers = { token: sToken };
-      const [bookingsRes, roomsRes, usersRes] = await Promise.all([
+      const [bookingsRes, roomsRes] = await Promise.all([
         axios.get(`${backendUrl}/api/staff/bookings`, { headers }),
         axios.get(`${backendUrl}/api/staff/rooms`, { headers }),
-        axios.get(`${backendUrl}/api/staff/users`, { headers }),
       ]);
 
       if (bookingsRes.data.success) setAllBookings(bookingsRes.data.bookings || []);
       if (roomsRes.data.success) setAllRooms(roomsRes.data.rooms || []);
-      if (usersRes.data.success) setAllUsers(usersRes.data.users || []);
     } catch (error) {
       console.error("Dashboard Fetch Error:", error);
       if (!silent) {
@@ -97,7 +94,6 @@ const StaffDashboard = () => {
         matchesRealtimeEntity(event.detail, [
           "bookings",
           "rooms",
-          "users",
           "account_status",
         ])
       ) {
@@ -141,16 +137,27 @@ const StaffDashboard = () => {
     const pendingCancellations = bookings.filter(
       (booking) => booking.status === "cancellation_pending"
     ).length;
+    const totalParticipants = bookings.reduce((sum, booking) => {
+      const roomGuests = Array.isArray(booking.bookingItems)
+        ? booking.bookingItems.reduce(
+            (roomSum, item) => roomSum + Number(item?.roomGuests || 0),
+            0
+          )
+        : 0;
+      const venueParticipants = Number(booking.participants || 0);
+
+      return sum + roomGuests + venueParticipants;
+    }, 0);
 
     return {
       totalBookings: bookings.length,
-      totalUsers: (allUsers || []).length,
+      totalParticipants,
       occupancy: occupiedCount,
       totalRooms: rooms.length,
       occupancyRate,
       pendingRequests: pendingBookings + pendingCancellations,
     };
-  }, [allRooms, allBookings, allUsers]);
+  }, [allRooms, allBookings]);
 
   const chartData = useMemo(() => {
     const months = [];
@@ -222,11 +229,11 @@ const StaffDashboard = () => {
           subValue="All time"
         />
         <StatCard
-          label="Total Guests"
-          value={stats.totalUsers}
+          label="Total Participants"
+          value={stats.totalParticipants}
           icon={<Users size={20} />}
           color="emerald"
-          subValue="Directory count"
+          subValue="From booking records"
         />
         <StatCard
           label="Actions Required"

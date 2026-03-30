@@ -75,8 +75,6 @@ const Dashboard = () => {
     getAllRooms,
     allBookings,
     getAllBookings,
-    allUsers,
-    getAllUsers,
     allPackages,
     getAllPackages,
   } = useContext(AdminContext);
@@ -97,7 +95,6 @@ const Dashboard = () => {
     if (aToken) {
       getAllRooms();
       getAllBookings();
-      getAllUsers();
       getAllPackages();
     }
   }, [aToken]);
@@ -154,7 +151,6 @@ const Dashboard = () => {
     return {
       revenue: yearlyRevenue,
       monthlyIncome,
-      totalUsers: (allUsers || []).length,
       occupancy: occupiedCount,
       totalRooms: rooms.length,
       occupancyRate,
@@ -162,7 +158,7 @@ const Dashboard = () => {
       pendingBookings: pendingBookings.length,
       pendingCancellations: pendingCancellations.length,
     };
-  }, [allBookings, allRooms, allUsers]);
+  }, [allBookings, allRooms]);
 
   const chartData = useMemo(() => {
     const months = [];
@@ -732,7 +728,7 @@ const Dashboard = () => {
                     <span className="text-sm font-black text-slate-900">{reportStats.totalBookings}</span>
                   </div>
                   <div className="flex items-center justify-between border-b border-slate-50 py-2">
-                    <span className="text-sm font-bold text-slate-500">Guest Count</span>
+                    <span className="text-sm font-bold text-slate-500">Total Participants</span>
                     <span className="text-sm font-black text-slate-900">
                       {reportStats.totalParticipants}
                     </span>

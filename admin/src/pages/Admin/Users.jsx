@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Search, 
   User, 
+  Users as UsersIcon,
   UserPlus,
   Mail, 
   Shield,
@@ -48,8 +49,9 @@ const Users = () => {
 
   const getFullName = (u) => {
     if (u.firstName) {
-      const middle = u.middleName ? `${u.middleName} ` : '';
-      return `${u.firstName} ${middle}${u.lastName}`.trim();
+      return [u.firstName, u.middleName, u.lastName, u.suffix]
+        .filter(Boolean)
+        .join(" ");
     }
     return u.name || "Unknown User";
   };
@@ -57,6 +59,25 @@ const Users = () => {
   const getDisplayPhone = (value) => {
     const normalized = String(value || "").trim();
     return normalized && normalized !== "0000000000" ? normalized : "";
+  };
+
+  const getRoleLabel = (role) => {
+    if (role === "admin") return "Administrator";
+    if (role === "staff") return "Staff";
+    if (role === "guest") return "Guest";
+    return role || "User";
+  };
+
+  const getRoleIcon = (role, size = 14) => {
+    if (role === "admin") return <Shield size={size} />;
+    if (role === "staff") return <UsersIcon size={size} />;
+    return <User size={size} />;
+  };
+
+  const getRoleBadgeClassName = (role) => {
+    if (role === "admin") return "border-rose-100 bg-rose-50 text-rose-600";
+    if (role === "staff") return "border-indigo-100 bg-indigo-50 text-indigo-700";
+    return "border-slate-200 bg-slate-100 text-slate-600";
   };
 
   const handleOpenAddStaff = () => {
@@ -159,7 +180,7 @@ const Users = () => {
 
   const roleOptions = [
     { value: "all", label: "All Roles" },
-    { value: "staff", label: "Staff", icon: Shield },
+    { value: "staff", label: "Staff", icon: UsersIcon },
     { value: "guest", label: "Guest", icon: User },
   ];
 
@@ -197,7 +218,7 @@ const Users = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
             <input
               type="text"
-              placeholder="Search by name, email..."
+              placeholder="Search by name, email, or suffix..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"
@@ -210,7 +231,7 @@ const Users = () => {
               options={roleOptions}
               value={roleFilter}
               onChange={setRoleFilter}
-              icon={Shield}
+              icon={UsersIcon}
               showLabelPrefix
               neutralValue="all"
               triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[140px]"
@@ -270,7 +291,7 @@ const Users = () => {
                         <img src={u.image} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-                          <User size={18} />
+                          {getRoleIcon(u.role, 18)}
                         </div>
                       )}
                     </div>
@@ -305,14 +326,9 @@ const Users = () => {
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                      u.role === "admin"
-                        ? "border-rose-100 bg-rose-50 text-rose-600"
-                        : u.role === "staff"
-                          ? "border-indigo-100 bg-indigo-50 text-indigo-700"
-                          : "border-slate-200 bg-slate-100 text-slate-600"
-                    }`}>
-                      {u.role === "guest" ? "Guest" : u.role || "User"}
+                    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getRoleBadgeClassName(u.role)}`}>
+                      {getRoleIcon(u.role, 12)}
+                      {getRoleLabel(u.role)}
                     </span>
 
                     {!isAdminRow && (
@@ -338,7 +354,7 @@ const Users = () => {
                             : "border-amber-100 bg-amber-50 text-amber-700 hover:bg-amber-100"
                         }`}
                       >
-                        {u.disabled ? <RefreshCcw size={14} /> : <Shield size={14} />}
+                        {u.disabled ? <RefreshCcw size={14} /> : <XCircle size={14} />}
                         {u.disabled ? "Enable Account" : "Disable Account"}
                       </button>
                       {u.role === "staff" && (
@@ -392,7 +408,7 @@ const Users = () => {
                           ) : u.image ? (
                             <img src={u.image} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400"><User size={16}/></div>
+                            <div className="bg-slate-100 w-full h-full flex items-center justify-center text-slate-400">{getRoleIcon(u.role, 16)}</div>
                           )}
                         </div>
                         <div>
@@ -426,12 +442,9 @@ const Users = () => {
 </td>
 
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide border ${
-                        u.role === 'admin' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                        u.role === 'staff' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
-                        'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}>
-                        {u.role === 'guest' ? 'Guest' : u.role || 'User'}
+                      <span className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${getRoleBadgeClassName(u.role)}`}>
+                        {getRoleIcon(u.role, 12)}
+                        {getRoleLabel(u.role)}
                       </span>
                     </td>
 
@@ -459,7 +472,7 @@ const Users = () => {
                                     : 'bg-amber-50 border-amber-100 text-amber-700 hover:bg-amber-100'
                                 }`}
                             >
-                                {u.disabled ? <RefreshCcw size={14}/> : <Shield size={14}/>}
+                                {u.disabled ? <RefreshCcw size={14}/> : <XCircle size={14}/>}
                                 {u.disabled ? "Enable" : "Disable"}
                             </button>
                             {u.role === "staff" && (

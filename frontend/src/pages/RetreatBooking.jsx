@@ -629,7 +629,7 @@ const RetreatBooking = () => {
 
         const participants = Number(venueParticipants);
 
-        if (!participants <= 0) {
+        if (!Number.isFinite(participants) || participants <= 0) {
             return toast.error("Enter venue participants first.");
         }
 
