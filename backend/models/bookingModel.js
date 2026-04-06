@@ -111,18 +111,6 @@ const bookingSchema = new mongoose.Schema(
       default: false,
     },
 
-    amountPaid: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
-    pendingPaymentAmount: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-
     checkIn: {
       type: Boolean,
       default: false,
@@ -156,26 +144,16 @@ const bookingSchema = new mongoose.Schema(
       default: false,
     },
 
-    checkInConfirmedAt: {
-      type: Date,
-      default: null,
+    amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
-    checkInConfirmedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-
-    checkOutConfirmedAt: {
-      type: Date,
-      default: null,
-    },
-
-    checkOutConfirmedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
+    pendingPaymentAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     cancellationRequestedAt: {
@@ -200,6 +178,28 @@ const bookingSchema = new mongoose.Schema(
     },
 
     refundedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    checkInConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+
+    checkInConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    checkOutConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+
+    checkOutConfirmedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
