@@ -138,13 +138,16 @@ const App = () => {
 
   // Logic to hide Navbar/Footer on specific pages
   const isFullScreenPage = location.pathname === "/reviews";
-  const guestPageFrameClassName = "w-full";
+  const isLoginPage = location.pathname === "/login";
+  const guestPageFrameClassName = isLoginPage ? "w-full bg-[#F4F5F7]" : "w-full";
   const shouldCollapseGuestRoomsGap = !token && location.pathname === "/rooms";
   const mainClassName = isFullScreenPage
     ? ""
     : shouldCollapseGuestRoomsGap
       ? "pt-20"
-      : "min-h-screen pt-20";
+      : isLoginPage
+        ? "pt-20 bg-[#F4F5F7]"
+        : "min-h-screen pt-20";
 
   return (
     <div className="w-full overflow-hidden">

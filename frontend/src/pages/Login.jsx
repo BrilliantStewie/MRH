@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Eye, EyeOff, Loader2, Info, Mail, ShieldCheck, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { User, Camera, Eye, EyeOff, Loader2, Info, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../config/firebase";
@@ -601,8 +601,12 @@ const Login = () => {
     return onSubmitHandler(e);
   };
 
+  const isSignUpMode = state === 'Sign Up';
+  const isResetPasswordMode = state === 'Reset Password';
+  const isForgotPasswordMode = state === 'Login' && showForgotEmailField;
+
   return (
-    <div className='relative flex min-h-[100svh] items-center justify-center bg-[#F4F5F7] px-3 py-4 font-sans sm:px-6 sm:py-6 lg:px-8 lg:py-8 xl:px-10'>
+    <div className='relative w-full bg-[#F4F5F7] px-3 pb-6 pt-4 font-sans sm:px-6 sm:pb-8 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-5 xl:px-10'>
       <div id="login-recaptcha-container" className="hidden"></div>
       <AccountStatusModal
         open={Boolean(disabledModalMessage)}
@@ -658,9 +662,9 @@ const Login = () => {
         />
       )}
 
-      <div className='flex w-full flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)] sm:rounded-[40px] lg:flex-row'>
-        <div className='flex w-full flex-col justify-center bg-white p-6 sm:p-10 lg:w-[46%] lg:p-14 xl:w-[44%]'>
-          <div className='mx-auto w-full max-w-[480px] xl:max-w-[520px]'>
+      <div className='mx-auto flex w-full max-w-[1920px] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_25px_70px_-15px_rgba(0,0,0,0.1)] sm:rounded-[40px] lg:min-h-[calc(100vh-9rem)] lg:flex-row'>
+        <div className='flex w-full flex-col justify-center bg-white p-6 sm:p-10 lg:w-[48%] lg:p-14 xl:w-[46%]'>
+          <div className='mx-auto w-full max-w-[520px] xl:max-w-[560px]'>
             <div className='mb-6 lg:hidden'>
               <div className='relative overflow-hidden rounded-[24px] border border-slate-200 bg-slate-900 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.55)]'>
                 <img src={loginVisual} alt="Mercedarian Retreat House" className='h-44 w-full object-cover opacity-90' />
@@ -673,15 +677,15 @@ const Login = () => {
             </div>
             <div className='mb-8'>
               <h2 className='text-3xl font-bold text-gray-900 tracking-tight'>
-                {state === 'Reset Password' ? "Set New Password" : (state === 'Sign Up' ? "Create Account" : (showForgotEmailField ? "Reset Password" : "Welcome Back"))}
+                {isResetPasswordMode ? "Set New Password" : (isSignUpMode ? "Create Account" : (showForgotEmailField ? "Reset Password" : "Welcome Back"))}
               </h2>
               <p className='text-gray-400 text-sm mt-3 leading-relaxed'>
-                {state === 'Reset Password' ? "Please choose a strong password." : (showForgotEmailField ? "Enter your email or phone to receive a code." : `Today is a new day. ${state === 'Sign Up' ? "Join us to start managing." : "Sign in to start managing."}`)}
+                {isResetPasswordMode ? "Please choose a strong password." : (showForgotEmailField ? "Enter your email or phone to receive a code." : `Today is a new day. ${isSignUpMode ? "Join us to start managing." : "Sign in to start managing."}`)}
               </p>
             </div>
 
-            <form onSubmit={handleFormSubmit} className='space-y-4'>
-              {state !== 'Reset Password' && (
+            <form onSubmit={handleFormSubmit} className='space-y-5'>
+              {!isResetPasswordMode && (
                 <>
                   {state === 'Sign Up' && (
                     <>
@@ -794,7 +798,7 @@ const Login = () => {
                       </p>
                     )}
 
-                    {showForgotEmailField && state === 'Login' && (
+                    {isForgotPasswordMode && (
                       <div className="mt-4 p-5 bg-white border border-gray-100 rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-2 duration-400">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <button
@@ -912,17 +916,9 @@ const Login = () => {
           </div>
         </div>
 
-        <div className='hidden p-6 lg:block lg:w-[54%] xl:w-[56%]'>
-          <div className='relative h-full w-full overflow-hidden rounded-[35px] shadow-inner'>
+        <div className='hidden p-6 lg:flex lg:w-[52%] xl:w-[54%]'>
+          <div className='relative min-h-[28rem] flex-1 overflow-hidden rounded-[35px] shadow-inner'>
              <img src={loginVisual} alt="Mercedarian Retreat House" className='absolute inset-0 h-full w-full object-cover' />
-             <div className='absolute inset-0 bg-gradient-to-br from-slate-950/45 via-slate-900/15 to-transparent'></div>
-             <div className='absolute inset-x-0 bottom-0 p-8'>
-               <div className='max-w-sm rounded-[28px] border border-white/20 bg-white/12 p-6 text-white backdrop-blur-md'>
-                 <p className='text-[11px] font-bold uppercase tracking-[0.35em] text-white/70'>Mercedarian Retreat House</p>
-                 <h3 className='mt-3 text-2xl font-bold leading-tight'>A calm, intentional stay experience from booking to arrival.</h3>
-                 <p className='mt-3 text-sm leading-6 text-white/80'>Secure access, clearer verification, and a more cohesive guest journey.</p>
-               </div>
-             </div>
           </div>
         </div>
       </div>
