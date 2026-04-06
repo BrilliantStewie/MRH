@@ -399,26 +399,28 @@ const Rooms = () => {
   const filterLabelIconSize = 12;
   const pageRootClassName = isLoggedIn
     ? "relative bg-slate-50 pt-2"
-    : "relative bg-slate-50 pt-2";
+    : "relative bg-slate-50 pt-2 lg:min-h-[calc(100vh-5rem)]";
   const pageShellClassName = isLoggedIn
     ? "mx-auto flex w-full flex-col gap-4 px-3 pb-[14px] sm:px-4 lg:flex-row lg:gap-4 lg:px-5"
-    : "mx-auto flex w-full flex-col gap-4 px-3 pb-[14px] sm:px-4 lg:flex-row lg:gap-4 lg:px-5";
+    : "mx-auto flex w-full flex-col gap-4 px-3 pb-[14px] sm:px-4 lg:min-h-[calc(100vh-6rem)] lg:flex-row lg:items-stretch lg:gap-4 lg:px-5";
   const sidebarClassName = isLoggedIn
     ? "w-full pb-5 pr-2 lg:w-[340px] xl:w-[360px]"
     : "w-full pb-5 pr-2 lg:w-[340px] xl:w-[360px]";
   const filterPanelClassName = isLoggedIn
     ? "rounded-xl border bg-white p-3 shadow-sm sm:p-4"
     : "rounded-xl border bg-white p-3 shadow-sm sm:p-4";
-  const roomContentClassName = "flex flex-col gap-4";
+  const roomContentClassName = isLoggedIn
+    ? "flex flex-col gap-4"
+    : "flex flex-col gap-4 lg:min-h-0 lg:flex-1";
   const roomGridClassName = isLoggedIn
     ? "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4"
-    : "grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4";
+    : "grid grid-cols-1 gap-3 md:grid-cols-2 lg:min-h-0 lg:flex-1 lg:auto-rows-fr lg:grid-cols-4";
   const directoryBarClassName = isLoggedIn
     ? "pt-1"
     : "pt-1";
   const roomMainClassName = isLoggedIn
     ? "flex-1 px-0.5 pt-0 pb-5"
-    : "flex-1 px-0.5 pt-0 pb-5";
+    : "flex-1 px-0.5 pt-0 pb-5 lg:flex lg:min-h-0 lg:flex-col";
 
   const getRoomAvailabilityState = (room) => {
     const roomId = String(room?._id || "");
@@ -949,7 +951,7 @@ const Rooms = () => {
                       }}
                       className={`group flex flex-col overflow-hidden border bg-white transition-all duration-300 ${
                         !isLoggedIn
-                          ? "cursor-pointer rounded-[26px] border-slate-200 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.5)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)]"
+                          ? "cursor-pointer rounded-[26px] border-slate-200 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.5)] hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_28px_60px_-32px_rgba(15,23,42,0.45)] lg:h-full"
                           : isUnavailable
                             ? "rounded-[26px] border-slate-100 shadow-[0_20px_44px_-34px_rgba(15,23,42,0.18)]"
                             : selected
@@ -959,7 +961,7 @@ const Rooms = () => {
                     >
                       <div
                         className={`group/image relative cursor-zoom-in overflow-hidden bg-slate-200 ${
-                          isLoggedIn ? "h-32 xl:h-36" : "h-32 xl:h-36"
+                          isLoggedIn ? "h-32 xl:h-36" : "h-36 xl:h-40"
                         }`}
                         onClick={(event) => {
                           event.stopPropagation();
