@@ -14,6 +14,7 @@ import {
   getBookingCheckInDate,
   getBookingCheckOutDate,
 } from "./bookingDateFields.js";
+import { isNoShowBooking } from "./bookingStay.js";
 
 const ROOM_LOCK_WINDOW_MS = 30 * 1000;
 const ACTIVE_BOOKING_STATUSES = ["pending", "approved"];
@@ -120,6 +121,8 @@ const findActiveBookingsForRange = async (start, end) => {
   );
 
   return bookings.filter((booking) => {
+    if (isNoShowBooking(booking)) return false;
+
     const existingStart = normalizeDate(getBookingCheckInDate(booking));
     const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
     return rangesOverlap(existingStart, existingEnd, start, end);
@@ -171,6 +174,8 @@ const findConflictingBookings = async (roomIds, start, end) => {
   );
 
   return bookings.filter((booking) => {
+    if (isNoShowBooking(booking)) return false;
+
     const existingStart = normalizeDate(getBookingCheckInDate(booking));
     const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));

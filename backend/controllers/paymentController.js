@@ -1,10 +1,15 @@
 import axios from "axios";
 // IMPORTANT: Import your booking model here. Adjust the path as needed!
 import bookingModel from "../models/bookingModel.js"; 
+import {
+  getBookingPaymentSnapshot,
+  resolveBookingPaymentAmount,
+  isBookingFullyPaid,
+} from "../utils/bookingPayment.js";
 
 export const createCheckoutSession = async (req, res) => {
   try {
-    const { bookingId } = req.body;
+    const { bookingId, amount: requestedAmount } = req.body;
 
     // 1. Fetch the booking from the database to get the real price
     const booking = await bookingModel
@@ -18,12 +23,23 @@ export const createCheckoutSession = async (req, res) => {
       return res.json({ success: false, message: "Unauthorized booking access" });
     }
 
-    if (booking.paymentStatus === "paid") {
-      return res.json({ success: false, message: "Booking is already marked as paid." });
+    const paymentSnapshot = getBookingPaymentSnapshot(booking);
+
+    if (booking.paymentStatus === "pending" && paymentSnapshot.pendingPaymentAmount > 0) {
+      return res.json({ success: false, message: "A payment confirmation is already pending." });
     }
 
-    const amount = booking.totalPrice; 
-    const description = "Your receipt from Mercedarian Retreat House";
+    if (isBookingFullyPaid(booking)) {
+      return res.json({ success: false, message: "Booking is already fully paid." });
+    }
+
+    const paymentRequest = resolveBookingPaymentAmount(booking, requestedAmount);
+    if (!paymentRequest.valid) {
+      return res.json({ success: false, message: paymentRequest.message });
+    }
+
+    const amount = paymentRequest.amount;
+    const description = "Your booking payment receipt from Mercedarian Retreat House";
     const user = booking.userId;
     const customerName = user
       ? [user.firstName, user.middleName, user.lastName, user.suffix].filter(Boolean).join(" ")
@@ -55,7 +71,7 @@ export const createCheckoutSession = async (req, res) => {
               {
                 currency: "PHP",
                 amount: amount * 100, // Convert to Centavos
-                description: `Booking reference: ${bookingId}`,
+                description: `Booking payment for booking reference: ${bookingId}`,
                 name: "Mercedarian Retreat House",
                 quantity: 1,
               },
@@ -74,10 +90,9 @@ export const createCheckoutSession = async (req, res) => {
     const response = await axios.request(options);
 
     try {
-      await bookingModel.findByIdAndUpdate(bookingId, {
-        paymentMethod: "gcash",
-        paymentStatus: "pending"
-      });
+      booking.paymentMethod = "gcash";
+      booking.pendingPaymentAmount = amount;
+      await booking.save();
     } catch (updateError) {
       console.error("Failed to update booking payment method:", updateError.message);
     }

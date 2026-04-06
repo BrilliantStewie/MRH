@@ -8,7 +8,7 @@ import { toast } from "react-toastify";
 import {
     ArrowLeft, Calendar, User, Package, CheckCircle,
     Trash2, Image as ImageIcon, Building2, Users,
-    Utensils, Wind, Tag, ChevronDown, ChevronUp, Info
+    Utensils, Wind, Tag, ChevronDown, ChevronUp, Info, X
 } from "lucide-react";
 import {
     getBookingCheckInDateValue,
@@ -20,6 +20,23 @@ import {
 } from "../utils/realtime";
 
 const RETREAT_AVAILABILITY_REFRESH_INTERVAL_MS = 15000;
+const getBookingTermsSections = (currencySymbol = "PHP ") => [
+    {
+        title: "Payment Terms",
+        items: [
+            "You may choose how much to pay for this booking.",
+            "The confirmed total must reach at least 50% downpayment before the booking is treated as secured.",
+            `After the booking is secured, each succeeding payment must be at least ${currencySymbol}100 unless the remaining balance is below ${currencySymbol}100.`,
+        ],
+    },
+    {
+        title: "Cancellation and Refund Policy",
+        items: [
+            "If the booking is cancelled more than 7 days before check-in, only the confirmed 50% downpayment is refundable.",
+            "Cancellations made 7 days or less before check-in are non-refundable.",
+        ],
+    },
+];
 
 const RetreatBooking = () => {
     const { backendUrl, token, selectedRooms, addRoom, removeRoom, clearRooms, currencySymbol } = useContext(AppContext);
@@ -65,6 +82,29 @@ const RetreatBooking = () => {
         const saved = sessionStorage.getItem("draftSelectedPackages");
         return saved ? JSON.parse(saved) : {};
     });
+    const [acceptedBookingTerms, setAcceptedBookingTerms] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+
+    const bookingTermsSections = getBookingTermsSections(currencySymbol);
+
+    useEffect(() => {
+        if (!showTermsModal) return undefined;
+
+        const originalOverflow = document.body.style.overflow;
+        const handleKeyDown = (event) => {
+            if (event.key === "Escape") {
+                setShowTermsModal(false);
+            }
+        };
+
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [showTermsModal]);
 
     // Save session state
     useEffect(() => {
@@ -556,6 +596,9 @@ const RetreatBooking = () => {
         if (!startDate || !endDate) return toast.error("Please select dates.");
         if (!token) { toast.error("Please login first."); navigate("/login"); return; }
         if (!bookingName.trim()) return toast.error("Please enter an Event Name.");
+        if (!acceptedBookingTerms) {
+            return toast.error("Please accept the booking terms and refund policy.");
+        }
         if (selectedRooms.length === 0) {
             if (Number(venueParticipants) <= 0) {
                 return toast.error("Please enter venue participants.");
@@ -678,7 +721,11 @@ const RetreatBooking = () => {
         !endDate ||
         (selectedRooms.length === 0 && (venueParticipants <= 0 || !hasVenuePackageSelected())) ||
         (isSameDayBooking && selectedRooms.length > 0) ||
-        selectedRooms.some(room => !roomPackages[room._id]);
+        selectedRooms.some(room => !roomPackages[room._id]) ||
+        !acceptedBookingTerms;
+
+    const bookingTotal = calculateTotal();
+    const requiredDownpayment = bookingTotal * 0.5;
 
     // Get unique package IDs currently in use to display in Step 3
     const uniqueSelectedPackageIds = [
@@ -731,7 +778,7 @@ const RetreatBooking = () => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 px-3 pt-8 pb-20 font-sans text-slate-900 sm:px-4 lg:px-6 xl:px-8 2xl:px-10">
+        <div className="min-h-screen w-full bg-slate-50 font-sans text-slate-900">
             <style>{`
                 .react-datepicker-wrapper { width: 100%; }
                 .react-datepicker { font-family: inherit; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: none; overflow: hidden; }
@@ -843,6 +890,7 @@ const RetreatBooking = () => {
                 .custom-input { width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #334155; outline: none; transition: all 0.2s; background: white; }
                 .custom-input:focus { border-color: #0f172a; box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05); }
             `}</style>
+            <div className="mx-auto w-full max-w-[1400px] px-3 pt-8 pb-20 sm:px-4 lg:px-6 xl:px-8 2xl:px-10">
 
             <div className="mb-8 flex w-full items-center gap-4">
                 <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
@@ -851,8 +899,8 @@ const RetreatBooking = () => {
                 <h1 className="text-2xl font-bold tracking-tight">Complete Your Booking</h1>
             </div>
 
-            <div className="flex w-full flex-col gap-8 lg:flex-row lg:items-start">
-                <div className="flex-1 space-y-6">
+            <div className="flex w-full flex-col gap-8 lg:flex-row lg:items-start lg:justify-center">
+                <div className="w-full space-y-6 lg:max-w-[860px] xl:max-w-[920px]">
 
                     {/* 1. DATES & PEOPLE */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -1095,8 +1143,8 @@ const RetreatBooking = () => {
                                                                         <>
                                                                             <option value="" disabled>Select a package...</option>
                                                                             {availablePkgs.map(pkg => (
-                                                                                <option key={pkg._id} value={pkg._id}>
-                                                                                    {pkg.name} (+{currencySymbol}{getPrice(pkg.price)}/pax)
+                                                                            <option key={pkg._id} value={pkg._id}>
+                                                                                    {pkg.name} (Price: {currencySymbol}{getPrice(pkg.price)} per participant)
                                                                                 </option>
                                                                             ))}
                                                                         </>
@@ -1181,9 +1229,12 @@ const RetreatBooking = () => {
                                                 )}
                                             </div>
                                             <div className="pt-3 border-t border-slate-200 mt-auto">
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                                                    Price
+                                                </p>
                                                 <p className="font-bold text-slate-900 text-sm">
-                                                    {pkgPrice === 0 ? "Free / Included" : `+${currencySymbol}${pkgPrice}`}
-                                                    {pkgPrice > 0 && <span className="text-xs text-slate-400 font-medium"> /pax/day</span>}
+                                                    {pkgPrice === 0 ? "Free / Included" : `${currencySymbol}${pkgPrice}`}
+                                                    {pkgPrice > 0 && <span className="text-xs text-slate-400 font-medium"> per participant / day</span>}
                                                 </p>
                                             </div>
                                         </div>
@@ -1231,7 +1282,61 @@ const RetreatBooking = () => {
                         </div>
                         <div className="flex justify-between items-center mb-6">
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Price</span>
-                            <span className="font-extrabold text-3xl text-slate-900">{currencySymbol}{calculateTotal().toLocaleString()}</span>
+                            <span className="font-extrabold text-3xl text-slate-900">{currencySymbol}{bookingTotal.toLocaleString()}</span>
+                        </div>
+                        <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700">Required Downpayment</p>
+                            <p className="mt-1 text-lg font-extrabold text-emerald-900">{currencySymbol}{requiredDownpayment.toLocaleString()}</p>
+                            <p className="mt-1 text-xs leading-5 text-emerald-800">
+                                The booking will only be treated as booked once a confirmed payment reaches at least 50% of the total amount.
+                            </p>
+                        </div>
+                        <div className="mb-5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left">
+                            <div className="flex items-start gap-3">
+                                <input
+                                    id="retreat-booking-terms"
+                                    type="checkbox"
+                                    checked={acceptedBookingTerms}
+                                    onChange={(e) => setAcceptedBookingTerms(e.target.checked)}
+                                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <div className="min-w-0 text-sm leading-6 text-slate-700">
+                                    <label
+                                        htmlFor="retreat-booking-terms"
+                                        className="cursor-pointer"
+                                    >
+                                        I certify that I have read and agree to the{" "}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setShowTermsModal(true);
+                                        }}
+                                        className="font-semibold text-sky-600 underline underline-offset-2 transition hover:text-sky-700"
+                                    >
+                                        Terms and Conditions
+                                    </button>
+                                    <label htmlFor="retreat-booking-terms" className="cursor-pointer">
+                                        {" "}and{" "}
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setShowTermsModal(true);
+                                        }}
+                                        className="font-semibold text-sky-600 underline underline-offset-2 transition hover:text-sky-700"
+                                    >
+                                        Refund Policy
+                                    </button>
+                                    <label htmlFor="retreat-booking-terms" className="cursor-pointer">
+                                        .
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                         <button onClick={handleProceed} disabled={isInvalidBookingState} className={`w-full py-4 rounded-xl font-bold uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2 ${isInvalidBookingState ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none" : "bg-blue-500 text-white hover:bg-blue-600 shadow-lg shadow-blue-200 active:scale-[0.98]"}`}>
                             Book Now <CheckCircle size={16} />
@@ -1242,6 +1347,91 @@ const RetreatBooking = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+            {showTermsModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+                        onClick={() => setShowTermsModal(false)}
+                    />
+
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="retreat-booking-terms-title"
+                        className="relative z-10 flex w-full max-w-2xl flex-col overflow-hidden rounded-[30px] border border-blue-100 bg-white shadow-[0_32px_90px_-26px_rgba(15,23,42,0.45)]"
+                    >
+                        <div className="relative overflow-hidden border-b border-blue-100 bg-gradient-to-br from-blue-600 via-sky-600 to-cyan-500 px-6 py-5 text-white">
+                            <div className="absolute -right-14 -top-12 h-36 w-36 rounded-full bg-white/10 blur-2xl" />
+                            <div className="absolute -left-10 bottom-0 h-24 w-24 rounded-full bg-cyan-300/20 blur-2xl" />
+                            <div className="relative flex items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-100">
+                                        Retreat Booking
+                                    </p>
+                                    <h3 id="retreat-booking-terms-title" className="mt-1 text-2xl font-bold">
+                                        Booking Terms & Policies
+                                    </h3>
+                                    <p className="mt-2 max-w-xl text-sm leading-6 text-blue-50">
+                                        Review these payment and refund rules before completing your booking.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTermsModal(false)}
+                                    className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
+                                    aria-label="Close terms and conditions"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-6 py-6">
+                            {bookingTermsSections.map((section) => (
+                                <div
+                                    key={section.title}
+                                    className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4"
+                                >
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                                        {section.title}
+                                    </p>
+                                    <div className="mt-3 space-y-3">
+                                        {section.items.map((item) => (
+                                            <div key={item} className="flex items-start gap-3">
+                                                <span className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
+                                                <p className="text-sm leading-6 text-slate-700">{item}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+
+                            <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-700">
+                                    Important
+                                </p>
+                                <p className="mt-2 text-sm leading-6 text-amber-900">
+                                    Proceeding with the booking means you confirm that you understand these terms and agree to follow them.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAcceptedBookingTerms(true);
+                                    setShowTermsModal(false);
+                                }}
+                                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                            >
+                                I Understand
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             </div>
         </div>
     );

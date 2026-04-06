@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { getBookingStayFlags } from "../utils/bookingStay.js";
 import { coerceBookingDateValue } from "../utils/bookingDateFields.js";
+import { getBookingPaymentSnapshot } from "../utils/bookingPayment.js";
 
 const bookingItemSchema = new mongoose.Schema(
   {
@@ -101,13 +102,25 @@ const bookingSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "pending", "paid"],
+      enum: ["unpaid", "pending", "partially_paid", "paid"],
       default: "unpaid",
     },
 
     payment: {
       type: Boolean,
       default: false,
+    },
+
+    amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    pendingPaymentAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
     checkIn: {
@@ -160,6 +173,33 @@ const bookingSchema = new mongoose.Schema(
     },
 
     checkOutConfirmedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    cancellationRequestedAt: {
+      type: Date,
+      default: null,
+    },
+
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundedAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    refundedAt: {
+      type: Date,
+      default: null,
+    },
+
+    refundedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
@@ -222,7 +262,39 @@ bookingSchema.pre("validate", function (next) {
     return next(new Error("Cannot confirm check-out before check-in"));
   }
 
-  this.payment = this.paymentStatus === "paid";
+  const normalizedStatus = String(this.status || "").trim().toLowerCase();
+
+  if (normalizedStatus === "cancelled" && !this.cancelledAt) {
+    this.cancelledAt = new Date();
+  } else if (normalizedStatus !== "cancelled") {
+    this.cancelledAt = null;
+  }
+
+  if (!["cancellation_pending", "cancelled"].includes(normalizedStatus)) {
+    this.cancellationRequestedAt = null;
+  }
+
+  const paymentSnapshot = getBookingPaymentSnapshot(this);
+  this.amountPaid = paymentSnapshot.amountPaid;
+  this.pendingPaymentAmount = paymentSnapshot.pendingPaymentAmount;
+  this.paymentStatus = paymentSnapshot.paymentStatus;
+  this.payment = paymentSnapshot.payment;
+
+  const normalizedRefundedAmount = Math.min(
+    Math.max(Number(this.refundedAmount || 0), 0),
+    paymentSnapshot.amountPaid
+  );
+
+  this.refundedAmount = normalizedRefundedAmount;
+
+  if (normalizedRefundedAmount <= 0) {
+    this.refundedAmount = 0;
+    this.refundedAt = null;
+    this.refundedBy = null;
+  } else if (!this.refundedAt) {
+    this.refundedAt = new Date();
+  }
+
   next();
 });
 

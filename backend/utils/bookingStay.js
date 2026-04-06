@@ -1,3 +1,5 @@
+import { hasRequiredBookingDownpayment } from "./bookingPayment.js";
+
 export const BOOKING_STAY_ACTIONS = Object.freeze({
   CHECK_IN: "checkIn",
   CHECK_OUT: "checkOut",
@@ -74,6 +76,8 @@ export const getBookingStayFlags = (booking = {}) => {
   };
 };
 
+export const isNoShowBooking = (booking = {}) => getBookingStayFlags(booking).noShow;
+
 export const getBookingStayStatus = (booking) => {
   const bookingStatus = String(booking?.status || "").trim().toLowerCase();
   const { checkIn, checkOut, noShow } = getBookingStayFlags(booking);
@@ -112,6 +116,15 @@ export const validateBookingStayAction = (booking, action) => {
 
   if (bookingStatus !== "approved") {
     return "Only approved bookings can be updated for stay confirmations.";
+  }
+
+  if (
+    [BOOKING_STAY_ACTIONS.CHECK_IN, BOOKING_STAY_ACTIONS.NO_SHOW].includes(
+      normalizedAction
+    ) &&
+    !hasRequiredBookingDownpayment(booking)
+  ) {
+    return "At least 50% downpayment must be confirmed before stay updates.";
   }
 
   if (normalizedAction === BOOKING_STAY_ACTIONS.CHECK_IN) {

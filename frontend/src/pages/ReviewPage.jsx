@@ -397,10 +397,12 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                     <p className="text-xl font-extrabold text-slate-900">₱{Number(booking.totalPrice || 0).toLocaleString()}</p>
                   </div>
                   <span className="rounded-full bg-slate-900 px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                    {booking.paymentStatus === "paid"
+                    {(booking.fullyPaid === true || booking.paymentStatus === "paid")
                       ? "Paid"
+                      : (booking.bookingSecured === true || booking.downpaymentSatisfied === true)
+                        ? "Booked"
                       : booking.status === "approved"
-                        ? "Waiting for payment"
+                        ? "Waiting for minimum payment"
                         : "Waiting for approval"}
                   </span>
                 </div>

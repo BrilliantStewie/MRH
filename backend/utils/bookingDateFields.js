@@ -36,7 +36,7 @@ const buildLegacyBookingDateRangeQuery = (dateField, start, end) => ({
 });
 
 const BOOKING_DATE_SELECT =
-  "checkIn checkInDate checkOut checkOutDate";
+  "checkIn checkInDate checkOut checkOutDate noShow checkInStatus";
 
 export {
   BOOKING_DATE_SELECT,

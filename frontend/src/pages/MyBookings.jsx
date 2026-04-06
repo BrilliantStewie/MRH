@@ -26,10 +26,148 @@ import {
 } from "../utils/realtime";
 
 const USER_BOOKINGS_REFRESH_INTERVAL_MS = 15000;
+const USER_BOOKINGS_PREVIEW_COUNT = 10;
+const BOOKING_FOLLOW_UP_MINIMUM_PAYMENT = 100;
+const normalizeBookingToken = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/[_-\s]/g, "")
+    .toLowerCase();
+
+const isNoShowBooking = (booking = {}) => {
+  const stayToken = normalizeBookingToken(booking?.stayStatus);
+  const checkInToken = normalizeBookingToken(booking?.checkInStatus);
+  return Boolean(booking?.noShow) || stayToken === "noshow" || checkInToken === "noshow";
+};
 
 // --- HELPER: Date Formatter ---
 const formatDate = (dateInput) => {
   return formatDatePHT(dateInput) || "N/A";
+};
+
+const getBookingTotalAmount = (booking = {}) => Number(booking?.totalPrice || 0);
+
+const getBookingDownpaymentAmount = (booking = {}) =>
+  Number(booking?.minimumDownpayment || getBookingTotalAmount(booking) * 0.5 || 0);
+
+const isBookingFullyPaid = (booking = {}) =>
+  booking?.fullyPaid === true ||
+  booking?.payment === true ||
+  String(booking?.paymentStatus || "").trim().toLowerCase() === "paid";
+
+const isBookingSecured = (booking = {}) =>
+  booking?.bookingSecured === true ||
+  booking?.downpaymentSatisfied === true ||
+  isBookingFullyPaid(booking);
+
+const isRefundProcessed = (booking = {}) =>
+  booking?.refundProcessed === true ||
+  Number(booking?.refundedAmount || 0) > 0 ||
+  Boolean(booking?.refundedAt);
+
+const shouldHideRefundReason = (reason = "") =>
+  /not refundable because cancellations?(?: was)? made .* days or less before check-in/i.test(
+    String(reason).trim()
+  );
+
+const getRefundPolicyLabel = (booking = {}) => {
+  const refundReason = String(booking?.refundReason || "").trim();
+
+  if (isRefundProcessed(booking)) {
+    return `Refund processed: ${formatPaymentCurrency(booking?.refundedAmount || 0)}.`;
+  }
+
+  if (booking?.refundEligible) {
+    return `Refundable amount: ${formatPaymentCurrency(booking?.refundableAmount || 0)} from the confirmed 50% downpayment.`;
+  }
+
+  if (Number(booking?.refundableDownpaymentAmount || booking?.amountPaid || 0) > 0) {
+    return shouldHideRefundReason(refundReason) ? "" : refundReason;
+  }
+
+  return "";
+};
+
+const normalizePaymentAmount = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return 0;
+  }
+
+  return Math.round(numericValue * 100) / 100;
+};
+
+const formatPaymentCurrency = (value) =>
+  `₱${normalizePaymentAmount(value).toLocaleString()}`;
+
+const getBookingPaidAmount = (booking = {}) => {
+  const explicitPaidAmount = normalizePaymentAmount(booking?.amountPaid);
+  const totalAmount = getBookingTotalAmount(booking);
+
+  if (explicitPaidAmount > 0) {
+    return Math.min(explicitPaidAmount, totalAmount || explicitPaidAmount);
+  }
+
+  return isBookingFullyPaid(booking) ? totalAmount : 0;
+};
+
+const getBookingRemainingBalance = (booking = {}) => {
+  const totalAmount = getBookingTotalAmount(booking);
+
+  if (booking?.remainingBalance !== undefined && booking?.remainingBalance !== null) {
+    return normalizePaymentAmount(
+      Math.min(booking.remainingBalance, totalAmount || booking.remainingBalance)
+    );
+  }
+
+  return normalizePaymentAmount(Math.max(totalAmount - getBookingPaidAmount(booking), 0));
+};
+
+const getBookingRemainingDownpayment = (booking = {}) =>
+  normalizePaymentAmount(
+    booking?.remainingDownpayment ??
+      Math.max(getBookingDownpaymentAmount(booking) - getBookingPaidAmount(booking), 0)
+  );
+
+const getBookingMinimumPaymentAmount = (booking = {}) => {
+  const remainingBalance = getBookingRemainingBalance(booking);
+  const remainingDownpayment = getBookingRemainingDownpayment(booking);
+
+  if (remainingBalance <= 0) return 0;
+
+  if (remainingDownpayment > 0) {
+    return normalizePaymentAmount(
+      Math.min(remainingDownpayment, remainingBalance || remainingDownpayment)
+    );
+  }
+
+  return normalizePaymentAmount(
+    Math.min(BOOKING_FOLLOW_UP_MINIMUM_PAYMENT, remainingBalance)
+  );
+};
+
+const getBookingPaymentGuidanceText = (booking = {}) => {
+  const minimumPaymentAmount = getBookingMinimumPaymentAmount(booking);
+  const remainingBalance = getBookingRemainingBalance(booking);
+
+  if (remainingBalance <= 0) {
+    return "This booking has no remaining balance.";
+  }
+
+  if (getBookingRemainingDownpayment(booking) > 0) {
+    return `You may pay any amount from ${formatPaymentCurrency(minimumPaymentAmount)} up to ${formatPaymentCurrency(remainingBalance)}. The booking becomes booked once the confirmed total reaches at least 50%.`;
+  }
+
+  return `Succeeding payments must be at least ${formatPaymentCurrency(minimumPaymentAmount)} and may be paid up to ${formatPaymentCurrency(remainingBalance)}.`;
+};
+
+const sanitizePaymentInputValue = (value) =>
+  String(value ?? "").replace(/-/g, "");
+
+const handlePaymentInputKeyDown = (event) => {
+  if (event.key === "-" || event.key === "Subtract") {
+    event.preventDefault();
+  }
 };
 
 // --- REUSABLE DROPDOWN COMPONENT ---
@@ -108,7 +246,7 @@ const MyBookings = () => {
   const [showAllBookings, setShowAllBookings] = useState(false);
   const [cancelDialog, setCancelDialog] = useState({ open: false, bookingId: null, isApproved: false });
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
-  const [cashDialog, setCashDialog] = useState({ open: false, bookingId: null });
+  const [paymentDrafts, setPaymentDrafts] = useState({});
 
   // Filters State
   const [activeTab, setActiveTab] = useState('all');
@@ -159,6 +297,93 @@ const MyBookings = () => {
     }
   };
 
+  const getDefaultPaymentDraft = (booking = {}) => {
+    const minimumPaymentAmount = getBookingMinimumPaymentAmount(booking);
+    const remainingBalance = getBookingRemainingBalance(booking);
+    const suggestedAmount = minimumPaymentAmount > 0 ? minimumPaymentAmount : remainingBalance;
+
+    return suggestedAmount > 0 ? String(suggestedAmount) : "";
+  };
+
+  const getPaymentDraftValue = (booking = {}) => {
+    const existingDraft = paymentDrafts[booking?._id];
+    return existingDraft !== undefined ? existingDraft : getDefaultPaymentDraft(booking);
+  };
+
+  const setPaymentDraftValue = (bookingId, value) => {
+    const sanitizedValue = sanitizePaymentInputValue(value);
+    setPaymentDrafts((current) => ({
+      ...current,
+      [bookingId]: sanitizedValue,
+    }));
+  };
+
+  const clearPaymentDraft = (bookingId) => {
+    setPaymentDrafts((current) => {
+      if (!(bookingId in current)) {
+        return current;
+      }
+
+      const nextDrafts = { ...current };
+      delete nextDrafts[bookingId];
+      return nextDrafts;
+    });
+  };
+
+  const validatePaymentAmount = (booking = {}, rawAmount) => {
+    const minimumPaymentAmount = getBookingMinimumPaymentAmount(booking);
+    const remainingBalance = getBookingRemainingBalance(booking);
+    const amount = normalizePaymentAmount(rawAmount);
+
+    if (remainingBalance <= 0) {
+      return {
+        valid: false,
+        amount,
+        minimumPaymentAmount,
+        remainingBalance,
+        message: "This booking has no remaining balance.",
+      };
+    }
+
+    if (!amount) {
+      return {
+        valid: false,
+        amount,
+        minimumPaymentAmount,
+        remainingBalance,
+        message: `Enter an amount between ${formatPaymentCurrency(minimumPaymentAmount)} and ${formatPaymentCurrency(remainingBalance)}.`,
+      };
+    }
+
+    if (amount < minimumPaymentAmount) {
+      return {
+        valid: false,
+        amount,
+        minimumPaymentAmount,
+        remainingBalance,
+        message: `The minimum payment for this booking is ${formatPaymentCurrency(minimumPaymentAmount)}.`,
+      };
+    }
+
+    if (amount > remainingBalance) {
+      return {
+        valid: false,
+        amount,
+        minimumPaymentAmount,
+        remainingBalance,
+        message: `The payment cannot be more than the remaining balance of ${formatPaymentCurrency(remainingBalance)}.`,
+      };
+    }
+
+    return {
+      valid: true,
+      amount,
+      minimumPaymentAmount,
+      remainingBalance,
+      message: "",
+    };
+  };
+
   // Payment Verification
   const verifyPaymentStatus = async (bookingId) => {
     const toastId = toast.loading("Verifying payment...");
@@ -177,23 +402,44 @@ const MyBookings = () => {
   };
 
   // Action Handlers
-  const submitCashPayment = async (bookingId) => {
+  const submitCashPayment = async (bookingId, rawAmount) => {
+    const booking = bookings.find((item) => item._id === bookingId);
+    const paymentValidation = validatePaymentAmount(booking, rawAmount);
+
+    if (!paymentValidation.valid) {
+      toast.warning(paymentValidation.message);
+      return false;
+    }
+
     const toastId = toast.loading("Setting cash payment...");
     try {
-      const { data } = await axios.post(backendUrl + '/api/user/mark-cash', { bookingId }, { headers: { token } });
+      const { data } = await axios.post(
+        backendUrl + '/api/user/mark-cash',
+        { bookingId, amount: paymentValidation.amount },
+        { headers: { token } }
+      );
       if (data.success) {
-        toast.update(toastId, { render: "Cash payment set. Proceed to counter.", type: "success", isLoading: false, autoClose: 2200 });
+        clearPaymentDraft(bookingId);
+        toast.update(toastId, { render: data.message || "Cash payment set. Proceed to counter.", type: "success", isLoading: false, autoClose: 2200 });
         fetchUserBookings();
+        return true;
       } else {
         toast.update(toastId, { render: data.message || "Unable to update payment method.", type: "error", isLoading: false, autoClose: 3000 });
       }
     } catch {
       toast.update(toastId, { render: "Cash payment update failed.", type: "error", isLoading: false, autoClose: 3000 });
     }
+    return false;
   }
 
-  const handleCashPayment = (bookingId) => {
-    setCashDialog({ open: true, bookingId });
+  const handleCashPayment = async (bookingId, rawAmount = null) => {
+    const booking = bookings.find((item) => item._id === bookingId);
+    const amount = rawAmount ?? getPaymentDraftValue(booking);
+    const success = await submitCashPayment(bookingId, amount);
+
+    if (success) {
+      setShowPaymentOptionsId(null);
+    }
   };
 
   const handleOnlinePayment = async (bookingId) => {
@@ -203,16 +449,26 @@ const MyBookings = () => {
       return;
     }
 
+    const paymentValidation = validatePaymentAmount(booking, getPaymentDraftValue(booking));
+    if (!paymentValidation.valid) {
+      toast.warning(paymentValidation.message);
+      return;
+    }
+
     try {
-      const toastId = toast.loading("Preparing GCash checkout...");
-      const { data } = await axios.post(backendUrl + "/api/user/create-checkout-session", { 
-  bookingId: booking._id,
-  amount: booking.totalPrice, 
-  description: `Room Booking ID: ${booking._id}`
-}, { headers: { token } });
+      const toastId = toast.loading(`Preparing ${formatPaymentCurrency(paymentValidation.amount)} payment...`);
+      const { data } = await axios.post(
+        backendUrl + "/api/user/create-checkout-session",
+        {
+          bookingId: booking._id,
+          amount: paymentValidation.amount,
+        },
+        { headers: { token } }
+      );
 
       if (data.success) {
         toast.update(toastId, { render: "Opening GCash checkout...", type: "success", isLoading: false, autoClose: 1200 });
+        setShowPaymentOptionsId(null);
         window.location.href = data.checkoutUrl;
       } else {
         toast.update(toastId, { render: data.message || "Unable to start GCash checkout.", type: "error", isLoading: false, autoClose: 3000 });
@@ -320,8 +576,8 @@ const MyBookings = () => {
       const latestApproved = [...bookings]
         .filter((b) => b.status === "approved")
         .sort((a, b) => {
-          const aDate = new Date(a.updatedAt || a.createdAt || getBookingCheckInDateValue(a) || 0).getTime();
-          const bDate = new Date(b.updatedAt || b.createdAt || getBookingCheckInDateValue(b) || 0).getTime();
+          const aDate = new Date(a.createdAt || a.date || a.updatedAt || getBookingCheckInDateValue(a) || 0).getTime();
+          const bDate = new Date(b.createdAt || b.date || b.updatedAt || getBookingCheckInDateValue(b) || 0).getTime();
           return bDate - aDate;
         })[0];
       if (latestApproved?._id) {
@@ -361,13 +617,13 @@ const MyBookings = () => {
     return () => clearInterval(id);
   }, []);
 
-  const getBookingSortTimestamp = (booking) => {
-    const status = String(booking?.status || "").toLowerCase();
+  const getBookingRequestTimestamp = (booking) => {
     const sortSource =
-      status === "pending" || status === "cancellation_pending"
-        ? booking?.createdAt || booking?.date || booking?.updatedAt || getBookingCheckInDateValue(booking)
-        : getBookingCheckInDateValue(booking) || booking?.slotDate || booking?.date || booking?.createdAt;
-
+      booking?.createdAt ||
+      booking?.date ||
+      booking?.updatedAt ||
+      getBookingCheckInDateValue(booking) ||
+      booking?.slotDate;
     const parsedDate = new Date(sortSource);
     return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
   };
@@ -398,8 +654,8 @@ const MyBookings = () => {
 
   }).sort((a, b) =>
     sortOrder === 'newest'
-      ? getBookingSortTimestamp(b) - getBookingSortTimestamp(a)
-      : getBookingSortTimestamp(a) - getBookingSortTimestamp(b)
+      ? getBookingRequestTimestamp(b) - getBookingRequestTimestamp(a)
+      : getBookingRequestTimestamp(a) - getBookingRequestTimestamp(b)
   );
 }, [bookings, activeTab, searchQuery, monthFilter, yearFilter, sortOrder]);
   
@@ -412,17 +668,34 @@ const MyBookings = () => {
 
   const months = Array.from({ length: 12 }, (_, i) => ({ label: getMonthLabelPHT(i), value: i.toString() }));
   const sortOptions = [{ label: "Newest First", value: "newest" }, { label: "Oldest First", value: "oldest" }];
-  const displayedBookings = showAllBookings ? filteredBookings : filteredBookings.slice(0, 5);
+  const displayedBookings = showAllBookings
+    ? filteredBookings
+    : filteredBookings.slice(0, USER_BOOKINGS_PREVIEW_COUNT);
   const selectedRoomItems = selectedBooking?.bookingItems || [];
   const selectedPackageObjects = selectedRoomItems.map(item => item.packageId).filter(Boolean);
   const selectedExtraPackages = Array.isArray(selectedBooking?.extraPackages)
     ? selectedBooking.extraPackages.filter(pkg => typeof pkg === "object" && pkg)
     : [];
+  const selectedBookingIsNoShow = isNoShowBooking(selectedBooking);
   const uniquePackages = Array.from(
     new Map(
       [...selectedPackageObjects, ...selectedExtraPackages].map(pkg => [pkg._id || pkg, pkg])
     ).values()
   ).filter(pkg => typeof pkg === "object");
+  const cancelDialogBooking = bookings.find((booking) => booking._id === cancelDialog.bookingId) || null;
+  const paymentModalBooking = bookings.find((booking) => booking._id === showPaymentOptionsId) || null;
+  const paymentModalDraftValue = paymentModalBooking
+    ? getPaymentDraftValue(paymentModalBooking)
+    : "";
+  const paymentModalValidation = paymentModalBooking
+    ? validatePaymentAmount(paymentModalBooking, paymentModalDraftValue)
+    : {
+      valid: false,
+      amount: 0,
+      minimumPaymentAmount: 0,
+      remainingBalance: 0,
+      message: "",
+    };
 
   const getStatusBadge = (status) => {
     const styles = {
@@ -451,6 +724,11 @@ const MyBookings = () => {
                   {cancelDialog.isApproved
                     ? "This will send a cancellation request to the admin for review."
                     : "This booking will be canceled immediately."}
+                </p>
+                <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
+                  {cancelDialogBooking
+                    ? getRefundPolicyLabel(cancelDialogBooking)
+                    : "Refunds only apply to the confirmed 50% downpayment when cancellation is made more than 7 days before check-in."}
                 </p>
               </div>
             </div>
@@ -496,38 +774,93 @@ const MyBookings = () => {
           </div>
         </div>
       )}
-      {cashDialog.open && (
+      {paymentModalBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-[0_20px_60px_-30px_rgba(15,23,42,0.6)]">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                <Banknote size={20} />
+                <Wallet size={20} />
               </div>
               <div className="flex-1">
-                <p className="text-base font-bold text-slate-900">Pay over counter?</p>
+                <p className="text-base font-bold text-slate-900">Choose payment method</p>
                 <p className="mt-1 text-sm text-slate-600">
-                  We will mark this booking as cash payment and notify the admin.
+                  Enter the amount you want to pay, then choose GCash or Cash.
+                </p>
+                <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
+                  Minimum now: {formatPaymentCurrency(getBookingMinimumPaymentAmount(paymentModalBooking))}. Remaining balance: {formatPaymentCurrency(getBookingRemainingBalance(paymentModalBooking))}.
                 </p>
               </div>
+              <button
+                type="button"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-700"
+                onClick={() => setShowPaymentOptionsId(null)}
+                aria-label="Close payment modal"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <label className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700">
+                Payment amount
+              </label>
+              <input
+                type="number"
+                min={getBookingMinimumPaymentAmount(paymentModalBooking)}
+                max={getBookingRemainingBalance(paymentModalBooking)}
+                step="0.01"
+                onKeyDown={handlePaymentInputKeyDown}
+                value={paymentModalDraftValue}
+                onChange={(event) => {
+                  const nextAmount = sanitizePaymentInputValue(event.target.value);
+                  if (paymentModalBooking?._id) {
+                    setPaymentDraftValue(paymentModalBooking._id, nextAmount);
+                  }
+                }}
+                aria-invalid={!paymentModalValidation.valid}
+                className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:ring-4 ${
+                  paymentModalValidation.valid
+                    ? "border-blue-200 focus:border-blue-400 focus:ring-blue-100"
+                    : "border-rose-300 focus:border-rose-400 focus:ring-rose-100"
+                }`}
+                placeholder={getDefaultPaymentDraft(paymentModalBooking)}
+              />
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                {getBookingPaymentGuidanceText(paymentModalBooking)}
+              </p>
+              {!paymentModalValidation.valid && (
+                <p className="mt-2 flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                  <span>{paymentModalValidation.message}</span>
+                </p>
+              )}
             </div>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
-                onClick={() => setCashDialog({ open: false, bookingId: null })}
+                disabled={!paymentModalValidation.valid}
+                className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-wider ${
+                  paymentModalValidation.valid
+                    ? "border border-blue-200 bg-white text-blue-700 hover:bg-blue-50"
+                    : "cursor-not-allowed bg-slate-200 text-slate-400"
+                }`}
+                onClick={() => paymentModalBooking?._id && handleOnlinePayment(paymentModalBooking._id)}
               >
-                Cancel
+                GCash
               </button>
               <button
                 type="button"
-                className="rounded-full bg-blue-600 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white hover:bg-blue-700"
-                onClick={async () => {
-                  if (!cashDialog.bookingId) return;
-                  setCashDialog({ open: false, bookingId: null });
-                  await submitCashPayment(cashDialog.bookingId);
-                }}
+                disabled={!paymentModalValidation.valid}
+                className={`rounded-full px-4 py-2 text-[10px] font-bold uppercase tracking-wider ${
+                  paymentModalValidation.valid
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "cursor-not-allowed bg-slate-200 text-slate-400"
+                }`}
+                onClick={() =>
+                  paymentModalBooking?._id &&
+                  handleCashPayment(paymentModalBooking._id, paymentModalDraftValue)
+                }
               >
-                Pay over the counter
+                Cash
               </button>
             </div>
           </div>
@@ -670,27 +1003,30 @@ const MyBookings = () => {
               const todayPH = getPHDateValue(new Date());
               const checkOutPH = getPHDateValue(checkOut);
               
-              const isPaid = booking.paymentStatus === "paid" || booking.payment === true;
-              const isCash = booking.paymentMethod === "cash";
+              const isFullyPaid = isBookingFullyPaid(booking);
+              const isBooked = isBookingSecured(booking);
               const isApproved = booking.status === "approved";
               const isCancellationPending = booking.status === "cancellation_pending";
               const hasPassed = Boolean(checkOutPH && todayPH > checkOutPH);
-              const isGCashPending = booking.paymentMethod === "gcash" && booking.paymentStatus === "pending";
+              const hasPendingPayment = booking.paymentStatus === "pending" && Number(booking.pendingPaymentAmount || 0) > 0;
+              const isGCashPending = booking.paymentMethod === "gcash" && hasPendingPayment;
+              const isCashPending = booking.paymentMethod === "cash" && hasPendingPayment;
+              const isNoShow = isNoShowBooking(booking);
               
               const showPaymentButtons =
                 booking.status === "approved" &&
-                booking.paymentStatus === "unpaid" &&
-                !isPaid &&
-                !isCash &&
-                booking.paymentMethod !== "gcash";
-              const canRate = isApproved && hasPassed && !booking.rating;
+                !isFullyPaid &&
+                !hasPendingPayment &&
+                !isNoShow;
+              const canRate = isApproved && hasPassed && !booking.rating && !isNoShow;
               const hasRated = booking.rating > 0;
 
               // Logic: Show cancel button if not passed, not already cancelled/declined, and not already pending admin review
               const showCancelButton = !hasPassed && 
                                        !booking.status.includes('cancelled') && 
                                        !booking.status.includes('declined') && 
-                                       !isCancellationPending;
+                                       !isCancellationPending &&
+                                       !isNoShow;
 
               const imageUrl = isVenueOnly
                 ? venueOnlyImage
@@ -700,9 +1036,13 @@ const MyBookings = () => {
                 <div
                   id={`booking-${booking._id}`}
                   key={booking._id}
-                  className={`group relative bg-white/95 rounded-[28px] p-4 md:p-5 border border-slate-200/70 shadow-[0_20px_60px_-45px_rgba(15,23,42,0.45)] hover:shadow-[0_26px_70px_-45px_rgba(15,23,42,0.55)] hover:border-slate-200 transition-all duration-300 cursor-pointer overflow-hidden ${flashBookingId === `booking-${booking._id}` ? "booking-flash" : ""}`}
+                  className={`group relative overflow-hidden rounded-[28px] border p-4 transition-all duration-300 md:p-5 ${
+                    isNoShow
+                      ? "border-rose-200/80 bg-rose-50/55 shadow-[0_20px_60px_-45px_rgba(190,24,93,0.22)]"
+                      : "cursor-pointer border-slate-200/70 bg-white/95 shadow-[0_20px_60px_-45px_rgba(15,23,42,0.45)] hover:border-slate-200 hover:shadow-[0_26px_70px_-45px_rgba(15,23,42,0.55)]"
+                  } ${flashBookingId === `booking-${booking._id}` ? "booking-flash" : ""}`}
                 >
-                  <div className="flex flex-col md:flex-row gap-6">
+                  <div className={`flex flex-col gap-6 md:flex-row ${isNoShow ? "pointer-events-none blur-[3px] saturate-[0.65] opacity-45" : ""}`}>
                     {/* IMAGE SECTION */}
                     <div className="w-full md:w-72 h-48 md:h-56 shrink-0 relative rounded-3xl overflow-hidden bg-slate-100 ring-1 ring-slate-100">
                       {imageUrl ? (
@@ -731,13 +1071,15 @@ const MyBookings = () => {
                         {/* End of Addition */}
 
 
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="mb-2 flex justify-between items-start gap-3">
                           <div className="flex items-center gap-2">
                             <h3 className="text-[20px] font-bold text-slate-900 line-clamp-1 pr-2">
                               {booking.bookingName || (isMultiRoom ? "Room Group" : primaryRoomName)}
                             </h3>
                           </div>
-                          {getStatusBadge(booking.status)}
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {getStatusBadge(booking.status)}
+                          </div>
                         </div>
 
                           <div className="space-y-3 mb-6">
@@ -762,26 +1104,42 @@ const MyBookings = () => {
                         <div>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Amount</p>
                           <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-2xl font-extrabold text-slate-900">₱{Number(booking.totalPrice).toLocaleString()}</span>
+                            <span className="text-2xl font-extrabold text-slate-900">{formatPaymentCurrency(booking.totalPrice)}</span>
                             
-                            {isPaid && (
+                            {isFullyPaid && (
                               <span className="flex items-center gap-1.5 pl-2 text-emerald-600 text-[11px] font-bold uppercase">
                                 <CheckCircle2 size={14} className="fill-emerald-100" /> Paid
                               </span>
                             )}
 
-                            {isGCashPending && (
-                              <span className="flex items-center gap-1.5 pl-2 text-amber-600 text-[11px] font-bold uppercase">
-                                <Loader2 size={14} className="animate-spin" /> Verifying
+                            {!isFullyPaid && isBooked && (
+                              <span className="flex items-center gap-1.5 pl-2 text-emerald-600 text-[11px] font-bold uppercase">
+                                <CheckCircle2 size={14} className="fill-emerald-100" /> Booked
                               </span>
                             )}
 
-                            {isCash && !isPaid && (
+                            {isGCashPending && (
+                              <span className="flex items-center gap-1.5 pl-2 text-amber-600 text-[11px] font-bold uppercase">
+                                <Loader2 size={14} className="animate-spin" /> Verifying Payment
+                              </span>
+                            )}
+
+                            {isCashPending && (
                               <span className="flex items-center gap-1.5 pl-2 text-blue-600 text-[11px] font-bold uppercase">
-                                <Banknote size={14} /> Cash (Proceed to Counter)
+                                <Banknote size={14} /> Cash Pending (Counter)
                               </span>
                             )}
                           </div>
+                          {!isFullyPaid && isBooked && (
+                            <p className="mt-2 text-xs text-slate-500">
+                              {`Amount paid: ${formatPaymentCurrency(getBookingPaidAmount(booking))}. Remaining balance: ${formatPaymentCurrency(getBookingRemainingBalance(booking))}.`}
+                            </p>
+                          )}
+                          {getRefundPolicyLabel(booking) && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              {getRefundPolicyLabel(booking)}
+                            </p>
+                          )}
                           
                            {hasRated && (
                              <div className="flex items-center gap-1 mt-2">
@@ -794,45 +1152,28 @@ const MyBookings = () => {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                        <div className="flex flex-wrap gap-2 w-full md:w-auto md:justify-end">
                           {showPaymentButtons && (
-                            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto md:ml-auto">
-                              {showPaymentOptionsId === booking._id ? (
-                                <>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleOnlinePayment(booking._id); }}
-                                    className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-blue-200 text-blue-700 font-bold text-sm hover:bg-blue-50 hover:border-blue-300 transition-all"
-                                  >
-                                    <Wallet size={16} className="text-blue-500" />
-                                    GCash
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleCashPayment(booking._id); }}
-                                    className="flex-1 md:flex-none px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold text-sm hover:bg-slate-50 hover:border-slate-300 transition-all"
-                                  >
-                                    Cash
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setShowPaymentOptionsId(null); }}
-                                    className="h-10 w-10 rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all flex items-center justify-center"
-                                    aria-label="Cancel payment options"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setShowPaymentOptionsId(booking._id);
-                                  }}
-                                  className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white font-bold text-sm hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all"
-                                >
-                                  <Wallet size={16} className="text-blue-100" />
-                                  Pay now
-                                </button>
-                              )}
-                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPaymentDraftValue(booking._id, getDefaultPaymentDraft(booking));
+                                setShowPaymentOptionsId(booking._id);
+                              }}
+                              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 text-white font-bold text-sm hover:shadow-lg hover:shadow-blue-500/30 hover:-translate-y-0.5 transition-all"
+                            >
+                              <Wallet size={16} className="text-blue-100" />
+                              Pay now
+                            </button>
+                          )}
+
+                          {showCancelButton && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id, booking.status); }}
+                              className="flex-1 md:flex-none px-4 py-2.5 text-rose-500 font-bold text-sm hover:bg-rose-50 rounded-xl transition-all"
+                            >
+                              Cancel
+                            </button>
                           )}
 
                           {canRate && (
@@ -852,23 +1193,37 @@ const MyBookings = () => {
                               Edit Review
                             </button>
                           )}
-
-                          {showCancelButton && (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCancelBooking(booking._id, booking.status); }}
-                              className="flex-1 md:flex-none px-4 py-2.5 text-rose-500 font-bold text-sm hover:bg-rose-50 rounded-xl transition-all"
-                            >
-                              Cancel
-                            </button>
-                          )}
                         </div>
                       </div>
                     </div>
                   </div>
+
+                  {isNoShow && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center p-6">
+                      <div className="pointer-events-auto flex max-w-sm flex-col items-center gap-3 rounded-[24px] border border-rose-200 bg-white/92 px-6 py-5 text-center shadow-[0_24px_60px_-34px_rgba(190,24,93,0.45)] backdrop-blur-md">
+                        <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-rose-700">
+                          No-Show
+                        </span>
+                        <p className="text-sm font-semibold leading-6 text-slate-700">
+                          This booking was marked as no-show by the property.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedBooking(booking);
+                          }}
+                          className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.16em] text-white transition hover:bg-rose-700"
+                        >
+                          View details
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
               })}
-              {filteredBookings.length > 5 && (
+              {filteredBookings.length > USER_BOOKINGS_PREVIEW_COUNT && (
                 <div className="flex justify-center pt-2">
                   <button
                     onClick={() => setShowAllBookings((value) => !value)}
@@ -876,7 +1231,7 @@ const MyBookings = () => {
                   >
                     {showAllBookings
                       ? "Show less"
-                      : `Show all (+${Math.max(filteredBookings.length - 5, 0)} more)`}
+                      : `Show all (+${Math.max(filteredBookings.length - USER_BOOKINGS_PREVIEW_COUNT, 0)} more)`}
                   </button>
                 </div>
               )}
@@ -939,8 +1294,28 @@ const MyBookings = () => {
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Check-out</p>
                     <p className="text-sm font-semibold text-slate-900">{formatDate(getBookingCheckOutDateValue(selectedBooking))}</p>
                   </div>
-                  <div className="sm:ml-auto">{getStatusBadge(selectedBooking.status)}</div>
+                  <div className="sm:ml-auto flex flex-wrap items-center justify-end gap-2">
+                    {getStatusBadge(selectedBooking.status)}
+                    {selectedBookingIsNoShow && (
+                      <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+                        No-Show
+                      </span>
+                    )}
+                  </div>
                 </div>
+                {selectedBookingIsNoShow && (
+                  <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                    <div className="flex items-center gap-2 text-rose-700">
+                      <AlertTriangle size={16} />
+                      <span className="text-[11px] font-bold uppercase tracking-[0.16em]">
+                        No-Show Recorded
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-rose-700/90">
+                      This booking was marked as no-show by the property. You can still view this record here for reference.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1019,7 +1394,7 @@ const MyBookings = () => {
                           <p className="text-xs text-slate-500">{pkg.description || "Package details available upon request."}</p>
                         </div>
                         <div className="text-sm font-bold text-slate-900">
-                          ₱{Number(pkg.price || 0).toLocaleString()}
+                          {formatPaymentCurrency(pkg.price || 0)}
                         </div>
                       </div>
                     ))}
@@ -1040,13 +1415,25 @@ const MyBookings = () => {
               <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Billing</p>
-                  <p className="text-xl font-extrabold text-slate-900">₱{Number(selectedBooking.totalPrice || 0).toLocaleString()}</p>
+                  <p className="text-xl font-extrabold text-slate-900">{formatPaymentCurrency(selectedBooking.totalPrice || 0)}</p>
+                  {!isBookingFullyPaid(selectedBooking) && isBookingSecured(selectedBooking) && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {`Amount paid: ${formatPaymentCurrency(getBookingPaidAmount(selectedBooking))}. Remaining balance: ${formatPaymentCurrency(getBookingRemainingBalance(selectedBooking))}.`}
+                    </p>
+                  )}
+                  {getRefundPolicyLabel(selectedBooking) && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {getRefundPolicyLabel(selectedBooking)}
+                    </p>
+                  )}
                 </div>
                 <span className="rounded-full bg-slate-900 px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                  {selectedBooking.paymentStatus === "paid"
+                  {isBookingFullyPaid(selectedBooking)
                     ? "Paid"
+                    : isBookingSecured(selectedBooking)
+                      ? "Booked"
                     : selectedBooking.status === "approved"
-                      ? "Waiting for payment"
+                      ? "Waiting for minimum payment"
                       : "Waiting for approval"}
                 </span>
               </div>

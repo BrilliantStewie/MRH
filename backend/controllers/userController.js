@@ -25,6 +25,12 @@ import {
     BOOKING_DATE_SELECT,
     getBookingCheckInDate,
 } from "../utils/bookingDateFields.js";
+import {
+    getBookingPaymentSnapshot,
+    isBookingFullyPaid,
+    resolveBookingPaymentAmount,
+} from "../utils/bookingPayment.js";
+import { getBookingRefundSummary } from "../utils/bookingRefund.js";
 import { createValidatedBooking } from "../utils/bookingService.js";
 import { getBookingReviewEligibility } from "../utils/bookingRules.js";
 import {
@@ -1056,6 +1062,7 @@ const createBooking = async (req, res) => {
                         <p>Check-in: ${new Date(getBookingCheckInDate(newBooking)).toLocaleDateString()}</p>
                         <p>Total: PHP ${newBooking.totalPrice}</p>
                         <p>Status: Pending approval</p>
+                        <p>You may choose your payment amount once approved, but the confirmed total must reach at least 50% downpayment to secure the booking. After the booking is secured, each succeeding payment must be at least PHP 100 unless the remaining balance is below PHP 100.</p>
                         <p>Mercedarian Retreat House</p>
                     </div>
                 `
@@ -1096,20 +1103,36 @@ const cancelBooking = async (req, res) => {
             return res.json({ success: false, message: "Unauthorized booking access" });
         }
 
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+        const refundSummary = getBookingRefundSummary(booking, new Date());
+        const refundReason = String(refundSummary.refundReason || "").trim();
         const isApproved = booking.status === 'approved';
-        const isPaid = booking.payment === true || booking.paymentStatus === 'paid';
+        const isPaid = paymentSnapshot.amountPaid > 0 || booking.payment === true || booking.paymentStatus === 'paid';
 
         if (isApproved || isPaid) {
-            await bookingModel.findByIdAndUpdate(bookingId, { status: "cancellation_pending" });
+            await bookingModel.findByIdAndUpdate(bookingId, {
+                status: "cancellation_pending",
+                cancellationRequestedAt: new Date()
+            });
             await notifyAdminsAndStaff({
                 type: "booking_update",
                 message: `Cancellation request received: ${booking.bookingName || "Booking"}`,
                 link: `/admin/bookings?bookingId=${booking._id}`,
                 sender: booking.userId?._id || booking.userId
             });
-            res.json({ success: true, message: "Cancellation request sent for approval" });
+            res.json({
+                success: true,
+                message: refundSummary.refundEligible
+                    ? `Cancellation request sent for approval. Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).`
+                    : refundReason
+                        ? `Cancellation request sent for approval. ${refundReason}`
+                        : "Cancellation request sent for approval."
+            });
         } else {
-            await bookingModel.findByIdAndUpdate(bookingId, { status: "cancelled" });
+            await bookingModel.findByIdAndUpdate(bookingId, {
+                status: "cancelled",
+                cancelledAt: new Date()
+            });
             
             await sendEmail(
                 booking.userId.email,
@@ -1119,12 +1142,24 @@ const cancelBooking = async (req, res) => {
                         <p>Hello ${booking.userId.firstName || "Guest"},</p>
                         <p>Your booking was cancelled.</p>
                         <p>Check-in: ${new Date(getBookingCheckInDate(booking)).toLocaleDateString()}</p>
+                        ${refundSummary.refundEligible
+                            ? `<p>Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).</p>`
+                            : refundReason
+                                ? `<p>${refundReason}</p>`
+                                : ""}
                         <p>Mercedarian Retreat House</p>
                     </div>
                 `
             );
 
-            res.json({ success: true, message: "Booking Cancelled" });
+            res.json({
+                success: true,
+                message: refundSummary.refundEligible
+                    ? `Booking cancelled. Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).`
+                    : refundReason
+                        ? `Booking cancelled. ${refundReason}`
+                        : "Booking cancelled."
+            });
         }
     } catch (error) {
         res.json({ success: false, message: error.message });
@@ -1138,7 +1173,7 @@ const createCheckoutSession = async (req, res) => {
         if (!process.env.PAYMONGO_SECRET_KEY || !process.env.FRONTEND_URL) {
             return res.json({ success: false, message: "Payment configuration missing." });
         }
-        const { bookingId } = req.body;
+        const { bookingId, amount: requestedAmount } = req.body;
         const booking = await bookingModel
             .findById(bookingId)
             .populate("bookingItems.roomId")
@@ -1151,9 +1186,21 @@ const createCheckoutSession = async (req, res) => {
             return res.json({ success: false, message: "Unauthorized booking access" });
         }
 
-        if (booking.paymentStatus === "paid") {
-            return res.json({ success: false, message: "Booking is already marked as paid." });
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+
+        if (booking.paymentStatus === "pending" && paymentSnapshot.pendingPaymentAmount > 0) {
+            return res.json({ success: false, message: "A payment confirmation is already pending." });
         }
+
+        if (isBookingFullyPaid(booking)) {
+            return res.json({ success: false, message: "Booking is already fully paid." });
+        }
+
+        const paymentRequest = resolveBookingPaymentAmount(booking, requestedAmount);
+        if (!paymentRequest.valid) {
+            return res.json({ success: false, message: paymentRequest.message });
+        }
+        const checkoutAmount = paymentRequest.amount;
 
         const roomName = booking.bookingItems?.[0]?.roomId?.name;
         const packageName =
@@ -1177,11 +1224,11 @@ const createCheckoutSession = async (req, res) => {
                         name: customerName,
                         email: customerEmail
                     },
-                    description: "Your receipt from Mercedarian Retreat House",
+                    description: "Your booking payment receipt from Mercedarian Retreat House",
                     line_items: [{
                         currency: 'PHP',
-                        amount: booking.totalPrice * 100,
-                        description: `Booking for ${itemName}`,
+                        amount: checkoutAmount * 100,
+                        description: `Booking payment for ${itemName}`,
                         name: "Mercedarian Retreat House",
                         quantity: 1
                     }],
@@ -1202,15 +1249,18 @@ const createCheckoutSession = async (req, res) => {
         });
 
         try {
-            await bookingModel.findByIdAndUpdate(bookingId, {
-                paymentMethod: 'gcash',
-                paymentStatus: 'pending'
-            });
+            booking.paymentMethod = 'gcash';
+            booking.pendingPaymentAmount = checkoutAmount;
+            await booking.save();
         } catch (updateError) {
             console.error("Failed to update booking payment method:", updateError.message);
         }
 
-        res.json({ success: true, checkoutUrl: response.data.data.attributes.checkout_url });
+        res.json({
+            success: true,
+            checkoutUrl: response.data.data.attributes.checkout_url,
+            amount: checkoutAmount
+        });
     } catch (error) {
         const paymongoDetail = error.response?.data?.errors?.[0]?.detail;
         console.error("PayMongo checkout error:", error.response?.data || error.message);
@@ -1273,8 +1323,23 @@ const verifyPayment = async (req, res) => {
             return res.json({ success: false, message: "Unauthorized booking access" });
         }
 
-        if (booking.paymentStatus === "paid") {
-            return res.json({ success: true, message: "Payment already confirmed." });
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+        const hasPendingGcashPayment =
+            booking.paymentMethod === "gcash" &&
+            booking.paymentStatus === "pending" &&
+            paymentSnapshot.pendingPaymentAmount > 0;
+
+        if (isBookingFullyPaid(booking) && !hasPendingGcashPayment) {
+            return res.json({ success: true, message: "Booking is already fully paid." });
+        }
+
+        if (!hasPendingGcashPayment) {
+            return res.json({
+                success: true,
+                message: paymentSnapshot.downpaymentSatisfied
+                    ? "Booking is already secured. You may continue paying the remaining balance anytime."
+                    : "The booking still needs the required 50% downpayment to be secured."
+            });
         }
 
         if (booking.paymentMethod !== "gcash" || booking.paymentStatus !== "pending") {
@@ -1303,7 +1368,7 @@ const verifyPayment = async (req, res) => {
 
 const markCashPayment = async (req, res) => {
     try {
-        const { bookingId } = req.body;
+        const { bookingId, amount: requestedAmount } = req.body;
         const booking = await bookingModel.findById(bookingId).populate("userId");
 
         if (!booking) {
@@ -1314,14 +1379,25 @@ const markCashPayment = async (req, res) => {
             return res.json({ success: false, message: "Unauthorized booking access" });
         }
 
-        if (booking.paymentStatus === "paid") {
-            return res.json({ success: false, message: "Booking is already marked as paid." });
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+
+        if (booking.paymentStatus === "pending" && paymentSnapshot.pendingPaymentAmount > 0) {
+            return res.json({ success: false, message: "A payment confirmation is already pending." });
         }
 
-        await bookingModel.findByIdAndUpdate(bookingId, { 
-            paymentMethod: 'cash',
-            paymentStatus: 'pending'
-        });
+        if (isBookingFullyPaid(booking)) {
+            return res.json({ success: false, message: "Booking is already fully paid." });
+        }
+
+        const paymentRequest = resolveBookingPaymentAmount(booking, requestedAmount);
+        if (!paymentRequest.valid) {
+            return res.json({ success: false, message: paymentRequest.message });
+        }
+        const cashPaymentAmount = paymentRequest.amount;
+
+        booking.paymentMethod = 'cash';
+        booking.pendingPaymentAmount = cashPaymentAmount;
+        await booking.save();
 
         await notifyAdminsAndStaff({
             type: "payment_update",
@@ -1333,11 +1409,14 @@ const markCashPayment = async (req, res) => {
         await notifyUser({
             recipient: booking.userId?._id || booking.userId,
             type: "payment_update",
-            message: "Cash payment selected. Please pay at the counter.",
+            message: `Cash payment selected. Please pay PHP ${cashPaymentAmount.toLocaleString()} at the counter.`,
             link: `/my-bookings?bookingId=${booking._id}`
         });
 
-        res.json({ success: true, message: "Marked as Pay Now (Cash)" });
+        res.json({
+            success: true,
+            message: `Cash payment selected for PHP ${cashPaymentAmount.toLocaleString()}.`
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -1346,10 +1425,23 @@ const markCashPayment = async (req, res) => {
 const confirmCashPayment = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { 
-            payment: true,
-            paymentStatus: 'paid' 
-        }, { new: true }).populate("userId");
+        const booking = await bookingModel.findById(bookingId).populate("userId");
+
+        if (!booking) {
+            return res.json({ success: false, message: "Booking not found" });
+        }
+
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+        const confirmedAmount = paymentSnapshot.pendingPaymentAmount;
+
+        if (confirmedAmount <= 0) {
+            return res.json({ success: false, message: "No pending payment to confirm." });
+        }
+
+        booking.amountPaid = paymentSnapshot.amountPaid + confirmedAmount;
+        booking.pendingPaymentAmount = 0;
+        const updatedPaymentSnapshot = getBookingPaymentSnapshot(booking);
+        await booking.save();
 
         if (booking) {
             await sendEmail(
@@ -1358,8 +1450,8 @@ const confirmCashPayment = async (req, res) => {
                 `
                     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                         <p>Hello ${booking.userId.firstName},</p>
-                        <p>Your cash payment was confirmed.</p>
-                        <p>Your booking is now secured.</p>
+                        <p>Your cash payment of PHP ${confirmedAmount.toLocaleString()} was confirmed.</p>
+                        <p>${updatedPaymentSnapshot.fullyPaid ? "Your booking is now fully paid." : "Your booking is now secured."}</p>
                         <p>Mercedarian Retreat House</p>
                     </div>
                 `
@@ -1368,12 +1460,19 @@ const confirmCashPayment = async (req, res) => {
             await notifyUser({
                 recipient: booking.userId?._id || booking.userId,
                 type: "payment_update",
-                message: "Cash payment confirmed. Your reservation is secured.",
+                message: updatedPaymentSnapshot.fullyPaid
+                    ? "Cash payment confirmed. Your booking is now fully paid."
+                    : "Cash payment confirmed. Your booking is now secured.",
                 link: `/my-bookings?bookingId=${booking._id}`
             });
         }
 
-        res.json({ success: true, message: "Payment Confirmed by Admin" });
+        res.json({
+            success: true,
+            message: updatedPaymentSnapshot.fullyPaid
+                ? "Payment confirmed by admin. Booking is now fully paid."
+                : "Payment confirmed by admin. Booking is now secured."
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }

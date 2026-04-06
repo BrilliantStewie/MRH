@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import Review from "../models/reviewModel.js";
 import { getBookingStayFlags, getBookingStayStatus } from "./bookingStay.js";
+import { getBookingPaymentSnapshot } from "./bookingPayment.js";
+import { getBookingRefundSummary } from "./bookingRefund.js";
 import {
   getBookingCheckInDate,
   getBookingCheckOutDate,
@@ -175,6 +177,8 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
   const { checkIn, checkOut, noShow } = getBookingStayFlags(booking);
   const checkInDate = getBookingCheckInDate(booking);
   const checkOutDate = getBookingCheckOutDate(booking);
+  const paymentSnapshot = getBookingPaymentSnapshot(booking);
+  const refundSummary = getBookingRefundSummary(booking);
 
   return {
     ...bookingRest,
@@ -198,6 +202,30 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
     checkInDate: checkInDate || null,
     checkOutDate: checkOutDate || null,
     totalPrice: booking.totalPrice ?? 0,
+    amountPaid: paymentSnapshot.amountPaid,
+    pendingPaymentAmount: paymentSnapshot.pendingPaymentAmount,
+    minimumDownpayment: paymentSnapshot.minimumDownpayment,
+    remainingDownpayment: paymentSnapshot.remainingDownpayment,
+    remainingBalance: paymentSnapshot.remainingBalance,
+    downpaymentSatisfied: paymentSnapshot.downpaymentSatisfied,
+    bookingSecured: paymentSnapshot.downpaymentSatisfied,
+    fullyPaid: paymentSnapshot.fullyPaid,
+    paymentStatus: paymentSnapshot.paymentStatus,
+    payment: paymentSnapshot.payment,
+    cancellationRequestedAt: booking.cancellationRequestedAt || null,
+    cancelledAt: booking.cancelledAt || null,
+    refundWindowDays: refundSummary.refundWindowDays,
+    refundReferenceDate: refundSummary.refundReferenceDate,
+    daysBeforeCheckIn: refundSummary.daysBeforeCheckIn,
+    refundableAmount: refundSummary.refundableAmount,
+    refundableDownpaymentAmount: refundSummary.refundableDownpaymentAmount,
+    refundEligible: refundSummary.refundEligible,
+    refundReason: refundSummary.refundReason,
+    refundedAmount: booking.refundedAmount || 0,
+    refundedAt: booking.refundedAt || null,
+    refundedBy: booking.refundedBy || null,
+    refundProcessed:
+      Boolean(booking.refundedAt) || Number(booking.refundedAmount || 0) > 0,
     rating,
     review: comment,
     comment,

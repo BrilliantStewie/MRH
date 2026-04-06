@@ -19,6 +19,7 @@ import {
   resolveCancellation,
   paymentConfirmed,
   approveCancellationRequest,
+  processRefund,
   checkExpiredCancellations,
   getBuildings,
   addBuilding,
@@ -84,6 +85,7 @@ adminRouter.post("/confirm-payment", authAdmin, paymentConfirmed);
 adminRouter.post("/approve-cancellation", authAdmin, approveCancellationRequest);
 adminRouter.post("/check-expired-cancellations", authAdmin, checkExpiredCancellations);
 adminRouter.post("/resolve-cancellation", authAdmin, resolveCancellation);
+adminRouter.post("/process-refund", authAdmin, processRefund);
 
 // 💬 REVIEW CHAT (New Route for Admin/Staff replies)
 adminRouter.post("/add-review-chat", authAdmin, addReviewChat);

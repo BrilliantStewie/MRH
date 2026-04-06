@@ -495,6 +495,26 @@ const AdminContextProvider = ({ children }) => {
     }
 };
 
+  const processRefund = async (bookingId) => {
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/process-refund`,
+        { bookingId },
+        { headers: { token: aToken } }
+      );
+
+      if (data.success) {
+        toast.success(data.message);
+        getAllBookings();
+        getDashboardData();
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || error.message);
+    }
+  };
+
   const updateBookingStayStatus = async (bookingId, action) => {
     try {
       const { data } = await axios.put(
@@ -800,6 +820,7 @@ const AdminContextProvider = ({ children }) => {
     declineBooking,
     paymentConfirmed,
     approveCancellation,
+    processRefund,
     updateBookingStayStatus,
     hasNewBookings, // ✅ Exported for Sidebar
 

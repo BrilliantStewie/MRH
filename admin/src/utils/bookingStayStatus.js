@@ -103,6 +103,8 @@ const hasReachedCheckInDate = (booking = {}) => {
 };
 
 const isPaymentConfirmed = (booking = {}) =>
+  booking?.downpaymentSatisfied === true ||
+  booking?.bookingSecured === true ||
   String(booking?.paymentStatus || "").trim().toLowerCase() === "paid" ||
   booking?.payment === true;
 

@@ -4,7 +4,7 @@ import { AdminContext } from "../../context/AdminContext";
 import {
   ArrowUpDown, Search, User, RotateCcw, CalendarDays, ArrowRight,
   Moon, Home, Layers, Phone, CheckCircle, Building2,
-  Package, Info, X, Clock, BarChart3, ChevronDown, Trash2,
+  Package, Info, X, Clock, ChevronDown, Trash2,
   AlertCircle, CheckCircle2, XCircle, Banknote, Mail, Users, ChevronUp, ChevronLeft, ChevronRight
 } from "lucide-react";
 import FilterDropdown from "../../components/Admin/FilterDropdown";
@@ -31,12 +31,91 @@ import {
   getPHYear,
 } from "../../utils/dateTime";
 
-const BOOKINGS_PER_PAGE = 8;
+const DEFAULT_BOOKINGS_PER_PAGE = 10;
+const getBookingRequestTimestamp = (booking = {}) => {
+  const requestDate =
+    booking?.createdAt ||
+    booking?.date ||
+    booking?.updatedAt ||
+    getBookingCheckInDateValue(booking) ||
+    getBookingCheckOutDateValue(booking);
+  const parsedDate = new Date(requestDate);
+  return Number.isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
+};
+
 const getBookingRoomType = (item) =>
   String(item?.roomId?.roomType || item?.roomType || "").trim();
 
 const getBookingBuilding = (item) =>
   String(item?.roomId?.building || item?.building || "").trim();
+
+const getBookingRoomItems = (booking) =>
+  Array.isArray(booking?.bookingItems)
+    ? booking.bookingItems.filter((item) => item?.roomId)
+    : [];
+
+const isBookingFullyPaid = (booking = {}) =>
+  booking?.fullyPaid === true ||
+  booking?.payment === true ||
+  String(booking?.paymentStatus || "").trim().toLowerCase() === "paid";
+
+const isBookingSecured = (booking = {}) =>
+  booking?.bookingSecured === true ||
+  booking?.downpaymentSatisfied === true ||
+  isBookingFullyPaid(booking);
+
+const isRefundProcessed = (booking = {}) =>
+  booking?.refundProcessed === true ||
+  Number(booking?.refundedAmount || 0) > 0 ||
+  Boolean(booking?.refundedAt);
+
+const getRefundStatusLabel = (booking = {}) => {
+  if (isRefundProcessed(booking)) {
+    return `Refunded PHP ${Number(booking?.refundedAmount || 0).toLocaleString()}`;
+  }
+
+  if (
+    String(booking?.status || "").trim().toLowerCase() === "cancelled" &&
+    booking?.refundEligible &&
+    Number(booking?.refundableAmount || 0) > 0
+  ) {
+    return `Refund Due PHP ${Number(booking?.refundableAmount || 0).toLocaleString()}`;
+  }
+
+  return "";
+};
+
+const getBookingPaymentMeta = (booking = {}) => {
+  if (isBookingFullyPaid(booking)) {
+    return {
+      label: "Paid",
+      className: "text-emerald-500",
+      icon: CheckCircle2,
+    };
+  }
+
+  if (Number(booking?.pendingPaymentAmount || 0) > 0 || booking?.paymentStatus === "pending") {
+    return {
+      label: "Pending",
+      className: "text-amber-500",
+      icon: Clock,
+    };
+  }
+
+  if (isBookingSecured(booking)) {
+    return {
+      label: "Booked",
+      className: "text-emerald-500",
+      icon: CheckCircle2,
+    };
+  }
+
+  return {
+    label: "Unpaid",
+    className: "text-amber-500",
+    icon: Clock,
+  };
+};
 
 // --- HELPER COMPONENT: Status Badge ---
 const StatusBadge = ({ status }) => {
@@ -71,8 +150,75 @@ const StayStatusBadge = ({ booking }) => {
   );
 };
 
+const PaymentStatusIndicator = ({ booking, size = 10, className = "" }) => {
+  const meta = getBookingPaymentMeta(booking);
+  const Icon = meta.icon;
+
+  return (
+    <div className={`${className} ${meta.className}`}>
+      <Icon size={size} />
+      {meta.label}
+    </div>
+  );
+};
+
+const BookingUnitPreview = ({ booking, variant = "card" }) => {
+  const roomList = getBookingRoomItems(booking);
+  const previewRoom = roomList[0];
+  const isTable = variant === "table";
+
+  const containerClassName = isTable
+    ? "inline-flex max-w-full items-center justify-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5"
+    : "inline-flex max-w-full items-center gap-1.5 rounded-md border border-slate-100 bg-white px-2 py-1";
+  const titleClassName = isTable
+    ? "truncate text-[10px] font-semibold text-slate-600"
+    : "truncate text-[9px] font-black text-slate-600";
+  const metaClassName = isTable
+    ? "ml-auto flex items-center gap-1 border-l border-slate-200 pl-1.5 text-[9px] text-slate-400"
+    : "ml-auto flex items-center gap-0.5 border-l border-slate-200 pl-1.5 text-[8px] text-slate-400";
+  const overflowClassName = isTable
+    ? "text-[9px] font-semibold text-slate-500"
+    : "text-[8px] font-bold text-slate-500";
+  const iconSize = isTable ? 10 : 9;
+  const capacityIconSize = isTable ? 8 : 7;
+
+  if (!previewRoom) {
+    return (
+      <div className={containerClassName}>
+        <Building2 size={iconSize} className="text-slate-400" />
+        <span className={titleClassName}>Venue Only</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={containerClassName}>
+        <Home size={iconSize} className="text-slate-400" />
+        <span className={titleClassName}>{previewRoom.roomId?.name || "Room"}</span>
+        {previewRoom.roomId?.capacity && (
+          <span className={metaClassName}>
+            <Users size={capacityIconSize} /> {previewRoom.roomId?.capacity}
+          </span>
+        )}
+      </div>
+      {roomList.length > 1 && (
+        <span className={overflowClassName}>
+          +{roomList.length - 1} room{roomList.length - 1 > 1 ? "s" : ""}
+        </span>
+      )}
+    </>
+  );
+};
+
 // --- MODAL COMPONENT (High-End Details View) ---
-const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl }) => {
+const BookingDetailsModal = ({
+  isOpen,
+  onClose,
+  booking,
+  formatDate,
+  backendUrl,
+}) => {
   const [showAllRooms, setShowAllRooms] = useState(false);
   const [showAllPackages, setShowAllPackages] = useState(false);
 
@@ -94,7 +240,7 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 };
 
   const packagesList = getPackagesList();
-  const roomList = booking.bookingItems || [];
+  const roomList = getBookingRoomItems(booking);
   const bookingTitle =
     String(booking.bookingName || "").trim() ||
     roomList[0]?.roomId?.name ||
@@ -106,6 +252,17 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
   const visiblePackages = showAllPackages ? packagesList : packagesList.slice(0, 1);
   const stayConfirmationDetails = getStayConfirmationDetails(booking);
   const stayMeta = getStayStatusMeta(booking);
+  const roomGuestCount = roomList.reduce((sum, item) => sum + Number(item?.roomGuests || 0), 0);
+  const venueParticipants = Math.max(Number(booking?.participants || 0), 0);
+  const totalParticipants = roomGuestCount + venueParticipants;
+  const participantsSummary =
+    roomGuestCount > 0 && venueParticipants > 0
+      ? `${roomGuestCount} room guest${roomGuestCount === 1 ? "" : "s"} + ${venueParticipants} venue participant${venueParticipants === 1 ? "" : "s"}`
+      : roomGuestCount > 0
+        ? `${roomGuestCount} guest${roomGuestCount === 1 ? "" : "s"} assigned to rooms`
+        : venueParticipants > 0
+          ? `${venueParticipants} venue participant${venueParticipants === 1 ? "" : "s"}`
+          : "No participants recorded";
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -158,6 +315,19 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
                     )}
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-100 bg-white px-3 py-3 shadow-sm shadow-slate-100/60">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">
+                  Participants
+                </p>
+                <Users size={12} className="text-slate-300" />
+              </div>
+              <p className="mt-1 text-[22px] font-black leading-none text-slate-800">
+                {totalParticipants}
+              </p>
+              <p className="mt-1 text-[10px] leading-snug text-slate-500">{participantsSummary}</p>
             </div>
           </div>
 
@@ -216,44 +386,63 @@ const BookingDetailsModal = ({ isOpen, onClose, booking, formatDate, backendUrl 
 
           <div className="md:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Reserved Units ({roomList.length})</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Reserved Units {roomList.length > 0 ? `(${roomList.length})` : "(Venue Only)"}
+              </h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {visibleRooms.map((room, i) => {
-                const roomData = room.roomId;
+              {visibleRooms.length > 0 ? (
+                visibleRooms.map((room, i) => {
+                  const roomData = room.roomId;
 
-const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
-  ? roomData.images[0]
-  : roomData?.coverImage;
+                  const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
+                    ? roomData.images[0]
+                    : roomData?.coverImage;
 
-                const imageUrl = (roomImg && typeof roomImg === 'string') 
-                  ? (roomImg.startsWith('http') ? roomImg : `${backendUrl}/${roomImg}`)
-                  : null;
+                  const imageUrl = (roomImg && typeof roomImg === 'string')
+                    ? (roomImg.startsWith('http') ? roomImg : `${backendUrl}/${roomImg}`)
+                    : null;
 
-                return (
-                  <div key={i} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
-                    <div className="h-12 w-16 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
-                      {imageUrl ? (
-                        <img src={imageUrl} className="w-full h-full object-cover" alt="room" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center"><Home size={14} className="text-slate-300" /></div>
-                      )}
-                    </div>
-                    <div className="flex-grow">
-                      <div className="flex justify-between items-start">
-                        <p className="text-[11px] font-black text-slate-800">
-  {room.roomId?.name || "Room"}
-</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase">{room.roomId?.building}</p>
+                  return (
+                    <div key={i} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
+                      <div className="h-12 w-16 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                        {imageUrl ? (
+                          <img src={imageUrl} className="w-full h-full object-cover" alt="room" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center"><Home size={14} className="text-slate-300" /></div>
+                        )}
                       </div>
-                      <div className="flex justify-between items-end mt-0.5">
-                        <p className="text-[10px] text-slate-500 font-medium">{room.roomId?.roomType}</p>
-                        <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.roomId?.capacity}</p>
+                      <div className="flex-grow">
+                        <div className="flex justify-between items-start">
+                          <p className="text-[11px] font-black text-slate-800">
+                            {room.roomId?.name || "Room"}
+                          </p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase">{room.roomId?.building}</p>
+                        </div>
+                        <div className="flex justify-between items-end mt-0.5">
+                          <p className="text-[10px] text-slate-500 font-medium">{room.roomId?.roomType}</p>
+                          <p className="text-[10px] font-bold text-slate-600 bg-slate-50 px-1.5 rounded-md flex items-center gap-1"><Users size={10} /> {room.roomId?.capacity}</p>
+                        </div>
                       </div>
                     </div>
+                  );
+                })
+              ) : (
+                <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+                  <div className="flex h-12 w-16 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-300">
+                    <Building2 size={16} />
                   </div>
-                );
-              })}
+                  <div className="flex-grow">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-[11px] font-black text-slate-800">Venue Only</p>
+                      <p className="text-[9px] font-bold uppercase text-slate-400">No rooms</p>
+                    </div>
+                    <p className="mt-0.5 text-[10px] font-medium text-slate-500">
+                      This booking has no room selected.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             
             {roomList.length > 2 && (
@@ -321,7 +510,7 @@ const roomImg = (Array.isArray(roomData?.images) && roomData.images.length > 0)
 
         </div>
 
-        <div className="flex justify-end border-t border-slate-100 bg-slate-50 p-6">
+        <div className="staff-billing-hidden flex justify-end border-t border-slate-100 bg-slate-50 p-6">
           <div className="text-right">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Billing</p>
             <p className="text-xl font-black text-slate-900">₱{booking.totalPrice?.toLocaleString()}</p>
@@ -394,19 +583,25 @@ const ActionAlertModal = ({
 };
 
 // --- MAIN PAGE ---
-const AllBookings = () => {
- const {
-   aToken,
-   allBookings,
-   getAllBookings,
-   approveBooking,
-   declineBooking,
-   paymentConfirmed,
-   approveCancellation,
-   updateBookingStayStatus,
-   backendUrl,
- } = useContext(AdminContext);
+export const BookingsPage = ({
+  bookingsSource = [],
+  backendUrl = "",
+  pageTitle = "All Bookings",
+  pageSubtitle = "Manage and track guest reservations",
+  bookingsPerPage = DEFAULT_BOOKINGS_PER_PAGE,
+  showBilling = true,
+  onApproveBooking,
+  onDeclineBooking,
+  onConfirmPayment,
+  onResolveCancellation,
+  onProcessRefund,
+  onUpdateStayStatus,
+}) => {
   const location = useLocation();
+  const resolvedBookingsPerPage = Math.max(
+    1,
+    Number(bookingsPerPage) || DEFAULT_BOOKINGS_PER_PAGE
+  );
 
   const [bookings, setBookings] = useState([]);
   const [filteredBookings, setFilteredBookings] = useState([]);
@@ -455,7 +650,7 @@ const AllBookings = () => {
         ? "No active bookings match the current filters."
         : "No results found matching your filters.";
   const directoryLabel = archiveFilter === "Archived" ? "Archived Directory" : "Booking Directory";
-  const totalPages = Math.max(1, Math.ceil(visibleBookings.length / BOOKINGS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(visibleBookings.length / resolvedBookingsPerPage));
   const currentPageSafe = Math.min(currentPage, totalPages);
   const visiblePageCount = Math.min(3, totalPages);
   const halfVisiblePageCount = Math.floor(visiblePageCount / 2);
@@ -471,10 +666,13 @@ const AllBookings = () => {
     { length: visiblePageEnd - visiblePageStart + 1 },
     (_, index) => visiblePageStart + index
   );
-  const pageStartIndex = (currentPageSafe - 1) * BOOKINGS_PER_PAGE;
-  const paginatedBookings = visibleBookings.slice(pageStartIndex, pageStartIndex + BOOKINGS_PER_PAGE);
+  const pageStartIndex = (currentPageSafe - 1) * resolvedBookingsPerPage;
+  const paginatedBookings = visibleBookings.slice(
+    pageStartIndex,
+    pageStartIndex + resolvedBookingsPerPage
+  );
   const pageStart = visibleBookings.length === 0 ? 0 : pageStartIndex + 1;
-  const pageEnd = Math.min(pageStartIndex + BOOKINGS_PER_PAGE, visibleBookings.length);
+  const pageEnd = Math.min(pageStartIndex + resolvedBookingsPerPage, visibleBookings.length);
   const sortOptions = [
     { value: "Newest First", label: "Newest First" },
     { value: "Oldest First", label: "Oldest First" },
@@ -531,8 +729,9 @@ const AllBookings = () => {
     ...years.map((year) => ({ value: year, label: String(year) })),
   ];
 
-  useEffect(() => { if (aToken) getAllBookings(); }, [aToken]);
-  useEffect(() => { if (allBookings) setBookings(allBookings); }, [allBookings]);
+  useEffect(() => {
+    setBookings(Array.isArray(bookingsSource) ? bookingsSource : []);
+  }, [bookingsSource]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -563,8 +762,8 @@ const AllBookings = () => {
     setIsActionSubmitting(true);
 
     try {
-      if (actionAlert.type === "decline-booking") {
-        await declineBooking(actionAlert.bookingId);
+      if (actionAlert.type === "decline-booking" && typeof onDeclineBooking === "function") {
+        await onDeclineBooking(actionAlert.bookingId);
       }
       setActionAlert(null);
     } finally {
@@ -573,11 +772,13 @@ const AllBookings = () => {
   };
 
   const handleStayAction = async (bookingId, action) => {
+    if (typeof onUpdateStayStatus !== "function") return;
+
     const actionKey = `${bookingId}:${action}`;
     setActiveStayActionKey(actionKey);
 
     try {
-      await updateBookingStayStatus(bookingId, action);
+      await onUpdateStayStatus(bookingId, action);
     } finally {
       setActiveStayActionKey("");
     }
@@ -620,7 +821,7 @@ const AllBookings = () => {
     const bookingId = flashBookingId.replace("booking-", "");
     const bookingIndex = visibleBookings.findIndex((booking) => booking._id === bookingId);
     if (bookingIndex >= 0) {
-      const targetPage = Math.floor(bookingIndex / BOOKINGS_PER_PAGE) + 1;
+      const targetPage = Math.floor(bookingIndex / resolvedBookingsPerPage) + 1;
       if (targetPage !== currentPage) {
         setCurrentPage(targetPage);
         return;
@@ -640,7 +841,7 @@ const AllBookings = () => {
       attempts += 1;
     }, 250);
     return () => clearInterval(interval);
-  }, [flashBookingId, visibleBookings, currentPage]);
+  }, [flashBookingId, visibleBookings, currentPage, resolvedBookingsPerPage]);
 
   useEffect(() => {
     if (!Array.isArray(bookings)) return;
@@ -648,7 +849,23 @@ const AllBookings = () => {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(b => `${b.userId?.firstName} ${b.userId?.lastName}`.toLowerCase().includes(term) || b._id.toLowerCase().includes(term));
+      filtered = filtered.filter((b) => {
+        const guestFullName = `${b.userId?.firstName || ""} ${b.userId?.lastName || ""}`
+          .trim()
+          .toLowerCase();
+        const guestDisplayName = String(b.userId?.name || guestFullName).toLowerCase();
+        const guestEmail = String(b.userId?.email || "").toLowerCase();
+        const bookingId = String(b._id || "").toLowerCase();
+        const bookingName = String(b.bookingName || "").toLowerCase();
+
+        return (
+          guestFullName.includes(term) ||
+          guestDisplayName.includes(term) ||
+          guestEmail.includes(term) ||
+          bookingId.includes(term) ||
+          bookingName.includes(term)
+        );
+      });
     }
     
     if (buildingFilter !== "All Buildings") filtered = filtered.filter(b => b.bookingItems?.some(r => getBookingBuilding(r) === buildingFilter));
@@ -677,8 +894,8 @@ const AllBookings = () => {
     }
 
     filtered.sort((a, b) => {
-        const dateA = new Date(a.date || a.createdAt);
-        const dateB = new Date(b.date || b.createdAt);
+        const dateA = getBookingRequestTimestamp(a);
+        const dateB = getBookingRequestTimestamp(b);
         return sortOrder === "Newest First" ? dateB - dateA : dateA - dateB;
     });
 
@@ -717,63 +934,52 @@ const AllBookings = () => {
     setMonthFilter("All Months");
   };
 
-  // Total Bookings now only counts "approved", "confirmed", or "checkedIn" statuses
-  const stats = {
-    total: bookings.filter((b) =>
-      ["approved", "confirmed", "checkedin"].includes(
-        String(b.status || "").replace(/[_-\s]/g, "").toLowerCase()
-      )
-    ).length,
-    pending: bookings.filter(b => b.status?.toLowerCase() === 'pending').length,
-    revenue: bookings
-      .filter(b => b.status?.toLowerCase() !== 'cancelled' && (b.paymentStatus === 'paid' || b.payment === true))
-      .reduce((acc, curr) => acc + (curr.totalPrice || 0), 0)
-  };
-
   const renderBookingActionButtons = (b) => (
     <>
-      {b.status?.toLowerCase() === "pending" && (
+      {b.status?.toLowerCase() === "pending" && typeof onApproveBooking === "function" && (
         <>
           <button
-            onClick={() => approveBooking(b._id)}
+            onClick={() => onApproveBooking(b._id)}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-500 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-emerald-200 transition-all active:scale-[0.98] hover:bg-emerald-600"
           >
             <CheckCircle size={12} />
             Approve
           </button>
-          <button
-            onClick={() =>
-              setActionAlert({
-                type: "decline-booking",
-                bookingId: b._id,
-                title: "Decline Booking Request",
-                description:
-                  "This booking request will be declined and the guest will no longer proceed with this reservation unless they create a new request.",
-                confirmLabel: "Decline Booking",
-              })
-            }
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-rose-500 transition-all hover:bg-rose-50"
-          >
-            <X size={12} />
-            Decline
-          </button>
+          {typeof onDeclineBooking === "function" && (
+            <button
+              onClick={() =>
+                setActionAlert({
+                  type: "decline-booking",
+                  bookingId: b._id,
+                  title: "Decline Booking Request",
+                  description:
+                    "This booking request will be declined and the guest will no longer proceed with this reservation unless they create a new request.",
+                  confirmLabel: "Decline Booking",
+                })
+              }
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-rose-500 transition-all hover:bg-rose-50"
+            >
+              <X size={12} />
+              Decline
+            </button>
+          )}
         </>
       )}
 
       {b.status?.toLowerCase() === "approved" &&
-        b.paymentStatus !== "paid" &&
-        b.payment !== true &&
+        typeof onConfirmPayment === "function" &&
+        Number(b.pendingPaymentAmount || 0) > 0 &&
         (b.paymentMethod === "cash" || b.paymentMethod === "gcash") && (
           <button
-            onClick={() => paymentConfirmed(b._id)}
+            onClick={() => onConfirmPayment(b._id)}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-indigo-100 transition-all hover:bg-indigo-700"
           >
             <Banknote size={12} />
-            Confirm Payment
+            Confirm PHP {Number(b.pendingPaymentAmount || 0).toLocaleString()}
           </button>
         )}
 
-      {getAvailableStayActions(b).canConfirmCheckIn && (
+      {typeof onUpdateStayStatus === "function" && getAvailableStayActions(b).canConfirmCheckIn && (
         <button
           type="button"
           onClick={() => handleStayAction(b._id, "checkIn")}
@@ -785,7 +991,7 @@ const AllBookings = () => {
         </button>
       )}
 
-      {getAvailableStayActions(b).canMarkNoShow && (
+      {typeof onUpdateStayStatus === "function" && getAvailableStayActions(b).canMarkNoShow && (
         <button
           type="button"
           onClick={() => handleStayAction(b._id, "noShow")}
@@ -797,7 +1003,7 @@ const AllBookings = () => {
         </button>
       )}
 
-      {getAvailableStayActions(b).canConfirmCheckOut && (
+      {typeof onUpdateStayStatus === "function" && getAvailableStayActions(b).canConfirmCheckOut && (
         <button
           type="button"
           onClick={() => handleStayAction(b._id, "checkOut")}
@@ -809,23 +1015,43 @@ const AllBookings = () => {
         </button>
       )}
 
-      {b.status?.toLowerCase() === "cancellation_pending" && (
+      {b.status?.toLowerCase() === "cancellation_pending" && typeof onResolveCancellation === "function" && (
         <div className="flex flex-wrap items-center gap-1.5">
           <button
-            onClick={() => approveCancellation(b._id, "approve")}
+            onClick={() => onResolveCancellation(b._id, "approve")}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-rose-600 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-rose-100 transition-all active:scale-[0.98] hover:bg-rose-700"
           >
             <Trash2 size={12} />
             Approve
           </button>
           <button
-            onClick={() => approveCancellation(b._id, "reject")}
+            onClick={() => onResolveCancellation(b._id, "reject")}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 transition-all hover:bg-slate-50"
           >
             <X size={12} />
             Decline
           </button>
         </div>
+        )}
+      {b.status?.toLowerCase() === "cancelled" &&
+        typeof onProcessRefund === "function" &&
+        b.refundEligible &&
+        Number(b.refundableAmount || 0) > 0 &&
+        !isRefundProcessed(b) && (
+          <button
+            onClick={() => onProcessRefund(b._id)}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-emerald-100 transition-all hover:bg-emerald-700"
+          >
+            <RotateCcw size={12} />
+            Refund PHP {Number(b.refundableAmount || 0).toLocaleString()}
+          </button>
+        )}
+
+      {b.status?.toLowerCase() === "cancelled" && isRefundProcessed(b) && (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+          <CheckCircle2 size={12} />
+          Refunded
+        </span>
       )}
     </>
   );
@@ -835,7 +1061,7 @@ const AllBookings = () => {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-[#f8fafc] px-3 pt-4 pb-0 font-sans md:px-4 md:pt-5 md:pb-0 xl:px-5">
+    <div className={`flex h-full min-h-0 w-full flex-col bg-[#f8fafc] px-3 pt-4 pb-0 font-sans md:px-4 md:pt-5 md:pb-0 xl:px-5 ${showBilling ? "" : "[&_.staff-billing-hidden]:hidden"}`}>
       <style>{`
         @keyframes bookingFlashRow {
           0%, 100% { background-color: transparent; }
@@ -850,8 +1076,8 @@ const AllBookings = () => {
       <div className="mb-7 w-full">
         <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-800 sm:text-[2.35rem]">All Bookings</h1>
-            <p className="mt-1.5 text-[15px] font-medium text-slate-500">Manage and track guest reservations</p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-800 sm:text-[2.35rem]">{pageTitle}</h1>
+            <p className="mt-1.5 text-[15px] font-medium text-slate-500">{pageSubtitle}</p>
           </div>
           
           <div className="relative w-full sm:w-auto" ref={filterRef}>
@@ -938,21 +1164,6 @@ const AllBookings = () => {
         </div>
       </div>
 
-      {/* STATS CARDS */}
-      <div className="mb-7 ml-auto grid w-full max-w-[620px] grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="flex min-h-[86px] items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-sm transition-transform hover:scale-[1.01]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><Layers size={20}/></div>
-          <div><p className="text-[11px] font-black uppercase text-slate-400">Total Bookings</p><p className="text-[28px] font-black leading-none text-slate-800">{stats.total}</p></div>
-        </div>
-        <div className="flex min-h-[86px] items-center gap-4 rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-sm transition-transform hover:scale-[1.01]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600"><Clock size={20}/></div>
-          <div><p className="text-[11px] font-black uppercase text-slate-400">Awaiting Action</p><p className="text-[28px] font-black leading-none text-slate-800">{stats.pending}</p></div>
-        </div>
-        <div className="hidden items-center gap-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition-transform hover:scale-[1.01]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><BarChart3 size={20}/></div>
-          <div><p className="text-[11px] font-black text-slate-400 uppercase">Total Revenue (Paid)</p><p className="text-[28px] font-black leading-none text-slate-800">₱{stats.revenue.toLocaleString()}</p></div>
-        </div>
-      </div>
 
       {/* SEARCH AND FILTERS */}
       <div className="mb-6 w-full">
@@ -1031,8 +1242,8 @@ const AllBookings = () => {
       </div>
 
       {/* TABLE */}
-      <div className="mb-8 flex flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-2.5 p-3 lg:hidden">
+      <div className="mb-8 flex min-h-[520px] flex-1 flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-1 flex-col gap-2.5 p-3 lg:hidden">
           {visibleBookings.length > 0 ? (
             paginatedBookings.map((b) => (
               <div
@@ -1074,25 +1285,8 @@ const AllBookings = () => {
                     <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2.5">
                       <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Booking Details</p>
                       <div className="mt-2 flex flex-wrap items-center gap-1">
-                      {b.bookingItems?.slice(0, 1).map((room, idx) => (
-                        <div key={idx} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-slate-100 bg-white px-2 py-1">
-                          <Home size={9} className="text-slate-400" />
-                          <span className="truncate text-[9px] font-black text-slate-600">
-                            {room.roomId?.name || "Room"}
-                          </span>
-                          {room.roomId?.capacity && (
-                            <span className="ml-auto flex items-center gap-0.5 border-l border-slate-200 pl-1.5 text-[8px] text-slate-400">
-                              <Users size={7} /> {room.roomId?.capacity}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                      {b.bookingItems?.length > 1 && (
-                        <span className="text-[8px] font-bold text-slate-500">
-                          +{b.bookingItems.length - 1} room{b.bookingItems.length - 1 > 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
+                        <BookingUnitPreview booking={b} variant="card" />
+                      </div>
                     <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-2 flex w-fit items-center gap-1 text-[8px] font-black uppercase tracking-[0.12em] text-blue-600 hover:text-blue-700 hover:underline">
                       <Info size={9} /> Details
                     </button>
@@ -1114,13 +1308,22 @@ const AllBookings = () => {
                       )}
                     </div>
 
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2.5">
+                    <div className="staff-billing-hidden rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2.5">
                     <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Billing</p>
                     <p className="mt-1 text-sm font-black text-slate-800">â‚±{b.totalPrice?.toLocaleString()}</p>
-                    <div className={`mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest ${(b.paymentStatus === 'paid' || b.payment === true) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                      {(b.paymentStatus === 'paid' || b.payment === true) ? <CheckCircle2 size={9} /> : <Clock size={9} />}
-                      {(b.paymentStatus === 'paid' || b.payment === true) ? 'Paid' : 'Unpaid'}
-                    </div>
+                    <PaymentStatusIndicator
+                      booking={b}
+                      size={9}
+                      className="mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest"
+                    />
+                    <p className="mt-1 text-[8px] font-semibold text-slate-500">
+                      Paid: PHP {Number(b.amountPaid || 0).toLocaleString()}
+                    </p>
+                    {getRefundStatusLabel(b) && (
+                      <p className="mt-1 text-[8px] font-semibold text-rose-600">
+                        {getRefundStatusLabel(b)}
+                      </p>
+                    )}
                   </div>
 
                     <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 sm:justify-start">
@@ -1140,15 +1343,15 @@ const AllBookings = () => {
           )}
         </div>
 
-        <div className="hidden overflow-x-auto lg:block">
+        <div className="hidden flex-1 overflow-auto lg:block">
           <table className="w-full min-w-[1220px] table-fixed text-left">
-            <thead className="bg-slate-50/50 border-b border-slate-100">
+            <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 backdrop-blur">
               <tr>
                 <th className="w-[30%] px-5 py-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Guest Profile</th>
                 <th className="w-[23%] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Booking Details</th>
                 <th className="w-[17%] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Current Status</th>
                 <th className="w-[20%] px-5 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Actions</th>
-                <th className="w-[10%] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Billing & Payment</th>
+                <th className="staff-billing-hidden w-[10%] px-5 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Billing & Payment</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -1181,20 +1384,7 @@ const AllBookings = () => {
                   <td className="px-5 py-4 align-top">
                     <div className="flex flex-col items-start gap-2 text-left">
                       <div className="flex max-w-[340px] flex-wrap items-center gap-1.5">
-                        {b.bookingItems?.slice(0, 1).map((room, idx) => (
-                          <div key={idx} className="inline-flex max-w-full items-center justify-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                            <Home size={10} className="text-slate-400" />
-                            <span className="truncate text-[10px] font-semibold text-slate-600">
-                              {room.roomId?.name || "Room"}
-                            </span>
-                            {room.roomId?.capacity && <span className="ml-auto flex items-center gap-1 border-l border-slate-200 pl-1.5 text-[9px] text-slate-400"><Users size={8}/> {room.roomId?.capacity}</span>}
-                          </div>
-                        ))}
-                        {b.bookingItems?.length > 1 && (
-                          <span className="text-[9px] font-semibold text-slate-500">
-                            +{b.bookingItems.length - 1} room{b.bookingItems.length - 1 > 1 ? 's' : ''}
-                          </span>
-                        )}
+                        <BookingUnitPreview booking={b} variant="table" />
                       </div>
                       <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-0.5 flex w-fit items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-600 hover:text-blue-700 hover:underline">
                         <Info size={10}/> View Full Details
@@ -1217,13 +1407,14 @@ const AllBookings = () => {
                       {renderBookingActionButtons(b)}
                     </div>
                   </td>
-                  <td className="px-5 py-4 align-top">
+                  <td className="staff-billing-hidden px-5 py-4 align-top">
                     <div className="flex flex-col items-start text-left">
                       <p className="text-[18px] font-black text-slate-800">₱{b.totalPrice?.toLocaleString()}</p>
-                      <div className={`mt-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] ${ (b.paymentStatus === 'paid' || b.payment === true) ? 'text-emerald-500' : 'text-amber-500'}`}>
-                          {(b.paymentStatus === 'paid' || b.payment === true) ? <CheckCircle2 size={10}/> : <Clock size={10}/>}
-                          {(b.paymentStatus === 'paid' || b.payment === true) ? 'Paid' : 'Unpaid'}
-                      </div>
+                      <PaymentStatusIndicator
+                        booking={b}
+                        size={10}
+                        className="mt-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.18em]"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -1240,53 +1431,51 @@ const AllBookings = () => {
             </tbody>
           </table>
         </div>
-        {visibleBookings.length > 0 && (
-          <div className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full text-left sm:w-auto">
-              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">{directoryLabel}</p>
-              <p className="mt-1 text-[12px] font-semibold text-slate-800">
-                Showing {pageStart}-{pageEnd} of {visibleBookings.length} bookings
-              </p>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
-                  disabled={currentPageSafe === 1}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {visiblePageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-3 text-[10px] font-bold transition ${
-                        currentPageSafe === page
-                          ? "bg-slate-900 text-white shadow-md"
-                          : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
-                  disabled={currentPageSafe === totalPages}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            )}
+        <div className="mt-auto flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full text-left sm:w-auto">
+            <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">{directoryLabel}</p>
+            <p className="mt-1 text-[12px] font-semibold text-slate-800">
+              Showing {pageStart}-{pageEnd} of {visibleBookings.length} bookings
+            </p>
           </div>
-        )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
+                disabled={currentPageSafe === 1}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {visiblePageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`inline-flex h-9 min-w-9 items-center justify-center rounded-xl px-3 text-[10px] font-bold transition ${
+                      currentPageSafe === page
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                disabled={currentPageSafe === totalPages}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {false && (
@@ -1332,24 +1521,7 @@ const AllBookings = () => {
                     <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2.5">
                       <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Booking Details</p>
                       <div className="mt-2 flex flex-wrap items-center gap-1">
-                        {b.bookingItems?.slice(0, 1).map((room, idx) => (
-                          <div key={idx} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-slate-100 bg-white px-2 py-1">
-                            <Home size={9} className="text-slate-400" />
-                            <span className="truncate text-[9px] font-black text-slate-600">
-                              {room.roomId?.name || "Room"}
-                            </span>
-                            {room.roomId?.capacity && (
-                              <span className="ml-auto flex items-center gap-0.5 border-l border-slate-200 pl-1.5 text-[8px] text-slate-400">
-                                <Users size={7} /> {room.roomId?.capacity}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                        {b.bookingItems?.length > 1 && (
-                          <span className="text-[8px] font-bold text-slate-500">
-                            +{b.bookingItems.length - 1} room{b.bookingItems.length - 1 > 1 ? "s" : ""}
-                          </span>
-                        )}
+                        <BookingUnitPreview booking={b} variant="card" />
                       </div>
                       <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-2 flex w-fit items-center gap-1 text-[8px] font-black uppercase tracking-[0.12em] text-blue-600 hover:text-blue-700 hover:underline">
                         <Info size={9} /> Details
@@ -1369,10 +1541,11 @@ const AllBookings = () => {
                     <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-2.5 py-2.5">
                       <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">Billing</p>
                       <p className="mt-1 text-sm font-black text-slate-800">₱{b.totalPrice?.toLocaleString()}</p>
-                      <div className={`mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest ${(b.paymentStatus === "paid" || b.payment === true) ? "text-emerald-500" : "text-amber-500"}`}>
-                        {(b.paymentStatus === "paid" || b.payment === true) ? <CheckCircle2 size={9} /> : <Clock size={9} />}
-                        {(b.paymentStatus === "paid" || b.payment === true) ? "Paid" : "Unpaid"}
-                      </div>
+                      <PaymentStatusIndicator
+                        booking={b}
+                        size={9}
+                        className="mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1420,20 +1593,7 @@ const AllBookings = () => {
                     <td className="px-5 py-4 align-top">
                       <div className="flex flex-col items-start gap-2 text-left">
                         <div className="flex max-w-[340px] flex-wrap items-center gap-1.5">
-                          {b.bookingItems?.slice(0, 1).map((room, idx) => (
-                            <div key={idx} className="inline-flex max-w-full items-center justify-start gap-1.5 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-1.5">
-                              <Home size={10} className="text-slate-400" />
-                              <span className="truncate text-[10px] font-semibold text-slate-600">
-                                {room.roomId?.name || "Room"}
-                              </span>
-                              {room.roomId?.capacity && <span className="ml-auto flex items-center gap-1 border-l border-slate-200 pl-1.5 text-[9px] text-slate-400"><Users size={8} /> {room.roomId?.capacity}</span>}
-                            </div>
-                          ))}
-                          {b.bookingItems?.length > 1 && (
-                            <span className="text-[9px] font-semibold text-slate-500">
-                              +{b.bookingItems.length - 1} room{b.bookingItems.length - 1 > 1 ? "s" : ""}
-                            </span>
-                          )}
+                          <BookingUnitPreview booking={b} variant="table" />
                         </div>
                         <button onClick={() => { setSelectedBooking(b); setIsModalOpen(true); }} className="mt-0.5 flex w-fit items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.14em] text-blue-600 hover:text-blue-700 hover:underline">
                           <Info size={10} /> View Full Details
@@ -1449,10 +1609,11 @@ const AllBookings = () => {
                     <td className="px-5 py-4 align-top">
                       <div className="flex flex-col items-start text-left">
                         <p className="text-[18px] font-black text-slate-800">₱{b.totalPrice?.toLocaleString()}</p>
-                        <div className={`mt-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] ${(b.paymentStatus === "paid" || b.payment === true) ? "text-emerald-500" : "text-amber-500"}`}>
-                          {(b.paymentStatus === "paid" || b.payment === true) ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                          {(b.paymentStatus === "paid" || b.payment === true) ? "Paid" : "Unpaid"}
-                        </div>
+                        <PaymentStatusIndicator
+                          booking={b}
+                          size={10}
+                          className="mt-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-[0.18em]"
+                        />
                       </div>
                     </td>
                   </tr>
@@ -1481,6 +1642,41 @@ const AllBookings = () => {
         confirmLabel={actionAlert?.confirmLabel}
       />
     </div>
+  );
+};
+
+const AllBookings = () => {
+  const {
+    aToken,
+    allBookings,
+    getAllBookings,
+    approveBooking,
+    declineBooking,
+    paymentConfirmed,
+    approveCancellation,
+    processRefund,
+    updateBookingStayStatus,
+    backendUrl,
+  } = useContext(AdminContext);
+
+  useEffect(() => {
+    if (aToken) getAllBookings();
+  }, [aToken]);
+
+  return (
+    <BookingsPage
+      bookingsSource={allBookings}
+      backendUrl={backendUrl}
+      pageTitle="All Bookings"
+      pageSubtitle="Manage and track guest reservations"
+      bookingsPerPage={DEFAULT_BOOKINGS_PER_PAGE}
+      onApproveBooking={approveBooking}
+      onDeclineBooking={declineBooking}
+      onConfirmPayment={paymentConfirmed}
+      onResolveCancellation={approveCancellation}
+      onProcessRefund={processRefund}
+      onUpdateStayStatus={updateBookingStayStatus}
+    />
   );
 };
 

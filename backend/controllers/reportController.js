@@ -2,6 +2,7 @@ import bookingModel from "../models/bookingModel.js";
 import reportModel from "../models/reportModel.js";
 import roomModel from "../models/roomModel.js";
 import userModel from "../models/userModel.js";
+import { getBookingNetPaidAmount } from "../utils/bookingPayment.js";
 import {
   BOOKING_DATE_SELECT,
   buildLegacyBookingDateRangeQuery,
@@ -140,14 +141,12 @@ const getBookingParticipants = (booking) => {
   return roomGuests + venueGuests;
 };
 
-const isPaidBooking = (booking) =>
-  booking?.payment === true ||
-  String(booking?.paymentStatus || "").trim().toLowerCase() === "paid";
+const isPaidBooking = (booking) => Number(getBookingNetPaidAmount(booking) || 0) > 0;
 
 const summarizeBookings = (bookings) =>
   bookings.reduce(
     (summary, booking) => {
-      const totalPrice = Number(booking?.totalPrice || 0);
+      const paidAmount = Number(getBookingNetPaidAmount(booking) || 0);
 
       summary.totalBookings += 1;
       summary.totalParticipants += getBookingParticipants(booking);
@@ -155,7 +154,7 @@ const summarizeBookings = (bookings) =>
         ? booking.bookingItems.length
         : 0;
       if (isPaidBooking(booking)) {
-        summary.totalIncome += totalPrice;
+        summary.totalIncome += paidAmount;
       }
 
       return summary;
@@ -308,7 +307,7 @@ const buildHistoricalTrend = ({ bookings, reportType, periodYear, periodMonth = 
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(booking?.totalPrice || 0);
+      bucket.income += Number(getBookingPaidAmount(booking) || 0);
     }
   });
 
@@ -344,7 +343,7 @@ const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(booking?.totalPrice || 0);
+      bucket.income += Number(getBookingPaidAmount(booking) || 0);
     }
   });
 

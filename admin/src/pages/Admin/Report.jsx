@@ -174,7 +174,8 @@ const getBookingDate = (booking) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const getBookingAmount = (booking) => Number(booking?.totalPrice || 0);
+const getBookingAmount = (booking) =>
+  Math.max(getBookingPaidAmount(booking) - Number(booking?.refundedAmount || 0), 0);
 
 const getBookingRooms = (booking) =>
   Array.isArray(booking?.bookingItems) ? booking.bookingItems : [];
@@ -191,8 +192,10 @@ const getBookingParticipants = (booking) => {
 
 const normalizeStatus = (value) => String(value || "").trim().toLowerCase();
 
-const isPaidBooking = (booking) =>
-  booking?.payment === true || normalizeStatus(booking?.paymentStatus) === "paid";
+const getBookingPaidAmount = (booking) =>
+  Number(booking?.amountPaid || (booking?.payment === true ? booking?.totalPrice : 0) || 0);
+
+const isPaidBooking = (booking) => getBookingPaidAmount(booking) > 0;
 
 const getPaymentMethod = (booking) =>
   String(booking?.paymentMethod || "").trim().toLowerCase();

@@ -18,7 +18,7 @@ import {
 import FilterDropdown from "../../components/Admin/FilterDropdown";
 import AddStaff from "./AddStaff";
 
-const USERS_PER_PAGE = 5;
+const USERS_PER_PAGE = 10;
 const normalizeUserRole = (role) => (role === "user" ? "guest" : role || "guest");
 
 const Users = () => {
@@ -261,8 +261,8 @@ const Users = () => {
       </div>
 
       {/* DATA TABLE */}
-      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 p-4 md:hidden">
+      <div className="flex min-h-[520px] w-full flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-1 flex-col gap-3 p-4 md:hidden">
           {displayedUsers.length > 0 ? (
             displayedUsers.map((u) => {
               const isAdminRow = u.role === "admin";
@@ -380,8 +380,8 @@ const Users = () => {
 
         <div className="hidden min-h-0 flex-1 overflow-auto md:block">
         <table className="w-full min-w-[800px] border-collapse text-left">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
+          <thead className="sticky top-0 z-10">
+            <tr className="border-b border-slate-200 bg-slate-50/95 backdrop-blur">
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Profile</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Contact Info</th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-wider text-slate-500">Role</th>
@@ -499,55 +499,53 @@ const Users = () => {
         </table>
         </div>
 
-        {filteredUsers.length > 0 && (
-          <div className="mt-auto flex flex-col gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="w-full text-left sm:w-auto">
-              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
-                User Directory
-              </p>
-              <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
-                Showing {visibleUserStart}-{visibleUserEnd} of {filteredUsers.length} users
-              </p>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={currentPageSafe === 1}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {visiblePageNumbers.map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold transition ${
-                        currentPageSafe === page
-                          ? "bg-slate-900 text-white shadow-md"
-                          : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={currentPageSafe === totalPages}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
-            )}
+        <div className="mt-auto flex flex-col gap-2 border-t border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="w-full text-left sm:w-auto">
+            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
+              User Directory
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
+              Showing {visibleUserStart}-{visibleUserEnd} of {filteredUsers.length} users
+            </p>
           </div>
-        )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPageSafe === 1}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {visiblePageNumbers.map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`inline-flex h-8 min-w-8 items-center justify-center rounded-lg px-2.5 text-[9px] font-bold transition ${
+                      currentPageSafe === page
+                        ? "bg-slate-900 text-white shadow-md"
+                        : "border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPageSafe === totalPages}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {showAddStaffModal && (

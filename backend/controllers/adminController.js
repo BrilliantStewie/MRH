@@ -30,6 +30,8 @@ import {
   serializeRoom,
 } from "../utils/dataConsistency.js";
 import { getBookingCheckInDate } from "../utils/bookingDateFields.js";
+import { getBookingPaymentSnapshot } from "../utils/bookingPayment.js";
+import { getBookingRefundSummary } from "../utils/bookingRefund.js";
 
 // ======================================================================
 // 🛠️ CLOUD HELPER
@@ -757,6 +759,7 @@ const approveBooking = async (req, res) => {
                 <p>Your booking has been approved.</p>
                 <p>Booking: ${booking.bookingName || "Reservation"}</p>
                 <p>Check-in: ${new Date(getBookingCheckInDate(booking)).toLocaleDateString()}</p>
+                <p>You may choose your payment amount for this booking, but the confirmed total must reach at least 50% downpayment to secure it. After the booking is secured, each succeeding payment must be at least PHP 100 unless the remaining balance is below PHP 100.</p>
                 <p>You can view details in your account.</p>
                 <p>Mercedarian Retreat House</p>
             </div>
@@ -798,9 +801,21 @@ const declineBooking = async (req, res) => {
 const paymentConfirmed = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { payment: true, paymentStatus: 'paid' }, { new: true }).populate('userId').populate('bookingItems.roomId')
+        const booking = await bookingModel.findById(bookingId).populate('userId').populate('bookingItems.roomId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        const paymentSnapshot = getBookingPaymentSnapshot(booking);
+        const confirmedAmount = paymentSnapshot.pendingPaymentAmount;
+
+        if (confirmedAmount <= 0) {
+            return res.json({ success: false, message: "No pending payment to confirm." });
+        }
+
+        booking.amountPaid = paymentSnapshot.amountPaid + confirmedAmount;
+        booking.pendingPaymentAmount = 0;
+        const updatedPaymentSnapshot = getBookingPaymentSnapshot(booking);
+        await booking.save();
 
         await sendEmail(
             booking.userId.email,
@@ -808,9 +823,9 @@ const paymentConfirmed = async (req, res) => {
             `
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                 <p>Hello ${booking.userId.firstName},</p>
-                <p>Your payment is confirmed.</p>
+                <p>Your payment of PHP ${confirmedAmount.toLocaleString()} is confirmed.</p>
                 <p>Booking: ${booking.bookingName || booking.bookingItems?.[0]?.roomId?.name || "Reservation"}</p>
-                <p>Your reservation is secured.</p>
+                <p>${updatedPaymentSnapshot.fullyPaid ? "Your booking is now fully paid." : "Your booking is now secured."}</p>
                 <p>Mercedarian Retreat House</p>
             </div>
             `
@@ -819,12 +834,19 @@ const paymentConfirmed = async (req, res) => {
         await createOrRefreshNotification({
             recipient: booking.userId._id,
             type: "payment_update",
-            message: `Payment confirmed for ${booking.bookingName || "your reservation"}.`,
+            message: updatedPaymentSnapshot.fullyPaid
+                ? `Payment confirmed for ${booking.bookingName || "your reservation"}. Booking is now fully paid.`
+                : `Payment confirmed for ${booking.bookingName || "your reservation"}. Booking is now secured.`,
             link: `/my-bookings?bookingId=${booking._id}`,
             isRead: false
         });
 
-        res.json({ success: true, message: "Payment Confirmed" });
+        res.json({
+            success: true,
+            message: updatedPaymentSnapshot.fullyPaid
+                ? "Payment confirmed. Booking is now fully paid."
+                : "Payment confirmed. Booking is now secured."
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -837,9 +859,15 @@ const paymentConfirmed = async (req, res) => {
 const approveCancellationRequest = async (req, res) => {
     try {
         const { bookingId } = req.body;
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: 'cancelled' }, { new: true }).populate('userId');
+        const booking = await bookingModel.findByIdAndUpdate(
+            bookingId,
+            { status: 'cancelled', cancelledAt: new Date() },
+            { new: true }
+        ).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+        const refundSummary = getBookingRefundSummary(booking);
+        const refundReason = String(refundSummary.refundReason || "").trim();
 
         await sendEmail(
             booking.userId.email,
@@ -849,12 +877,23 @@ const approveCancellationRequest = async (req, res) => {
                 <p>Hello ${booking.userId.firstName},</p>
                 <p>Your cancellation request was approved.</p>
                 <p>Your booking is now cancelled.</p>
+                ${refundSummary.refundEligible
+                    ? `<p>Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).</p>`
+                    : refundReason
+                        ? `<p>${refundReason}</p>`
+                        : ""}
                 <p>Mercedarian Retreat House</p>
             </div>
             `
         );
 
-        res.json({ success: true, message: "Cancellation Approved" });
+        res.json({
+            success: true,
+            message: refundSummary.refundEligible
+                ? `Cancellation approved. Refund due: PHP ${refundSummary.refundableAmount.toLocaleString()}`
+                : "Cancellation approved. No refund applies.",
+            refund: refundSummary
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -865,9 +904,20 @@ const resolveCancellation = async (req, res) => {
         const { bookingId, action } = req.body; 
         const newStatus = action === 'approve' ? 'cancelled' : 'approved';
         
-        const booking = await bookingModel.findByIdAndUpdate(bookingId, { status: newStatus }, { new: true }).populate('userId');
+        const booking = await bookingModel.findByIdAndUpdate(
+            bookingId,
+            {
+                status: newStatus,
+                ...(action === "reject"
+                    ? { cancellationRequestedAt: null, cancelledAt: null }
+                    : { cancelledAt: new Date() })
+            },
+            { new: true }
+        ).populate('userId');
 
         if (!booking) return res.json({ success: false, message: "Booking not found" });
+        const refundSummary = getBookingRefundSummary(booking);
+        const refundReason = String(refundSummary.refundReason || "").trim();
 
         await sendEmail(
             booking.userId.email,
@@ -876,13 +926,81 @@ const resolveCancellation = async (req, res) => {
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                 <p>Hello ${booking.userId.firstName},</p>
                 <p>Your cancellation request was ${action === 'approve' ? 'approved' : 'declined'}.</p>
-                ${action === 'approve' ? `<p>Your booking is now cancelled.</p>` : `<p>Your reservation remains active.</p>`}
+                ${action === 'approve'
+                    ? `<p>Your booking is now cancelled.</p>${refundSummary.refundEligible
+                        ? `<p>Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).</p>`
+                        : refundReason
+                            ? `<p>${refundReason}</p>`
+                            : ""}`
+                    : `<p>Your reservation remains active.</p>`}
                 <p>Mercedarian Retreat House</p>
             </div>
             `
         );
         
         res.json({ success: true, message: `Cancellation request ${action}d.` });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const processRefund = async (req, res) => {
+    try {
+        const { bookingId } = req.body;
+        const booking = await bookingModel.findById(bookingId).populate("userId");
+
+        if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        if (String(booking.status || "").toLowerCase() !== "cancelled") {
+            return res.json({ success: false, message: "Only cancelled bookings can be marked as refunded." });
+        }
+
+        const refundSummary = getBookingRefundSummary(booking);
+        if (!refundSummary.refundEligible || refundSummary.refundableAmount <= 0) {
+            return res.json({ success: false, message: "This booking is not eligible for a refund." });
+        }
+
+        if (Number(booking.refundedAmount || 0) > 0 || booking.refundedAt) {
+            return res.json({ success: false, message: "Refund has already been processed for this booking." });
+        }
+
+        booking.refundedAmount = refundSummary.refundableAmount;
+        booking.refundedAt = new Date();
+        booking.refundedBy = req.userId || null;
+        await booking.save();
+
+        await sendEmail(
+            booking.userId.email,
+            "Refund processed - Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.userId.firstName},</p>
+                <p>Your refund has been processed.</p>
+                <p>Refund amount: PHP ${booking.refundedAmount.toLocaleString()}</p>
+                <p>Booking: ${booking.bookingName || "Reservation"}</p>
+                <p>Mercedarian Retreat House</p>
+            </div>
+            `
+        );
+
+        await createOrRefreshNotification({
+            recipient: booking.userId._id,
+            type: "payment_update",
+            message: `Refund processed for ${booking.bookingName || "your reservation"}: PHP ${booking.refundedAmount.toLocaleString()}.`,
+            link: `/my-bookings?bookingId=${booking._id}`,
+            isRead: false
+        });
+
+        res.json({
+            success: true,
+            message: `Refund marked as processed for PHP ${booking.refundedAmount.toLocaleString()}.`,
+            refund: {
+                ...refundSummary,
+                refundedAmount: booking.refundedAmount,
+                refundedAt: booking.refundedAt,
+                refundProcessed: true
+            }
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -1084,6 +1202,7 @@ export {
     declineBooking,
     paymentConfirmed,
     approveCancellationRequest,
+    processRefund,
     checkExpiredCancellations,
     resolveCancellation,
     getBuildings, addBuilding, deleteBuilding, updateBuilding,

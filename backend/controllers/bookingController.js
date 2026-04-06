@@ -15,12 +15,19 @@ import {
   DAILY_BOOKING_LIMIT_MESSAGE,
   getDailyBookingLimitDates,
 } from "../utils/bookingService.js";
+import { isNoShowBooking } from "../utils/bookingStay.js";
 import {
   addDays,
   getBookingReviewEligibility,
   normalizeDate,
   rangesOverlap,
 } from "../utils/bookingRules.js";
+import {
+  getBookingPaymentSnapshot,
+  resolveBookingPaymentAmount,
+  isBookingFullyPaid,
+} from "../utils/bookingPayment.js";
+import { getBookingRefundSummary } from "../utils/bookingRefund.js";
 
 /* ======================================================
    CREATE BOOKING
@@ -108,18 +115,40 @@ return res.json({success:false,message:"Booking not found"});
 if(String(booking.userId) !== req.userId)
 return res.json({success:false,message:"Unauthorized"});
 
+const refundSummary = getBookingRefundSummary(booking, new Date());
+const refundReason = String(refundSummary.refundReason || "").trim();
+
 if(booking.status==="pending")
+{
 booking.status="cancelled";
+booking.cancellationRequestedAt = new Date();
+booking.cancelledAt = new Date();
+}
 
 else if(booking.status==="approved")
+{
 booking.status="cancellation_pending";
+booking.cancellationRequestedAt = new Date();
+booking.cancelledAt = null;
+}
 
 else
 return res.json({success:false,message:"Cannot cancel booking"});
 
 await booking.save();
 
-res.json({success:true,message:"Booking cancelled"});
+res.json({
+success:true,
+message:
+  booking.status === "cancellation_pending"
+    ? refundSummary.refundEligible
+      ? `Cancellation request sent. Refundable amount: PHP ${refundSummary.refundableAmount.toLocaleString()} (50% downpayment only).`
+      : refundReason
+        ? `Cancellation request sent. ${refundReason}`
+        : "Cancellation request sent."
+    : "Booking cancelled",
+refund: refundSummary
+});
 
 }catch(error){
 res.json({success:false,message:error.message});
@@ -144,15 +173,28 @@ return res.json({success:false,message:"Booking not found"});
 if(String(booking.userId) !== String(req.userId))
 return res.json({success:false,message:"Unauthorized"});
 
-if(booking.paymentStatus === "paid")
-return res.json({success:false,message:"Booking is already marked as paid"});
+const paymentSnapshot = getBookingPaymentSnapshot(booking);
+
+if(booking.paymentStatus === "pending" && paymentSnapshot.pendingPaymentAmount > 0)
+return res.json({success:false,message:"A payment confirmation is already pending"});
+
+if(isBookingFullyPaid(booking))
+return res.json({success:false,message:"Booking is already fully paid"});
+
+const paymentRequest = resolveBookingPaymentAmount(booking, requestedAmount);
+if(!paymentRequest.valid)
+return res.json({success:false,message:paymentRequest.message});
 
 booking.paymentMethod = "cash";
-booking.paymentStatus = "pending";
+booking.pendingPaymentAmount = paymentRequest.amount;
 
 await booking.save();
 
-res.json({success:true,booking});
+res.json({
+success:true,
+message:`Cash payment selected for PHP ${paymentRequest.amount.toLocaleString()}.`,
+booking
+});
 
 }catch(error){
 res.json({success:false,message:error.message});
@@ -177,8 +219,26 @@ return res.json({success:false,message:"Booking not found"});
 if(String(booking.userId) !== String(req.userId))
 return res.json({success:false,message:"Unauthorized"});
 
-if(booking.paymentStatus === "paid")
-return res.json({success:true,message:"Payment already confirmed",booking});
+if(isBookingFullyPaid(booking))
+return res.json({success:true,message:"Booking is already fully paid",booking});
+
+const paymentSnapshot = getBookingPaymentSnapshot(booking);
+const hasPendingGcashPayment =
+booking.paymentMethod === "gcash" &&
+booking.paymentStatus === "pending" &&
+paymentSnapshot.pendingPaymentAmount > 0;
+
+if(isBookingFullyPaid(booking) && !hasPendingGcashPayment)
+return res.json({success:true,message:"Booking is already fully paid",booking});
+
+if(!hasPendingGcashPayment)
+return res.json({
+success:true,
+message:paymentSnapshot.downpaymentSatisfied === true
+  ? "Booking is already secured. You may continue paying the remaining balance anytime."
+  : "The booking still needs the required 50% downpayment to be secured.",
+booking
+});
 
 if(booking.paymentMethod !== "gcash" || booking.paymentStatus !== "pending")
 return res.json({success:false,message:"GCash checkout is not in a verifiable state"});
@@ -198,9 +258,29 @@ res.json({success:false,message:error.message});
 export const createCheckoutSession = async (req,res)=>{
 try{
 
+const { bookingId, amount: requestedAmount } = req.body;
+const booking = await bookingModel.findById(bookingId);
+
+if(!booking)
+return res.json({success:false,message:"Booking not found"});
+
+if(String(booking.userId) !== String(req.userId))
+return res.json({success:false,message:"Unauthorized"});
+
+if(booking.paymentStatus === "pending" && Number(booking.pendingPaymentAmount || 0) > 0)
+return res.json({success:false,message:"A payment confirmation is already pending"});
+
+if(isBookingFullyPaid(booking))
+return res.json({success:false,message:"Booking is already fully paid"});
+
+const paymentRequest = resolveBookingPaymentAmount(booking, requestedAmount);
+if(!paymentRequest.valid)
+return res.json({success:false,message:paymentRequest.message});
+
 res.json({
 success:true,
-message:"Online checkout session created"
+message:"Please use the dedicated payment route for checkout sessions.",
+amount:paymentRequest.amount
 });
 
 }catch(error){
@@ -351,6 +431,8 @@ const bookings = await bookingModel.find(
 );
 
 const conflict = bookings.some((booking) => {
+  if (isNoShowBooking(booking)) return false;
+
   const existingStart = normalizeDate(getBookingCheckInDate(booking));
   const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
   const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
@@ -385,6 +467,7 @@ status: { $in: ["pending", "approved"] }
 const blockedDates=[];
 
 bookings.forEach(b=>{
+if (isNoShowBooking(b)) return;
 
 let current=new Date(getBookingCheckInDate(b));
 
@@ -451,6 +534,8 @@ try {
   }
 
   bookings.forEach((booking) => {
+    if (isNoShowBooking(booking)) return;
+
     const existingStart = normalizeDate(getBookingCheckInDate(booking));
     const existingEnd = normalizeDate(getBookingCheckOutDate(booking));
     const cleaningEnd = normalizeDate(addDays(existingEnd, 1));
@@ -502,7 +587,9 @@ try {
     `${BOOKING_DATE_SELECT} bookingItems participants status paymentStatus`
   );
 
-  const availability = bookings.map((b) => {
+  const availability = bookings
+    .filter((booking) => !isNoShowBooking(booking))
+    .map((b) => {
     const roomGuests = (b.bookingItems || []).reduce(
       (sum, item) => sum + Number(item.roomGuests || 0),
       0
@@ -542,6 +629,7 @@ const occupiedRoomIds = [];
 const cleaningRoomIds = [];
 
 bookings.forEach(b => {
+if (isNoShowBooking(b)) return;
 
 const checkin = normalizeDate(getBookingCheckInDate(b));
 const checkout = normalizeDate(getBookingCheckOutDate(b));
@@ -595,6 +683,7 @@ try{
 const userBusyDates=[];
 
  bookings.forEach(b=>{
+ if (isNoShowBooking(b)) return;
 
  const start = normalizeDate(getBookingCheckInDate(b));
  const end = normalizeDate(getBookingCheckOutDate(b));
