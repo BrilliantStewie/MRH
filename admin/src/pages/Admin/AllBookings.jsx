@@ -71,7 +71,7 @@ const isRefundProcessed = (booking = {}) =>
 
 const getRefundStatusLabel = (booking = {}) => {
   if (isRefundProcessed(booking)) {
-    return `Refunded PHP ${Number(booking?.refundedAmount || 0).toLocaleString()}`;
+    return `Refunded ₱${Number(booking?.refundedAmount || 0).toLocaleString()}`;
   }
 
   if (
@@ -79,7 +79,7 @@ const getRefundStatusLabel = (booking = {}) => {
     booking?.refundEligible &&
     Number(booking?.refundableAmount || 0) > 0
   ) {
-    return `Refund Due PHP ${Number(booking?.refundableAmount || 0).toLocaleString()}`;
+    return `Refund Due ₱${Number(booking?.refundableAmount || 0).toLocaleString()}`;
   }
 
   return "";
@@ -333,50 +333,47 @@ const BookingDetailsModal = ({
 
           <div className="space-y-3">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stay Period</h3>
-            <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
-              <div className="text-center">
-                <p className="text-[9px] font-bold text-blue-600 uppercase">Check-In</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(getBookingCheckInDateValue(booking))}</p>
+            <div className="grid grid-cols-[minmax(0,1fr)_30px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50/50 p-2.5">
+              <div className="min-w-0 rounded-xl border border-blue-100 bg-white/90 px-2.5 py-2 text-left shadow-sm shadow-blue-100/40">
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-600">Check-In</p>
+                <p className="mt-0.5 truncate text-[11px] font-black text-slate-700">{formatDate(getBookingCheckInDateValue(booking))}</p>
               </div>
-              <ArrowRight size={14} className="text-blue-300" />
-              <div className="text-center">
-                <p className="text-[9px] font-bold text-blue-600 uppercase">Check-Out</p>
-                <p className="text-xs font-black text-slate-700">{formatDate(getBookingCheckOutDateValue(booking))}</p>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-300">
+                <ArrowRight size={12} />
+              </div>
+              <div className="min-w-0 rounded-xl border border-blue-100 bg-white/90 px-2.5 py-2 text-left shadow-sm shadow-blue-100/40">
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-600">Check-Out</p>
+                <p className="mt-0.5 truncate text-[11px] font-black text-slate-700">{formatDate(getBookingCheckOutDateValue(booking))}</p>
               </div>
             </div>
-            <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/80 p-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Stay Confirmation</p>
-                <span className={`rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.16em] ${stayMeta.className}`}>
-                  {stayMeta.label}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+            <div className="space-y-1.5 rounded-xl border border-slate-100 bg-slate-50/80 p-2.5">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-400">Stay Confirmation</p>
+              <div className="grid grid-cols-1 gap-1.5">
+                <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Check-In</p>
-                    <span className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-600">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Check-In</p>
+                    <span className="text-[7px] font-black uppercase tracking-[0.12em] text-emerald-600">
                       {stayConfirmationDetails.checkIn.label}
                     </span>
                   </div>
-                  <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+                  <p className="mt-1 truncate text-[10px] font-bold text-slate-700">
                     {stayConfirmationDetails.checkIn.actorName || "No confirmer yet"}
                   </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+                  <p className="mt-0.5 text-[9px] leading-snug text-slate-500">
                     {stayConfirmationDetails.checkIn.timestamp || stayConfirmationDetails.checkIn.fallbackMessage}
                   </p>
                 </div>
-                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                <div className="rounded-lg border border-slate-200 bg-white px-2 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Check-Out</p>
-                    <span className="text-[8px] font-black uppercase tracking-[0.14em] text-sky-600">
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">Check-Out</p>
+                    <span className="text-[7px] font-black uppercase tracking-[0.12em] text-sky-600">
                       {stayConfirmationDetails.checkOut.label}
                     </span>
                   </div>
-                  <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+                  <p className="mt-1 truncate text-[10px] font-bold text-slate-700">
                     {stayConfirmationDetails.checkOut.actorName || "No confirmer yet"}
                   </p>
-                  <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+                  <p className="mt-0.5 text-[9px] leading-snug text-slate-500">
                     {stayConfirmationDetails.checkOut.timestamp || stayConfirmationDetails.checkOut.fallbackMessage}
                   </p>
                 </div>
@@ -975,7 +972,7 @@ export const BookingsPage = ({
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-indigo-600 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-indigo-100 transition-all hover:bg-indigo-700"
           >
             <Banknote size={12} />
-            Confirm PHP {Number(b.pendingPaymentAmount || 0).toLocaleString()}
+            Confirm ₱{Number(b.pendingPaymentAmount || 0).toLocaleString()}
           </button>
         )}
 
@@ -1043,7 +1040,7 @@ export const BookingsPage = ({
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-emerald-600 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-white shadow-sm shadow-emerald-100 transition-all hover:bg-emerald-700"
           >
             <RotateCcw size={12} />
-            Refund PHP {Number(b.refundableAmount || 0).toLocaleString()}
+            Refund ₱{Number(b.refundableAmount || 0).toLocaleString()}
           </button>
         )}
 
@@ -1317,7 +1314,7 @@ export const BookingsPage = ({
                       className="mt-1 flex items-center gap-1 text-[8px] font-black uppercase tracking-widest"
                     />
                     <p className="mt-1 text-[8px] font-semibold text-slate-500">
-                      Paid: PHP {Number(b.amountPaid || 0).toLocaleString()}
+                      Paid: ₱{Number(b.amountPaid || 0).toLocaleString()}
                     </p>
                     {getRefundStatusLabel(b) && (
                       <p className="mt-1 text-[8px] font-semibold text-rose-600">

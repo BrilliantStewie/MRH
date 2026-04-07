@@ -1,4 +1,6 @@
 import { hasRequiredBookingDownpayment } from "./bookingPayment.js";
+import { getBookingCheckOutDate } from "./bookingDateFields.js";
+import { getManilaDateValue } from "./manilaDate.js";
 
 export const BOOKING_STAY_ACTIONS = Object.freeze({
   CHECK_IN: "checkIn",
@@ -101,6 +103,18 @@ export const getBookingStayStatus = (booking) => {
   return BOOKING_STAY_STATUSES.NOT_READY;
 };
 
+const hasReachedCheckOutDate = (booking = {}, now = new Date()) => {
+  const checkOutDate = getBookingCheckOutDate(booking);
+  if (!checkOutDate || Number.isNaN(checkOutDate.getTime())) {
+    return false;
+  }
+
+  const currentManilaDate = getManilaDateValue(now);
+  const checkOutManilaDate = getManilaDateValue(checkOutDate);
+
+  return Boolean(currentManilaDate && checkOutManilaDate) && currentManilaDate >= checkOutManilaDate;
+};
+
 export const validateBookingStayAction = (booking, action) => {
   if (!booking) {
     return "Booking not found.";
@@ -166,6 +180,10 @@ export const validateBookingStayAction = (booking, action) => {
 
     if (checkOut) {
       return "This booking is already checked out.";
+    }
+
+    if (!hasReachedCheckOutDate(booking)) {
+      return "Check-out can only be confirmed on or after the scheduled check-out date.";
     }
   }
 

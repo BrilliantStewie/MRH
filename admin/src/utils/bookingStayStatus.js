@@ -1,4 +1,7 @@
-import { getBookingCheckInDateValue } from "./bookingDateFields";
+import {
+  getBookingCheckInDateValue,
+  getBookingCheckOutDateValue,
+} from "./bookingDateFields";
 import { getPHDateValue } from "./dateTime";
 
 const STAY_STATUS_META = {
@@ -102,6 +105,14 @@ const hasReachedCheckInDate = (booking = {}) => {
   return Boolean(todayValue) && todayValue >= checkInDateValue;
 };
 
+const hasReachedCheckOutDate = (booking = {}) => {
+  const checkOutDateValue = getPHDateValue(getBookingCheckOutDateValue(booking));
+  if (!checkOutDateValue) return false;
+
+  const todayValue = getPHDateValue(new Date());
+  return Boolean(todayValue) && todayValue >= checkOutDateValue;
+};
+
 const isPaymentConfirmed = (booking = {}) =>
   booking?.downpaymentSatisfied === true ||
   booking?.bookingSecured === true ||
@@ -202,7 +213,10 @@ export const getAvailableStayActions = (booking = {}) => {
       bookingStatus === "approved" &&
       stayStatus === "awaitingCheckIn" &&
       paymentConfirmed,
-    canConfirmCheckOut: bookingStatus === "approved" && stayStatus === "checkedIn",
+    canConfirmCheckOut:
+      bookingStatus === "approved" &&
+      stayStatus === "checkedIn" &&
+      hasReachedCheckOutDate(booking),
   };
 };
 

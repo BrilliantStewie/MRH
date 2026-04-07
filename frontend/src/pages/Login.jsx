@@ -46,6 +46,9 @@ const Login = () => {
   const [firebasePhonePurpose, setFirebasePhonePurpose] = useState('');
   const [phoneIdToken, setPhoneIdToken] = useState('');
   const recaptchaRef = useRef(null);
+  const googlePopupPendingRef = useRef(false);
+  const googlePopupWatchdogRef = useRef(null);
+  const googlePopupStartedAtRef = useRef(0);
 
   // New state for Forgot Password flow
   const [showForgotEmailField, setShowForgotEmailField] = useState(false);
@@ -82,6 +85,28 @@ const Login = () => {
     return err?.response?.data?.message || err?.message || "Google sign-in failed.";
   };
 
+  const clearGooglePopupWatchdog = () => {
+    if (googlePopupWatchdogRef.current) {
+      clearInterval(googlePopupWatchdogRef.current);
+      googlePopupWatchdogRef.current = null;
+    }
+  };
+
+  const startGooglePopupWatchdog = () => {
+    clearGooglePopupWatchdog();
+    googlePopupStartedAtRef.current = Date.now();
+
+    googlePopupWatchdogRef.current = setInterval(() => {
+      if (!googlePopupPendingRef.current) return;
+      if (!document.hasFocus()) return;
+      if (Date.now() - googlePopupStartedAtRef.current < 1200) return;
+
+      googlePopupPendingRef.current = false;
+      clearGooglePopupWatchdog();
+      setGoogleLoading(false);
+    }, 250);
+  };
+
   const openDisabledAccountModal = (message) => {
     setDisabledModalMessage(message || DEFAULT_DISABLED_ACCOUNT_MESSAGE);
     setError("");
@@ -101,6 +126,10 @@ const Login = () => {
       openDisabledAccountModal(notice);
       setState('Login');
     }
+  }, []);
+
+  useEffect(() => () => {
+    clearGooglePopupWatchdog();
   }, []);
 
   useEffect(() => {
@@ -487,10 +516,16 @@ const Login = () => {
   };
 
   const handleGoogleSignIn = async (intent = "login") => {
+    if (loading || googleLoading) return;
+
     setError("");
+    googlePopupPendingRef.current = true;
+    startGooglePopupWatchdog();
     setGoogleLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      googlePopupPendingRef.current = false;
+      clearGooglePopupWatchdog();
       const idToken = await result.user.getIdToken();
 
       const { data } = await axios.post(backendUrl + '/api/user/google-auth', { idToken, intent });
@@ -503,6 +538,8 @@ const Login = () => {
         setError(data.message || "Google sign-in failed.");
       }
     } catch (err) {
+      googlePopupPendingRef.current = false;
+      clearGooglePopupWatchdog();
       const code = err?.code;
       if (code === "auth/popup-blocked") {
         setError("Popup blocked. Redirecting to Google sign-in...");
@@ -510,9 +547,15 @@ const Login = () => {
         await signInWithRedirect(auth, googleProvider);
         return;
       }
+      if (code === "auth/popup-closed-by-user") {
+        setError("");
+        return;
+      }
       const message = resolveGoogleAuthError(err);
       setError(message);
     } finally {
+      googlePopupPendingRef.current = false;
+      clearGooglePopupWatchdog();
       setGoogleLoading(false);
     }
   };
@@ -606,8 +649,8 @@ const Login = () => {
   const isForgotPasswordMode = state === 'Login' && showForgotEmailField;
   const activeAuthStatusMessage = googleLoading
     ? (isSignUpMode
-        ? "Creating your account with Google. This can take a few seconds on Vercel."
-        : "Signing you in with Google. This can take a few seconds on Vercel.")
+        ? "Creating your account with Google. This can take a few seconds."
+        : "Signing you in with Google. This can take a few seconds.")
     : loading
       ? (isResetPasswordMode
           ? "Updating your password. Please wait..."
