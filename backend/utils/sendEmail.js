@@ -2,30 +2,72 @@ import nodemailer from "nodemailer";
 
 const EMAIL_USER = String(process.env.EMAIL_USER || "").trim();
 const EMAIL_PASS = String(process.env.EMAIL_PASS || "").trim();
+const EMAIL_TIMEOUT_CODES = new Set([
+  "ECONNECTION",
+  "EDNS",
+  "ENOTFOUND",
+  "EHOSTUNREACH",
+  "ESOCKET",
+  "ETIMEDOUT",
+]);
+
+let emailTransporter = null;
 
 const createFriendlyEmailError = (error) => {
   const combinedMessage = `${error?.message || ""} ${error?.response || ""}`;
-
-  if (error?.code === "EAUTH" && /gmail|gsmtp|badcredentials/i.test(combinedMessage)) {
-    return "Gmail rejected the login. Generate a new Google App Password for EMAIL_USER, update EMAIL_PASS in backend/.env, and restart the server.";
-  }
 
   if (!EMAIL_USER || !EMAIL_PASS) {
     return "Email is not configured. Set EMAIL_USER and EMAIL_PASS in backend/.env.";
   }
 
+  if (error?.code === "EAUTH" && /gmail|gsmtp|badcredentials/i.test(combinedMessage)) {
+    return "Gmail rejected the login. Generate a new Google App Password for EMAIL_USER, update EMAIL_PASS in backend/.env, and restart the server.";
+  }
+
+  if (EMAIL_TIMEOUT_CODES.has(error?.code)) {
+    return "The email service took too long to respond. Please try again in a moment.";
+  }
+
   return error?.message || "Unable to send email right now.";
 };
 
-const sendEmail = async (to, subject, htmlContent, plainText = "") => {
-  try {
-    const transporter = nodemailer.createTransport({
+const getEmailTransporter = () => {
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    throw Object.assign(new Error("Email is not configured."), {
+      code: "EMAIL_CONFIG_MISSING",
+    });
+  }
+
+  if (!emailTransporter) {
+    emailTransporter = nodemailer.createTransport({
       service: "gmail",
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 100,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
       auth: {
         user: EMAIL_USER,
         pass: EMAIL_PASS,
       },
     });
+  }
+
+  return emailTransporter;
+};
+
+const resetEmailTransporter = () => {
+  if (emailTransporter?.close) {
+    emailTransporter.close();
+  }
+
+  emailTransporter = null;
+};
+
+const sendEmail = async (to, subject, htmlContent, plainText = "") => {
+  try {
+    const transporter = getEmailTransporter();
 
     // Enhanced Professional Wrapper
     const professionalHtml = `
@@ -69,6 +111,10 @@ const sendEmail = async (to, subject, htmlContent, plainText = "") => {
     return { success: true };
 
   } catch (error) {
+    if (error?.code === "EAUTH" || EMAIL_TIMEOUT_CODES.has(error?.code)) {
+      resetEmailTransporter();
+    }
+
     const message = createFriendlyEmailError(error);
     console.error("Email error:", message);
     return { success: false, message, cause: error };

@@ -149,18 +149,22 @@ const ensureEmailSent = async (...args) => {
     return result;
 };
 
+const PENDING_ACCOUNT_PASSWORD_HASH =
+    "$2b$10$TLJN5G2wwSQNvtnHuDZcleAvrRpnXFD.2g42ScPTeoKe0DKgCtZ.S";
+
 // --- AUTHENTICATION ---
 
 // ✅ Send OTP for Email Verification or Password Reset
 const sendOTP = async (req, res) => {
     try {
-        const { email, isResetMode } = req.body;
+        const { isResetMode } = req.body;
+        const normalizedEmail = normalizeEmail(req.body.email);
 
-        if (!validator.isEmail(email)) {
+        if (!validator.isEmail(normalizedEmail)) {
             return res.json({ success: false, message: "Invalid email" });
         }
 
-        let user = await userModel.findOne({ email: email.toLowerCase().trim() });
+        let user = await userModel.findOne({ email: normalizedEmail });
 
         // ✅ PREVENT SENDING OTP IF EMAIL IS ALREADY TAKEN BY A VERIFIED USER (except for reset)
         if (!isResetMode && hasClaimedEmail(user)) {
@@ -175,16 +179,13 @@ const sendOTP = async (req, res) => {
             user.otpExpires = otpExpires;
             await user.save();
         } else {
-            const salt = await bcrypt.genSalt(10);
-            const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
-            
             user = new userModel({
-                email,
+                email: normalizedEmail,
                 otp,
                 otpExpires,
                 firstName: "Pending",
                 lastName: "Verification",
-                password: dummyPassword,
+                password: PENDING_ACCOUNT_PASSWORD_HASH,
                 passwordSet: false,
                 phone: null,
                 emailVerified: false
@@ -193,8 +194,8 @@ const sendOTP = async (req, res) => {
         }
 
         await ensureEmailSent(
-            email,
-            "Your verification code",
+            normalizedEmail,
+            "Your MRH verification code",
             `
                 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                     <p>Use this code to continue:</p>
@@ -203,7 +204,8 @@ const sendOTP = async (req, res) => {
                     <p>If you did not request this, you can ignore this email.</p>
                     <p>Mercedarian Retreat House</p>
                 </div>
-            `
+            `,
+            `Your MRH verification code is ${otp}. It expires in 10 minutes. If you did not request this, you can ignore this email.`
         );
 
         res.json({ success: true, message: "OTP sent to your email" });
@@ -238,9 +240,6 @@ const sendPhoneOTP = async (req, res) => {
             user.otpExpires = otpExpires;
             await user.save();
         } else {
-            const salt = await bcrypt.genSalt(10);
-            const dummyPassword = await bcrypt.hash(Math.random().toString(36), salt);
-
             user = new userModel({
                 phone: normalizedPhone,
                 email: `phone_${Date.now()}_${phone}@mrh.local`,
@@ -248,7 +247,7 @@ const sendPhoneOTP = async (req, res) => {
                 otpExpires,
                 firstName: "Pending",
                 lastName: "Phone User",
-                password: dummyPassword
+                password: PENDING_ACCOUNT_PASSWORD_HASH
             });
 
             await user.save();
@@ -331,7 +330,8 @@ const sendEmailChangeOTP = async (req, res) => {
                     <p>If you did not request this change, you can ignore this email.</p>
                     <p>Mercedarian Retreat House</p>
                 </div>
-            `
+            `,
+            `Your MRH email change code is ${otp}. It expires in 10 minutes. If you did not request this change, you can ignore this email.`
         );
 
         res.json({ success: true, message: "OTP sent to your new email address" });
