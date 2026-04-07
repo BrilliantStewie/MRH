@@ -978,6 +978,22 @@ const getUserData = async (req, res) => {
     }
 };
 
+const logoutUserSession = async (req, res) => {
+    try {
+        const userId = req.userId || req.body.userId;
+        const user = await userModel.findById(userId);
+
+        if (user) {
+            bumpSessionVersion(user);
+            await user.save({ validateBeforeSave: false });
+        }
+
+        res.json({ success: true, message: "Session ended" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 const updateUserProfile = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
@@ -985,6 +1001,7 @@ const updateUserProfile = async (req, res) => {
 
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
+        let refreshedToken = "";
 
         const normalizedFirstName = typeof firstName === "string" ? firstName.trim() : user.firstName;
         const normalizedLastName = typeof lastName === "string" ? lastName.trim() : user.lastName;
@@ -1056,7 +1073,23 @@ const updateUserProfile = async (req, res) => {
         }
 
         await user.save();
-        res.json({ success: true, message: "Profile updated successfully", userData: user });
+        const safeUser = await userModel.findById(userId).select("-password");
+
+        if (newPassword) {
+            refreshedToken = createToken(
+                safeUser._id,
+                `${safeUser.firstName} ${safeUser.lastName || ""}`.trim(),
+                safeUser.role,
+                getSessionVersion(safeUser)
+            );
+        }
+
+        res.json({
+            success: true,
+            message: "Profile updated successfully",
+            userData: safeUser,
+            token: refreshedToken || undefined,
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -1805,6 +1838,7 @@ export {
     checkPhoneExistsForUpdate,
     googleAuth, 
     getUserData, 
+    logoutUserSession,
     updateUserProfile,
     getUserBookings, 
     createBooking, 

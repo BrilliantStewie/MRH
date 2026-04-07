@@ -1,5 +1,6 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { toast } from "react-toastify";
 
 // Contexts
 import { AdminContext } from "./context/AdminContext";
@@ -28,6 +29,11 @@ import StaffProfile from "./pages/Staff/StaffProfile";
 
 // Route Guard
 import StaffProtectedRoute from "./routes/StaffProtectedRoute";
+
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+const ACTIVITY_SYNC_INTERVAL_MS = 15000;
+const ADMIN_ACTIVITY_STORAGE_KEY = "mrh_admin_last_activity_at";
+const STAFF_ACTIVITY_STORAGE_KEY = "mrh_staff_last_activity_at";
 
 const PANEL_SHELL_VARIANTS = {
   contained: {
@@ -66,17 +72,161 @@ const getPanelShellLayout = (pathname) =>
   PANEL_SHELL_VARIANTS[ROUTE_SHELL_MAP[pathname] || "contained"];
 
 const App = () => {
-  const { aToken } = useContext(AdminContext);
-  const { sToken } = useContext(StaffContext);
+  const { aToken, logoutAdmin, backendUrl: adminBackendUrl } = useContext(AdminContext);
+  const { sToken, staffLogout, backendUrl: staffBackendUrl } = useContext(StaffContext);
   const location = useLocation();
   const [isAdminSidebarOpen, setIsAdminSidebarOpen] = useState(false);
   const [isStaffSidebarOpen, setIsStaffSidebarOpen] = useState(false);
+  const inactivityTimeoutRef = useRef(null);
+  const lastActivityWriteRef = useRef(0);
+  const inactivityLogoutRef = useRef(false);
   const shellLayout = getPanelShellLayout(location.pathname);
+  const backendUrl = adminBackendUrl || staffBackendUrl;
 
   useEffect(() => {
     setIsAdminSidebarOpen(false);
     setIsStaffSidebarOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const activeSession = aToken
+      ? {
+          token: aToken,
+          tokenKey: "aToken",
+          activityKey: ADMIN_ACTIVITY_STORAGE_KEY,
+          logoutEndpoint: `${backendUrl}/api/admin/logout`,
+          clearSession: () => logoutAdmin({ silent: true }),
+        }
+      : sToken
+        ? {
+            token: sToken,
+            tokenKey: "sToken",
+            activityKey: STAFF_ACTIVITY_STORAGE_KEY,
+            logoutEndpoint: `${backendUrl}/api/staff/logout`,
+            clearSession: () => staffLogout({ silent: true }),
+          }
+        : null;
+
+    if (!activeSession || !backendUrl) return undefined;
+
+    const getLastActivityAt = () =>
+      Number(localStorage.getItem(activeSession.activityKey) || 0);
+
+    const clearInactivityTimeout = () => {
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = null;
+      }
+    };
+
+    const finalizeIdleLogout = () => {
+      localStorage.removeItem(activeSession.activityKey);
+      activeSession.clearSession();
+      toast.error("Session expired after 30 minutes of inactivity.");
+    };
+
+    const triggerIdleLogout = async () => {
+      if (inactivityLogoutRef.current || !activeSession.token) return;
+
+      const lastActivityAt = getLastActivityAt();
+      if (lastActivityAt && Date.now() - lastActivityAt < INACTIVITY_TIMEOUT_MS) {
+        scheduleIdleCheck();
+        return;
+      }
+
+      inactivityLogoutRef.current = true;
+
+      try {
+        await axios.post(
+          activeSession.logoutEndpoint,
+          {},
+          { headers: { token: activeSession.token } }
+        );
+      } catch (error) {
+        console.error("Idle logout request failed:", error.response?.data?.message || error.message);
+      } finally {
+        finalizeIdleLogout();
+        inactivityLogoutRef.current = false;
+      }
+    };
+
+    const scheduleIdleCheck = () => {
+      clearInactivityTimeout();
+
+      const lastActivityAt = getLastActivityAt() || Date.now();
+      const remainingMs = INACTIVITY_TIMEOUT_MS - (Date.now() - lastActivityAt);
+
+      if (remainingMs <= 0) {
+        void triggerIdleLogout();
+        return;
+      }
+
+      inactivityTimeoutRef.current = setTimeout(() => {
+        void triggerIdleLogout();
+      }, remainingMs);
+    };
+
+    const recordActivity = ({ force = false } = {}) => {
+      const now = Date.now();
+
+      if (force || now - lastActivityWriteRef.current >= ACTIVITY_SYNC_INTERVAL_MS) {
+        localStorage.setItem(activeSession.activityKey, String(now));
+        lastActivityWriteRef.current = now;
+      }
+
+      scheduleIdleCheck();
+    };
+
+    const handleActivity = () => recordActivity();
+    const handleVisibilityChange = () => {
+      const lastActivityAt = getLastActivityAt();
+
+      if (document.visibilityState === "visible" && lastActivityAt) {
+        if (Date.now() - lastActivityAt >= INACTIVITY_TIMEOUT_MS) {
+          void triggerIdleLogout();
+          return;
+        }
+      }
+
+      scheduleIdleCheck();
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === activeSession.activityKey) {
+        scheduleIdleCheck();
+        return;
+      }
+
+      if (event.key === activeSession.tokenKey && !event.newValue) {
+        activeSession.clearSession();
+      }
+    };
+
+    if (!getLastActivityAt()) {
+      recordActivity({ force: true });
+    } else if (Date.now() - getLastActivityAt() >= INACTIVITY_TIMEOUT_MS) {
+      void triggerIdleLogout();
+    } else {
+      scheduleIdleCheck();
+    }
+
+    window.addEventListener("pointerdown", handleActivity, { passive: true });
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("scroll", handleActivity, { passive: true });
+    window.addEventListener("touchstart", handleActivity, { passive: true });
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInactivityTimeout();
+      window.removeEventListener("pointerdown", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("scroll", handleActivity);
+      window.removeEventListener("touchstart", handleActivity);
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [aToken, sToken, backendUrl, logoutAdmin, staffLogout]);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#f8fafc] font-sans antialiased print:block print:h-auto print:overflow-visible print:bg-white">

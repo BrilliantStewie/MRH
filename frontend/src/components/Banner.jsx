@@ -121,10 +121,11 @@ const Banner = () => {
            {/* Button */}
            <div className="pt-2 sm:pt-4">
              <button
+               type="button"
                onClick={() => setIsCalendarOpen(true)}
                className="group inline-flex w-auto min-w-[190px] items-center justify-center gap-2 rounded-md bg-[#0f172a] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-white shadow-md transition-all duration-300 hover:bg-slate-800 hover:shadow-lg sm:w-max sm:px-5 sm:py-3.5 sm:text-xs sm:tracking-widest lg:gap-3 lg:rounded-lg lg:px-7 lg:py-4"
              >
-               <Calendar className="h-4 w-4" /> 
+               <Calendar className="h-4 w-4" />
                Check Availability 
                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
              </button>

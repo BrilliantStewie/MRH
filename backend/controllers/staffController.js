@@ -83,6 +83,18 @@ const parseStaffNamePayload = (value) => {
   };
 };
 
+const createStaffToken = (user) =>
+  jwt.sign(
+    buildSessionTokenPayload({
+      id: user._id,
+      role: "staff",
+      name: user.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : user.name,
+      sessionVersion: getSessionVersion(user),
+    }),
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
 const buildPhoneCandidates = (value) => {
   const rawDigits = String(value || "").replace(/\D/g, "");
   const normalized = normalizePHPhone(value);
@@ -222,6 +234,28 @@ export const verifyStaffSession = async (req, res) => {
   return res.status(200).json({ success: true });
 };
 
+export const logoutStaffSession = async (req, res) => {
+  try {
+    const staffId = req.userId || req.user?.id;
+    const staff = await userModel.findById(staffId);
+
+    if (staff) {
+      bumpSessionVersion(staff);
+      await staff.save({ validateBeforeSave: false });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Session ended",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Server error",
+    });
+  }
+};
+
 /* =====================================================
    UPDATE STAFF PROFILE
 ===================================================== */
@@ -243,6 +277,7 @@ export const updateStaffProfile = async (req, res) => {
 
     const staffId = req.userId || req.user?.id;
     const staff = await userModel.findById(staffId);
+    let refreshedToken = "";
 
     if (!staff || staff.role !== "staff") {
       return res.status(404).json({
@@ -401,10 +436,15 @@ export const updateStaffProfile = async (req, res) => {
     await staff.save();
     const safeStaff = await userModel.findById(staffId).select("-password");
 
+    if (newPassword) {
+      refreshedToken = createStaffToken(safeStaff);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
       userData: safeStaff,
+      token: refreshedToken || undefined,
     });
 
   } catch (error) {

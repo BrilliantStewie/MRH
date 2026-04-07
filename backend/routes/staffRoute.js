@@ -4,6 +4,7 @@ import upload from "../middlewares/multer.js";
 import {
   staffLogin,
   verifyStaffSession,
+  logoutStaffSession,
   getStaffProfile,
   updateStaffProfile,
   getStaffBookings,
@@ -26,6 +27,7 @@ const router = express.Router();
 ========================= */
 router.post("/login", staffLogin);
 router.get("/session", authStaff, verifyStaffSession);
+router.post("/logout", authStaff, logoutStaffSession);
 
 /* =========================
    STAFF PROFILE

@@ -15,7 +15,7 @@ const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
 const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
 
 const MyProfile = () => {
-  const { userData, setUserData, token, backendUrl, loadUserProfileData } = useContext(AppContext);
+  const { userData, setUserData, token, setToken, backendUrl, loadUserProfileData } = useContext(AppContext);
 
   const [isEdit, setIsEdit] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -439,6 +439,12 @@ const MyProfile = () => {
       );
 
       if (data.success) {
+        if (data.token) {
+          setToken(data.token);
+        }
+        if (data.userData) {
+          setUserData(data.userData);
+        }
         toast.success("Profile updated successfully!");
         setIsEdit(false);
         setImage(null);
@@ -448,7 +454,7 @@ const MyProfile = () => {
         setEmailOtpTarget("");
         setShowEmailOtpModal(false);
         setLocalEditData(prev => ({ ...prev, oldPassword: "", newPassword: "", confirmPassword: "" }));
-        if (loadUserProfileData) await loadUserProfileData();
+        if (!data.userData && loadUserProfileData) await loadUserProfileData();
       } else {
         toast.error(data.message);
       }

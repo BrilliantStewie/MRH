@@ -17,6 +17,7 @@ import {
   verifyEmailChangeOTP,
   verifyPhoneOTPUpdate,
   getUserData,
+  logoutUserSession,
   updateUserProfile,
   getUserBookings,
   createBooking,
@@ -63,6 +64,7 @@ userRouter.post("/request-phone-reset", requestPhoneReset);
 userRouter.post("/reset-password", resetPassword);
 
 userRouter.get("/profile", authUser, getUserData);
+userRouter.post("/logout", authUser, logoutUserSession);
 userRouter.post("/update-profile", authUser, upload.single("image"), updateUserProfile);
 
 // --- BOOKINGS ---

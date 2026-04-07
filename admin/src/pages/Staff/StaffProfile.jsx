@@ -39,7 +39,7 @@ const EMPTY_FORM = {
 };
 
 const StaffProfile = () => {
-  const { staffData, setStaffData, sToken, backendUrl, loadStaffData } = useContext(StaffContext);
+  const { staffData, setStaffData, sToken, setSToken, backendUrl, loadStaffData } = useContext(StaffContext);
 
   const [isEdit, setIsEdit] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -417,6 +417,10 @@ const StaffProfile = () => {
       if (!data.success) {
         toast.error(data.message || "Update failed");
         return;
+      }
+
+      if (data.token) {
+        setSToken(data.token);
       }
 
       toast.success("Profile updated successfully!");

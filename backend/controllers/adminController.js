@@ -225,6 +225,21 @@ const verifyAdminSession = async (req, res) => {
   res.json({ success: true });
 };
 
+const logoutAdminSession = async (req, res) => {
+  try {
+    const admin = await userModel.findById(req.userId);
+
+    if (admin) {
+      bumpSessionVersion(admin);
+      await admin.save({ validateBeforeSave: false });
+    }
+
+    res.json({ success: true, message: "Session ended" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export default loginAdmin;
 
 // ======================================================================
@@ -1185,6 +1200,7 @@ const updateRoomType = async (req, res) => {
 export {
     loginAdmin, 
     verifyAdminSession,
+    logoutAdminSession,
     adminDashboard, 
     getAllUsers, 
     getAllStaff, 

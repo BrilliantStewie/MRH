@@ -15,9 +15,9 @@ import {
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   const [viewDate, setViewDate] = useState(() => getCurrentPHDateObject() || new Date());
 
-  const bookingCountsByDate = useMemo(() => {
-    const counts = new Map();
-    if (!bookings) return counts;
+  const unavailableDates = useMemo(() => {
+    if (!bookings) return [];
+    const dates = [];
     bookings.forEach(b => {
       const status = String(b.status || b.paymentStatus || "")
         .replace(/[_-\s]/g, "")
@@ -26,18 +26,15 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
         const start = toPHDateObject(getBookingCheckInDateValue(b));
         const end = toPHDateObject(getBookingCheckOutDateValue(b));
         if (!start || !end) return;
-        const bookingCountRaw = Number(b.bookingCount);
-        const bookingCount = Number.isFinite(bookingCountRaw) && bookingCountRaw > 0 ? bookingCountRaw : 1;
 
         let current = new Date(start);
         while (current <= end) {
-          const key = current.getTime();
-          counts.set(key, (counts.get(key) || 0) + bookingCount);
+          dates.push(new Date(current).getTime());
           current.setDate(current.getDate() + 1);
         }
       }
     });
-    return counts;
+    return [...new Set(dates)].map((time) => new Date(time));
   }, [bookings]);
 
   const getDayClass = (date) => {
@@ -48,8 +45,7 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
     if (!isCurrentMonth || isPast) return "pro-day-locked";
     
     const time = date.getTime();
-    const bookingCount = bookingCountsByDate.get(time) || 0;
-    const isReserved = bookingCount >= 2;
+    const isReserved = unavailableDates.some((reservedDate) => reservedDate.getTime() === time);
     return isReserved ? "pro-day-amber" : "pro-day-open";
   };
 
