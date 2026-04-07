@@ -28,6 +28,7 @@ const Login = () => {
   const [state, setState] = useState('Login');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [verificationLoadingMessage, setVerificationLoadingMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -168,6 +169,7 @@ const Login = () => {
   useEffect(() => {
     setError("");
     setSuccessMessage("");
+    setVerificationLoadingMessage("");
     setIsEmailVerified(false);
     setIsPhoneVerified(false);
     setShowVerificationNag(false);
@@ -296,7 +298,11 @@ const Login = () => {
     }
 
     setError("");
-    setLoading(true);
+    if (purpose === 'signup') {
+      setVerificationLoadingMessage("Sending your phone verification code. Please wait...");
+    } else {
+      setLoading(true);
+    }
 
     try {
       if (purpose === 'reset') {
@@ -341,7 +347,11 @@ const Login = () => {
       setError(message);
       return { success: false, message };
     } finally {
-      setLoading(false);
+      if (purpose === 'signup') {
+        setVerificationLoadingMessage("");
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -398,7 +408,7 @@ const Login = () => {
     }
     
     setError("");
-    setLoading(true);
+    setVerificationLoadingMessage("Sending your email verification code. Please wait...");
     try {
       const endpoint = '/api/user/send-otp';
       const payload = { email: targetValue };
@@ -417,7 +427,7 @@ const Login = () => {
       const errorMsg = err.response?.data?.message || "Could not send code. Please try again.";
       setError(errorMsg);
     } finally {
-      setLoading(false);
+      setVerificationLoadingMessage("");
     }
   };
   
@@ -651,6 +661,8 @@ const Login = () => {
     ? (isSignUpMode
         ? "Creating your account with Google. This can take a few seconds."
         : "Signing you in with Google. This can take a few seconds.")
+    : verificationLoadingMessage
+      ? verificationLoadingMessage
     : loading
       ? (isResetPasswordMode
           ? "Updating your password. Please wait..."
@@ -816,7 +828,7 @@ const Login = () => {
                             required 
                           />
                           {state === 'Sign Up' && phone.length === 11 && !isPhoneFieldTaken && (
-                            <button type="button" onClick={() => handleVerifyClick('phone')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight'>Send OTP</button>
+                            <button type="button" disabled={loading || googleLoading || Boolean(verificationLoadingMessage)} onClick={() => handleVerifyClick('phone')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-60'>Send OTP</button>
                           )}
                         </div>
 
@@ -859,7 +871,7 @@ const Login = () => {
                       />
                       
                       {state === 'Sign Up' && validateEmail(email) && !isEmailVerified && !isAccountTaken && (
-                        <button type="button" onClick={() => handleVerifyClick('default')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight'>Send OTP</button>
+                        <button type="button" disabled={loading || googleLoading || Boolean(verificationLoadingMessage)} onClick={() => handleVerifyClick('default')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-60'>Send OTP</button>
                       )}
                     </div>
 
@@ -947,7 +959,7 @@ const Login = () => {
               {/* ✅ UPDATED BUTTON DISABLED LOGIC */}
               {!showForgotEmailField && (
                 <button 
-                  disabled={loading || googleLoading || (state === 'Sign Up' && (isAccountTaken || isPhoneFieldTaken))} 
+                  disabled={loading || googleLoading || Boolean(verificationLoadingMessage) || (state === 'Sign Up' && (isAccountTaken || isPhoneFieldTaken))} 
                   type='submit' 
                   className='w-full bg-[#1A2B32] text-white py-4 rounded-xl font-bold text-sm mt-6 hover:bg-black hover:shadow-lg transition-all active:scale-[0.99] disabled:bg-gray-200 disabled:cursor-not-allowed'
                 >
@@ -970,7 +982,7 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => handleGoogleSignIn(state === 'Sign Up' ? "signup" : "login")}
-                    disabled={loading || googleLoading}
+                    disabled={loading || googleLoading || Boolean(verificationLoadingMessage)}
                     className='w-full mt-3 border border-gray-200 bg-white text-gray-700 py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed'
                   >
                     {googleLoading ? (
