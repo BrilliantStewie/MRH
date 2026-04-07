@@ -259,6 +259,45 @@ const RetreatBooking = () => {
         );
     };
 
+    const getBlockedRoomIdsForDateRange = async (roomIds, checkIn, checkOut) => {
+        if (!Array.isArray(roomIds) || roomIds.length === 0 || !checkIn || !checkOut) {
+            return new Set();
+        }
+
+        const [rangeResponse, occupiedResponse] = await Promise.all([
+            axios.post(backendUrl + "/api/booking/booked-rooms", {
+                roomIds,
+                checkIn,
+                checkOut,
+            }),
+            axios.get(backendUrl + "/api/booking/occupied"),
+        ]);
+
+        const blockedRoomIds = new Set();
+
+        if (rangeResponse.data?.success) {
+            (rangeResponse.data?.bookedRoomIds || [])
+                .filter(Boolean)
+                .forEach((id) => blockedRoomIds.add(String(id)));
+
+            (rangeResponse.data?.bookedRooms || [])
+                .map((entry) => entry?.roomId)
+                .filter(Boolean)
+                .forEach((id) => blockedRoomIds.add(String(id)));
+        }
+
+        if (occupiedResponse.data?.success) {
+            [
+                ...(occupiedResponse.data?.occupiedRoomIds || []),
+                ...(occupiedResponse.data?.cleaningRoomIds || []),
+            ]
+                .filter(Boolean)
+                .forEach((id) => blockedRoomIds.add(String(id)));
+        }
+
+        return blockedRoomIds;
+    };
+
     const getRoomImage = (room) => {
         if (!room) return null;
         if (room.coverImage) return room.coverImage;
@@ -693,22 +732,16 @@ const RetreatBooking = () => {
 
         try {
             const { data } = await axios.get(backendUrl + "/api/room/list");
-            if (!data.success) return;
+            if (!data.success) {
+                toast.error(data.message || "Unable to load rooms.");
+                return;
+            }
 
             const roomIds = (data.rooms || []).map((room) => room._id);
-            const availabilityResponse = await axios.post(backendUrl + "/api/booking/booked-rooms", {
+            const blockedRoomIds = await getBlockedRoomIdsForDateRange(
                 roomIds,
-                checkIn: startDate,
-                checkOut: endDate,
-            });
-
-            const blockedRoomIds = new Set(
-                [
-                    ...(availabilityResponse.data?.bookedRoomIds || []),
-                    ...((availabilityResponse.data?.bookedRooms || []).map((entry) => entry?.roomId)),
-                ]
-                    .filter(Boolean)
-                    .map((id) => String(id))
+                startDate,
+                endDate
             );
 
             clearRooms();
