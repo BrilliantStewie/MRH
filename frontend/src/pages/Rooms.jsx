@@ -27,6 +27,7 @@ import {
   FRONTEND_REALTIME_EVENT_NAME,
   matchesRealtimeEntity,
 } from "../utils/realtime";
+import { toPHDateObject } from "../utils/dateTime";
 
 const ROOMS_PER_PAGE = 8;
 const FILTER_OPTION_PREVIEW_COUNT = 4;
@@ -64,8 +65,7 @@ const Rooms = () => {
   const getStoredDate = (key) => {
     const value = sessionStorage.getItem(key);
     if (!value) return null;
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
+    return toPHDateObject(value);
   };
   const [rangeStart] = useState(() => getStoredDate("draftStartDate"));
   const [rangeEnd] = useState(() => getStoredDate("draftEndDate"));

@@ -15,6 +15,10 @@ import {
     getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
 import {
+    getCurrentPHDateObject,
+    toPHDateObject,
+} from "../utils/dateTime";
+import {
     FRONTEND_REALTIME_EVENT_NAME,
     matchesRealtimeEntity,
 } from "../utils/realtime";
@@ -44,8 +48,7 @@ const RetreatBooking = () => {
     const getStoredDate = (key) => {
         const value = sessionStorage.getItem(key);
         if (!value) return null;
-        const parsed = new Date(value);
-        return Number.isNaN(parsed.getTime()) ? null : parsed;
+        return toPHDateObject(value);
     };
 
     const [venueParticipants, setVenueParticipants] = useState(() => (
@@ -242,9 +245,7 @@ const RetreatBooking = () => {
 
     // --- 4. HELPERS ---
     const toDateObj = (dateString) => {
-        const date = new Date(dateString);
-        date.setHours(0, 0, 0, 0);
-        return date;
+        return toPHDateObject(dateString);
     };
 
     const getRoomImage = (room) => {
@@ -539,10 +540,9 @@ const RetreatBooking = () => {
 
     const getDuration = () => {
         if (!startDate || !endDate) return 0;
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
+        const start = toDateObj(startDate);
+        const end = toDateObj(endDate);
+        if (!start || !end) return 0;
         if (start.getTime() === end.getTime()) return 1;
         return Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24));
     };
@@ -744,7 +744,9 @@ const RetreatBooking = () => {
     const isSameDay =
         startDate &&
         endDate &&
-        new Date(startDate).toDateString() === new Date(endDate).toDateString();
+        toDateObj(startDate)?.getTime() === toDateObj(endDate)?.getTime();
+
+    const todayPHDate = getCurrentPHDateObject();
 
     // Venue packages
     const venuePackages = dbPackages.filter(
@@ -928,7 +930,7 @@ const RetreatBooking = () => {
                                         selectsStart
                                         startDate={startDate}
                                         endDate={endDate}
-                                        minDate={new Date()}
+                                        minDate={todayPHDate}
                                         excludeDates={allBlockedDates}
                                         dayClassName={getDayClass}
                                         placeholderText="Select Date"
@@ -955,7 +957,7 @@ const RetreatBooking = () => {
                                         selectsEnd
                                         startDate={startDate}
                                         endDate={endDate}
-                                        minDate={startDate || new Date()}
+                                        minDate={startDate || todayPHDate}
                                         excludeDates={allBlockedDates}
                                         dayClassName={getDayClass}
                                         placeholderText="Select Date"

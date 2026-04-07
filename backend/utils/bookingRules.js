@@ -1,11 +1,8 @@
 import { getBookingStayFlags } from "./bookingStay.js";
 import { getBookingCheckOutDate } from "./bookingDateFields.js";
+import { createManilaDayStart } from "./manilaDate.js";
 
-const normalizeDate = (date) => {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-};
+const normalizeDate = (date) => createManilaDayStart(date);
 
 const addDays = (date, days) => {
   const updated = new Date(date);

@@ -6,10 +6,14 @@ import {
   getBookingCheckInDateValue,
   getBookingCheckOutDateValue,
 } from "../utils/bookingDateFields";
-import { formatMonthYearPHT } from "../utils/dateTime";
+import {
+  formatMonthYearPHT,
+  getCurrentPHDateObject,
+  toPHDateObject,
+} from "../utils/dateTime";
 
 const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
-  const [viewDate, setViewDate] = useState(new Date());
+  const [viewDate, setViewDate] = useState(() => getCurrentPHDateObject() || new Date());
 
   const bookingCountsByDate = useMemo(() => {
     const counts = new Map();
@@ -19,10 +23,9 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
         .replace(/[_-\s]/g, "")
         .toLowerCase();
       if (['approved', 'paid', 'checkedin', 'pending'].includes(status)) {
-        const start = new Date(getBookingCheckInDateValue(b));
-        const end = new Date(getBookingCheckOutDateValue(b));
-        start.setHours(0, 0, 0, 0);
-        end.setHours(0, 0, 0, 0);
+        const start = toPHDateObject(getBookingCheckInDateValue(b));
+        const end = toPHDateObject(getBookingCheckOutDateValue(b));
+        if (!start || !end) return;
         const bookingCountRaw = Number(b.bookingCount);
         const bookingCount = Number.isFinite(bookingCountRaw) && bookingCountRaw > 0 ? bookingCountRaw : 1;
 
@@ -38,8 +41,7 @@ const AvailabilityCalendar = ({ isOpen, onClose, bookings }) => {
   }, [bookings]);
 
   const getDayClass = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getCurrentPHDateObject();
     const isCurrentMonth = date.getMonth() === viewDate.getMonth();
     const isPast = date < today;
 

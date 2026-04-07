@@ -74,6 +74,15 @@ const getPHDateValue = (value) => {
   return parts ? `${parts.year}-${parts.month}-${parts.day}` : "";
 };
 
+const toPHDateObject = (value) => {
+  const parts = getPHDateParts(value);
+  if (!parts) return null;
+
+  return new Date(Number(parts.year), Number(parts.month) - 1, Number(parts.day));
+};
+
+const getCurrentPHDateObject = () => toPHDateObject(new Date());
+
 const getPHMonthIndex = (value) => {
   const parts = getPHDateParts(value);
   return parts ? Number(parts.month) - 1 : -1;
@@ -96,9 +105,11 @@ export {
   formatDateTimePHT,
   formatMonthYearPHT,
   formatDateRangePHT,
+  getCurrentPHDateObject,
   getPHDateValue,
   getPHMonthIndex,
   getPHYear,
   getCurrentPHYear,
   getMonthLabelPHT,
+  toPHDateObject,
 };
