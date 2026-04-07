@@ -247,6 +247,17 @@ const RetreatBooking = () => {
     const toDateObj = (dateString) => {
         return toPHDateObject(dateString);
     };
+    const isRoomUnavailableForSelection = (room, blockedRoomIds = new Set()) => {
+        const roomId = String(room?._id || "");
+        const roomStatus = String(room?.status || "").trim().toLowerCase();
+
+        return (
+            !roomId ||
+            blockedRoomIds.has(roomId) ||
+            room?.available === false ||
+            roomStatus === "maintenance"
+        );
+    };
 
     const getRoomImage = (room) => {
         if (!room) return null;
@@ -676,25 +687,48 @@ const RetreatBooking = () => {
             return toast.error("Enter venue participants first.");
         }
 
+        if (!startDate || !endDate) {
+            return toast.error("Please select check-in and check-out dates first.");
+        }
+
         try {
             const { data } = await axios.get(backendUrl + "/api/room/list");
             if (!data.success) return;
 
+            const roomIds = (data.rooms || []).map((room) => room._id);
+            const availabilityResponse = await axios.post(backendUrl + "/api/booking/booked-rooms", {
+                roomIds,
+                checkIn: startDate,
+                checkOut: endDate,
+            });
+
+            const blockedRoomIds = new Set(
+                [
+                    ...(availabilityResponse.data?.bookedRoomIds || []),
+                    ...((availabilityResponse.data?.bookedRooms || []).map((entry) => entry?.roomId)),
+                ]
+                    .filter(Boolean)
+                    .map((id) => String(id))
+            );
+
             clearRooms();
             let remaining = participants;
-            const sortedRooms = [...data.rooms].sort((a, b) => b.capacity - a.capacity);
+            const sortedRooms = [...data.rooms]
+                .filter((room) => !isRoomUnavailableForSelection(room, blockedRoomIds))
+                .sort((a, b) => b.capacity - a.capacity);
             const selected = [];
 
             for (const room of sortedRooms) {
                 if (remaining <= 0) break;
                 if (selectedRooms.some(r => r._id === room._id)) continue;
                 const capacity = Number(room.capacity);
+                if (!Number.isFinite(capacity) || capacity <= 0) continue;
                 if (getRoomTypeLabel(room).toLowerCase().includes("dorm") && remaining < 3) continue;
                 selected.push(room);
                 remaining -= capacity;
             }
 
-            if (selected.length === 0) return toast.error("No suitable rooms found");
+            if (selected.length === 0) return toast.error("No available rooms found for the selected dates.");
 
             let remainingPax = participants;
             const newParticipantsObj = {};
@@ -1028,7 +1062,8 @@ const RetreatBooking = () => {
                                 {Number(venueParticipants) > 0 && selectedRooms.length === 0 && !isSameDayBooking && (
                                     <button
                                         onClick={handleAutoRoomSelection}
-                                        className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-200"
+                                        disabled={!startDate || !endDate}
+                                        className="flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-slate-200 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
                                     >
 
                                         Auto Select
