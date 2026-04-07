@@ -638,7 +638,7 @@ const googleAuth = async (req, res) => {
             });
             await user.save();
 
-            await sendEmail(
+            void sendEmail(
                 email,
                 "Welcome to Mercedarian Retreat House",
                 `
