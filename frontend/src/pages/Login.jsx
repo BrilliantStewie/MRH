@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { User, Camera, Eye, EyeOff, Loader2, Info, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, Eye, EyeOff, Loader2, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../config/firebase";
@@ -604,6 +604,34 @@ const Login = () => {
   const isSignUpMode = state === 'Sign Up';
   const isResetPasswordMode = state === 'Reset Password';
   const isForgotPasswordMode = state === 'Login' && showForgotEmailField;
+  const activeAuthStatusMessage = googleLoading
+    ? (isSignUpMode
+        ? "Creating your account with Google. This can take a few seconds on Vercel."
+        : "Signing you in with Google. This can take a few seconds on Vercel.")
+    : loading
+      ? (isResetPasswordMode
+          ? "Updating your password. Please wait..."
+          : isSignUpMode
+            ? "Creating your account. Please wait..."
+            : isForgotPasswordMode
+              ? "Sending your recovery code. Please wait..."
+              : "Signing you in. Please wait...")
+      : "";
+  const submitButtonLabel = isResetPasswordMode
+    ? "Update Password"
+    : isSignUpMode
+      ? "Sign up"
+      : "Log in";
+  const loadingSubmitButtonLabel = isResetPasswordMode
+    ? "Updating Password..."
+    : isSignUpMode
+      ? "Creating Account..."
+      : isForgotPasswordMode
+        ? "Sending Code..."
+        : "Signing In...";
+  const googleButtonLabel = googleLoading
+    ? (isSignUpMode ? "Creating Account with Google..." : "Signing In with Google...")
+    : (isSignUpMode ? "Sign up with Google" : "Continue with Google");
 
   return (
     <div className='relative w-full bg-[#F4F5F7] px-3 pb-6 pt-4 font-sans sm:px-6 sm:pb-8 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-5 xl:px-10'>
@@ -682,6 +710,12 @@ const Login = () => {
               <p className='text-gray-400 text-sm mt-3 leading-relaxed'>
                 {isResetPasswordMode ? "Please choose a strong password." : (showForgotEmailField ? "Enter your email or phone to receive a code." : `Today is a new day. ${isSignUpMode ? "Join us to start managing." : "Sign in to start managing."}`)}
               </p>
+              {activeAuthStatusMessage && (
+                <div className='mt-4 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800 shadow-sm'>
+                  <Loader2 size={18} className='mt-0.5 shrink-0 animate-spin' />
+                  <p>{activeAuthStatusMessage}</p>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleFormSubmit} className='space-y-5'>
@@ -816,7 +850,7 @@ const Login = () => {
                           >
                             Cancel
                           </button>
-                          <button type="button" onClick={handleForgotPassword} disabled={loading} className="bg-[#1A2B32] text-white py-3.5 rounded-xl text-[10px] font-extrabold uppercase tracking-widest active:scale-[0.98]">Send Code</button>
+                          <button type="button" onClick={handleForgotPassword} disabled={loading || googleLoading} className="bg-[#1A2B32] text-white py-3.5 rounded-xl text-[10px] font-extrabold uppercase tracking-widest active:scale-[0.98] disabled:bg-gray-200 disabled:cursor-not-allowed">Send Code</button>
                         </div>
                       </div>
                     )}
@@ -870,11 +904,16 @@ const Login = () => {
               {/* ✅ UPDATED BUTTON DISABLED LOGIC */}
               {!showForgotEmailField && (
                 <button 
-                  disabled={loading || (state === 'Sign Up' && (isAccountTaken || isPhoneFieldTaken))} 
+                  disabled={loading || googleLoading || (state === 'Sign Up' && (isAccountTaken || isPhoneFieldTaken))} 
                   type='submit' 
                   className='w-full bg-[#1A2B32] text-white py-4 rounded-xl font-bold text-sm mt-6 hover:bg-black hover:shadow-lg transition-all active:scale-[0.99] disabled:bg-gray-200 disabled:cursor-not-allowed'
                 >
-                  {loading ? <Loader2 className='animate-spin mx-auto' size={20} /> : (state === 'Reset Password' ? "Update Password" : (state === 'Sign Up' ? "Sign up" : "Log in"))}
+                  {loading ? (
+                    <span className='flex items-center justify-center gap-2'>
+                      <Loader2 className='animate-spin' size={18} />
+                      <span>{loadingSubmitButtonLabel}</span>
+                    </span>
+                  ) : submitButtonLabel}
                 </button>
               )}
 
@@ -888,7 +927,7 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => handleGoogleSignIn(state === 'Sign Up' ? "signup" : "login")}
-                    disabled={googleLoading}
+                    disabled={loading || googleLoading}
                     className='w-full mt-3 border border-gray-200 bg-white text-gray-700 py-3.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-60 disabled:cursor-not-allowed'
                   >
                     {googleLoading ? (
@@ -901,7 +940,7 @@ const Login = () => {
                         <path fill="#34A853" d="M24 48c6.47 0 11.94-2.13 15.92-5.78l-7.62-5.9c-2.11 1.42-4.8 2.25-8.3 2.25-6.32 0-11.79-3.8-13.88-9.45l-8.02 6.23C6.27 42.62 14.64 48 24 48z"/>
                       </svg>
                     )}
-                    <span>{state === 'Sign Up' ? "Sign up with Google" : "Continue with Google"}</span>
+                    <span>{googleButtonLabel}</span>
                   </button>
                 </>
               )}
