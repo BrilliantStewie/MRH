@@ -1,7 +1,10 @@
+import axios from "axios";
 import nodemailer from "nodemailer";
 
 const EMAIL_USER = String(process.env.EMAIL_USER || "").trim();
 const EMAIL_PASS = String(process.env.EMAIL_PASS || "").trim();
+const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
+const EMAIL_FROM = String(process.env.EMAIL_FROM || "").trim();
 const EMAIL_TIMEOUT_CODES = new Set([
   "ECONNECTION",
   "EDNS",
@@ -10,18 +13,35 @@ const EMAIL_TIMEOUT_CODES = new Set([
   "ESOCKET",
   "ETIMEDOUT",
 ]);
+const IS_RENDER_RUNTIME = Boolean(
+  process.env.RENDER || process.env.RENDER_SERVICE_ID || process.env.RENDER_EXTERNAL_URL
+);
+const DEFAULT_RESEND_FROM = "Mercedarian Retreat House <onboarding@resend.dev>";
 
 let emailTransporter = null;
 
 const createFriendlyEmailError = (error) => {
   const combinedMessage = `${error?.message || ""} ${error?.response || ""}`;
+  const resendMessage =
+    error?.response?.data?.message ||
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.error ||
+    "";
 
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    return "Email is not configured. Set EMAIL_USER and EMAIL_PASS in backend/.env.";
+  if (RESEND_API_KEY && resendMessage) {
+    return resendMessage;
+  }
+
+  if (!RESEND_API_KEY && (!EMAIL_USER || !EMAIL_PASS)) {
+    return "Email is not configured. Set EMAIL_USER and EMAIL_PASS, or configure RESEND_API_KEY and EMAIL_FROM.";
   }
 
   if (error?.code === "EAUTH" && /gmail|gsmtp|badcredentials/i.test(combinedMessage)) {
     return "Gmail rejected the login. Generate a new Google App Password for EMAIL_USER, update EMAIL_PASS in backend/.env, and restart the server.";
+  }
+
+  if (IS_RENDER_RUNTIME && EMAIL_TIMEOUT_CODES.has(error?.code)) {
+    return "The live backend is hosted on Render and its current instance cannot complete SMTP email delivery. Upgrade the Render backend or switch to an API-based email provider such as Resend.";
   }
 
   if (EMAIL_TIMEOUT_CODES.has(error?.code)) {
@@ -65,10 +85,31 @@ const resetEmailTransporter = () => {
   emailTransporter = null;
 };
 
+const sendEmailWithResend = async (to, subject, professionalHtml, plainText) => {
+  const fromAddress = EMAIL_FROM || DEFAULT_RESEND_FROM;
+
+  const payload = {
+    from: fromAddress,
+    to: [to],
+    subject,
+    html: professionalHtml,
+  };
+
+  if (plainText) {
+    payload.text = plainText;
+  }
+
+  await axios.post("https://api.resend.com/emails", payload, {
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    timeout: 20000,
+  });
+};
+
 const sendEmail = async (to, subject, htmlContent, plainText = "") => {
   try {
-    const transporter = getEmailTransporter();
-
     // Enhanced Professional Wrapper
     const professionalHtml = `
       <div style="background-color: #f9fafb; padding: 40px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
@@ -99,6 +140,13 @@ const sendEmail = async (to, subject, htmlContent, plainText = "") => {
       </div>
     `;
 
+    if (RESEND_API_KEY) {
+      await sendEmailWithResend(to, subject, professionalHtml, plainText);
+      console.log(`Email sent via Resend to ${to}`);
+      return { success: true };
+    }
+
+    const transporter = getEmailTransporter();
     const info = await transporter.sendMail({
       from: `"Mercedarian Retreat House" <${EMAIL_USER}>`,
       to,
