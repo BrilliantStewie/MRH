@@ -44,7 +44,6 @@ const MyProfile = () => {
   const [emailConflictError, setEmailConflictError] = useState("");
   const [isCheckingEmailAvailability, setIsCheckingEmailAvailability] = useState(false);
   const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
-  const [phoneVerificationToken, setPhoneVerificationToken] = useState("");
   const [suffixError, setSuffixError] = useState("");
   const recaptchaRef = useRef(null);
   const phoneCheckRequestRef = useRef(0);
@@ -52,36 +51,37 @@ const MyProfile = () => {
 
   // Sync Global Context Data to Local State
   useEffect(() => {
-    if (userData) {
-      const normalizedPhone = normalizePhoneInput(userData.phone || "");
-      const normalizedEmail = normalizeEmailInput(userData.email || "");
-      setOriginalPhone(normalizedPhone);
-      setOriginalEmail(normalizedEmail);
-      setVerifiedEmailForSave(normalizedEmail);
-      setLocalEditData({
-        firstName: userData.firstName || "",
-        middleName: userData.middleName || "",
-        lastName: userData.lastName || "",
-        suffix: userData.suffix || "",
-        phone: normalizedPhone,
-        email: normalizedEmail,
-        oldPassword: "", newPassword: "", confirmPassword: "",
-      });
-      setRemoveImage(false);
-      setImage(null);
-      setPhoneError("");
-      setPhoneConflictError("");
-      setIsCheckingPhoneAvailability(false);
-      setSuffixError("");
-      setPhoneOtpSent(false);
-      setPhoneOtpVerified(false);
-      setPhoneVerificationToken("");
-      setEmailOtpTarget("");
-      setShowEmailOtpModal(false);
-      setEmailConflictError("");
-      setIsCheckingEmailAvailability(false);
+    if (!userData || isEdit) {
+      return;
     }
-  }, [userData]);
+
+    const normalizedPhone = normalizePhoneInput(userData.phone || "");
+    const normalizedEmail = normalizeEmailInput(userData.email || "");
+    setOriginalPhone(normalizedPhone);
+    setOriginalEmail(normalizedEmail);
+    setVerifiedEmailForSave(normalizedEmail);
+    setLocalEditData({
+      firstName: userData.firstName || "",
+      middleName: userData.middleName || "",
+      lastName: userData.lastName || "",
+      suffix: userData.suffix || "",
+      phone: normalizedPhone,
+      email: normalizedEmail,
+      oldPassword: "", newPassword: "", confirmPassword: "",
+    });
+    setRemoveImage(false);
+    setImage(null);
+    setPhoneError("");
+    setPhoneConflictError("");
+    setIsCheckingPhoneAvailability(false);
+    setSuffixError("");
+    setPhoneOtpSent(false);
+    setPhoneOtpVerified(false);
+    setEmailOtpTarget("");
+    setShowEmailOtpModal(false);
+    setEmailConflictError("");
+    setIsCheckingEmailAvailability(false);
+  }, [userData, isEdit]);
 
   const normalizePhoneInput = (value) => {
     const digits = String(value || "").replace(/\D/g, "");
@@ -285,7 +285,6 @@ const MyProfile = () => {
     setSuffixError("");
     setPhoneOtpSent(false);
     setPhoneOtpVerified(false);
-    setPhoneVerificationToken("");
     setEmailOtpTarget("");
     setShowEmailOtpModal(false);
     setEmailConflictError("");
@@ -421,9 +420,6 @@ const MyProfile = () => {
       formData.append("phone", normalizedPhone);
       formData.append("suffix", localEditData.suffix.trim() || "");
       formData.append("email", normalizedEmail);
-      if (phoneWasChanged && normalizedPhone && phoneVerificationToken) {
-        formData.append("phoneIdToken", phoneVerificationToken);
-      }
 
       if (removeImage) formData.append("removeImage", "true");
 
@@ -448,7 +444,6 @@ const MyProfile = () => {
         setImage(null);
         setRemoveImage(false);
         setOriginalEmail(normalizedEmail);
-        setPhoneVerificationToken("");
         setVerifiedEmailForSave(normalizedEmail);
         setEmailOtpTarget("");
         setShowEmailOtpModal(false);
@@ -478,27 +473,42 @@ const MyProfile = () => {
     const normalizedPhone = normalizePhoneInput(localEditData.phone);
     if (!isValidPHNumber(normalizedPhone)) {
       setPhoneError("Use an 11-digit PH number starting with 09.");
-      return;
+      return { success: false, message: "Use an 11-digit PH number starting with 09." };
     }
     if (phoneConflictError) {
-      return;
+      return { success: false, message: phoneConflictError };
     }
 
     setPhoneError("");
     setPhoneOtpLoading(true);
     try {
+      const stageResponse = await axios.post(
+        `${backendUrl}/api/user/stage-phone-firebase-update`,
+        { phone: normalizedPhone },
+        { headers: { token } }
+      );
+
+      if (!stageResponse.data?.success) {
+        const message = stageResponse.data?.message || "Failed to prepare phone verification.";
+        toast.error(message);
+        return { success: false, message };
+      }
+
       const verifier = await ensureRecaptcha();
       const e164 = `+63${normalizedPhone.slice(1)}`;
       const confirmation = await signInWithPhoneNumber(auth, e164, verifier);
       setFirebaseConfirmation(confirmation);
       setPhoneOtpSent(true);
       setShowPhoneOtpModal(true);
+      return { success: true };
     } catch (err) {
       if (recaptchaRef.current) {
         recaptchaRef.current.clear();
         recaptchaRef.current = null;
       }
-      toast.error(err?.message || "Failed to send OTP.");
+      const message = err?.response?.data?.message || err?.message || "Failed to send OTP.";
+      toast.error(message);
+      return { success: false, message };
     } finally {
       setPhoneOtpLoading(false);
     }
@@ -517,11 +527,21 @@ const MyProfile = () => {
         return { success: false, message: "Verified phone number does not match the current phone field." };
       }
 
-      setPhoneVerificationToken(idToken);
+      const { data } = await axios.post(
+        `${backendUrl}/api/user/verify-phone-firebase`,
+        { idToken },
+        { headers: { token } }
+      );
+
+      if (!data.success) {
+        await signOut(auth);
+        return { success: false, message: data.message || "Failed to verify phone." };
+      }
+
       setPhoneOtpVerified(true);
       setPhoneOtpSent(true);
       await signOut(auth);
-      return { success: true };
+      return { success: true, phone: normalizePhoneInput(data.phone || verifiedPhone) };
     } catch (err) {
       return { success: false, message: err?.response?.data?.message || err?.message || "Failed to verify phone." };
     }

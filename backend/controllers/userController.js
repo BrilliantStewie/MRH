@@ -404,11 +404,66 @@ const sendPhoneOTPUpdate = async (req, res) => {
     }
 };
 
+const stagePhoneFirebaseUpdate = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const normalizedPhone = normalizePHPhone(req.body.phone);
+
+        if (!normalizedPhone || !isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+
+        const currentPhone = normalizePHPhone(user.phone || "");
+        if (normalizedPhone === currentPhone) {
+            user.pendingPhone = "";
+            await user.save();
+            return res.json({ success: true, message: "Phone number is unchanged", phone: currentPhone });
+        }
+
+        const conflictUser = await userModel.findOne({
+            phone: normalizedPhone,
+            _id: { $ne: userId }
+        });
+
+        if (hasClaimedPhone(conflictUser)) {
+            return res.json({ success: false, message: "Phone number already taken" });
+        }
+
+        user.pendingPhone = normalizedPhone;
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
+
+        return res.json({
+            success: true,
+            message: "Phone update pending verification",
+            phone: normalizedPhone
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
 const verifyPhoneFirebase = async (req, res) => {
     try {
         const { idToken } = req.body;
         const { normalizedPhone } = await verifyFirebasePhoneToken(idToken);
         const userId = req.userId;
+        const user = await userModel.findById(userId);
+        if (!user) return res.json({ success: false, message: "User not found" });
+        const pendingPhone = normalizePHPhone(user.pendingPhone || "");
+
+        if (!pendingPhone) {
+            return res.json({ success: false, message: "No pending phone to verify" });
+        }
+
+        if (normalizedPhone !== pendingPhone) {
+            return res.json({ success: false, message: "Verified phone number does not match the pending phone number" });
+        }
+
         const conflictUser = await userModel.findOne({
             phone: normalizedPhone,
             _id: { $ne: userId }
@@ -416,6 +471,13 @@ const verifyPhoneFirebase = async (req, res) => {
         if (hasClaimedPhone(conflictUser)) {
             return res.json({ success: false, message: "Phone number already taken" });
         }
+
+        user.phone = pendingPhone;
+        user.phoneVerified = true;
+        user.pendingPhone = "";
+        user.otp = null;
+        user.otpExpires = null;
+        await user.save();
 
         res.json({ success: true, message: "Phone verified successfully", phone: normalizedPhone });
     } catch (error) {
@@ -919,7 +981,7 @@ const getUserData = async (req, res) => {
 const updateUserProfile = async (req, res) => {
     try {
         const userId = req.userId || req.body.userId;
-        const { firstName, middleName, lastName, suffix, phone, email, oldPassword, newPassword, removeImage, phoneIdToken } = req.body;
+        const { firstName, middleName, lastName, suffix, phone, email, oldPassword, newPassword, removeImage } = req.body;
 
         const user = await userModel.findById(userId);
         if (!user) return res.json({ success: false, message: "User not found" });
@@ -954,30 +1016,9 @@ const updateUserProfile = async (req, res) => {
         }
 
         const currentPhone = normalizePHPhone(user.phone || "");
+        const pendingPhone = normalizePHPhone(user.pendingPhone || "");
         if (normalizedPhone && normalizedPhone !== currentPhone) {
-            if (!phoneIdToken) {
-                return res.json({ success: false, message: "Please verify your phone number first" });
-            }
-
-            let verifiedPhone;
-            try {
-                verifiedPhone = await verifyFirebasePhoneToken(phoneIdToken);
-            } catch (error) {
-                return res.json({ success: false, message: error.message || "Please verify your phone number first" });
-            }
-
-            if (verifiedPhone.normalizedPhone !== normalizedPhone) {
-                return res.json({ success: false, message: "Verified phone number does not match the phone you entered" });
-            }
-
-            const phoneConflictUser = await userModel.findOne({
-                phone: normalizedPhone,
-                _id: { $ne: userId }
-            });
-
-            if (hasClaimedPhone(phoneConflictUser)) {
-                return res.json({ success: false, message: "Phone number already taken" });
-            }
+            return res.json({ success: false, message: "Please verify your phone number first" });
         }
 
         user.firstName = normalizedFirstName;
@@ -989,9 +1030,10 @@ const updateUserProfile = async (req, res) => {
         if (!normalizedPhone) {
             user.phoneVerified = false;
             user.pendingPhone = "";
-        } else if (normalizedPhone !== currentPhone) {
-            user.phoneVerified = true;
+        } else if (user.pendingPhone && pendingPhone !== normalizedPhone) {
             user.pendingPhone = "";
+        } else {
+            user.phoneVerified = true;
         }
 
         if (newPassword) {
@@ -1748,6 +1790,7 @@ export {
     sendEmailChangeOTP,
     sendPhoneOTP,
     sendPhoneOTPUpdate,
+    stagePhoneFirebaseUpdate,
     verifyPhoneFirebase,
     requestPasswordReset,
     requestPhoneReset,

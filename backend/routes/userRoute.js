@@ -7,6 +7,7 @@ import {
   sendEmailChangeOTP,
   sendPhoneOTP,
   sendPhoneOTPUpdate,
+  stagePhoneFirebaseUpdate,
   verifyPhoneFirebase,
   requestPasswordReset,
   requestPhoneReset,
@@ -45,6 +46,7 @@ userRouter.post("/send-otp", sendOTP);
 userRouter.post("/send-email-change-otp", authUser, sendEmailChangeOTP);
 userRouter.post("/send-phone-otp", sendPhoneOTP);
 userRouter.post("/send-phone-otp-update", authUser, sendPhoneOTPUpdate);
+userRouter.post("/stage-phone-firebase-update", authUser, stagePhoneFirebaseUpdate);
 userRouter.post("/verify-otp", verifyOTP);
 userRouter.post("/verify-phone-otp", verifyPhoneOTP);
 userRouter.post("/verify-email-change-otp", authUser, verifyEmailChangeOTP);
