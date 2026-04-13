@@ -142,7 +142,11 @@ export const dispatchRealtimeMutation = async (req) => {
     return;
   }
 
-  if (path === "/api/user/update-profile" || path === "/api/staff/update-profile") {
+  if (
+    path === "/api/user/update-profile" ||
+    path === "/api/staff/update-profile" ||
+    path === "/api/admin/update-profile"
+  ) {
     emitRealtimeUpdate({
       rooms: ["admin", "staff"],
       userIds: [req.userId],

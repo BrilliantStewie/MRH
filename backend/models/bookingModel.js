@@ -56,6 +56,13 @@ const bookingSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    declineReason: {
+      type: String,
+      trim: true,
+      default: "",
+      maxlength: 500,
+    },
+
     checkInDate: {
       type: Date,
       required: true,

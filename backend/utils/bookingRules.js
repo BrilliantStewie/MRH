@@ -10,6 +10,8 @@ const addDays = (date, days) => {
   return updated;
 };
 
+const REVIEW_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 const rangesOverlap = (startA, endA, startB, endB) =>
   startA <= endB && endA >= startB;
 
@@ -65,6 +67,7 @@ const getBookingReviewEligibility = (booking, now = new Date()) => {
 export {
   addDays,
   getBookingReviewEligibility,
+  REVIEW_EDIT_WINDOW_MS,
   isRoomPackageType,
   isVenuePackageType,
   normalizeDate,

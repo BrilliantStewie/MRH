@@ -195,19 +195,25 @@ const FilterDropdown = ({
             {options.map((option) => {
               const OptionIcon = option.icon;
               const selected = String(value) === String(option.value);
+              const isDisabled = Boolean(option.disabled);
 
               return (
                 <button
                   key={option.value}
                   type="button"
+                  disabled={isDisabled}
+                  aria-disabled={isDisabled}
                   onClick={() => {
+                    if (isDisabled) return;
                     onChange(option.value);
                     setIsOpen(false);
                   }}
                   className={`${optionButtonClass} ${
                       selected
                         ? "border-slate-200 bg-slate-100 text-slate-900 shadow-[0_12px_24px_-22px_rgba(15,23,42,0.2)]"
-                        : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
+                        : isDisabled
+                          ? "border-0 bg-transparent text-slate-300 cursor-not-allowed"
+                          : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
                   <span className={`flex min-w-0 items-center gap-2 ${dropdownTextClass}`}>

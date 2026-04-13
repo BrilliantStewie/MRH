@@ -2,11 +2,16 @@ import express from "express";
 import {
   loginAdmin,
   verifyAdminSession,
+  getAdminProfile,
+  updateAdminProfile,
   logoutAdminSession,
   adminDashboard,
   getAllUsers,
   addGuestUser,
   changeUserStatus,
+  sendStaffEmailOTP,
+  verifyStaffEmailOTP,
+  verifyStaffPhoneFirebase,
   createStaff,
   updateStaff,
   addRoom,
@@ -51,12 +56,17 @@ const adminRouter = express.Router();
 // 🔐 AUTH & DASHBOARD
 adminRouter.post("/login", loginAdmin);
 adminRouter.get("/session", authAdmin, verifyAdminSession);
+adminRouter.get("/profile", authAdmin, getAdminProfile);
+adminRouter.post("/update-profile", authAdmin, updateAdminProfile);
 adminRouter.post("/logout", authAdmin, logoutAdminSession);
 adminRouter.get("/dashboard", authAdmin, adminDashboard);
 
 // 👥 USERS & STAFF
 adminRouter.get("/users", authAdmin, getAllUsers);
 adminRouter.post("/add-guest", authAdmin, addGuestUser);
+adminRouter.post("/send-staff-email-otp", authAdmin, sendStaffEmailOTP);
+adminRouter.post("/verify-staff-email-otp", authAdmin, verifyStaffEmailOTP);
+adminRouter.post("/verify-staff-phone-firebase", authAdmin, verifyStaffPhoneFirebase);
 adminRouter.post("/create-staff", authAdmin, upload.single("image"), createStaff);
 adminRouter.post("/update-staff", authAdmin, upload.single("image"), updateStaff);
 adminRouter.post("/change-user-status", authAdmin, changeUserStatus);

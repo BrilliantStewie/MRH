@@ -20,9 +20,19 @@ const formatDate = (dateString) => {
 
 const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   const { backendUrl, token } = useContext(AppContext);
+  const REVIEW_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
   // --- 1. DETERMINE MODE (Create vs Edit) ---
   const isEditMode = Boolean(booking.reviewId || booking.rating > 0);
+  const isEditWindowOpen = !isEditMode
+    ? true
+    : (() => {
+        const createdAt = booking?.reviewCreatedAt || booking?.reviewUpdatedAt;
+        if (!createdAt) return true;
+        const parsed = new Date(createdAt);
+        if (Number.isNaN(parsed.getTime())) return true;
+        return Date.now() - parsed.getTime() <= REVIEW_EDIT_WINDOW_MS;
+      })();
 
   // --- 2. INITIALIZE STATE ---
   const [step, setStep] = useState(isEditMode ? 2 : 1); 
@@ -199,6 +209,10 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
   const handleSubmit = async () => {
     if (rating === 0) {
         toast.error("Please select a star rating");
+        return;
+    }
+    if (isEditMode && !isEditWindowOpen) {
+        toast.error("You can only edit a review within 24 hours of posting.");
         return;
     }
 
@@ -577,7 +591,7 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                       
                       <button 
                           onClick={handleSubmit} 
-                          disabled={rating === 0 || loading} 
+                          disabled={rating === 0 || loading || (isEditMode && !isEditWindowOpen)} 
                           className="flex-1 py-3 bg-[#1A1A1A] text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-black/10 hover:bg-black transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
                       >
                           {loading ? "Saving..." : (
@@ -588,6 +602,11 @@ const ReviewPage = ({ booking, onClose, user, onSuccess }) => {
                           )}
                       </button>
                   </div>
+                  {isEditMode && !isEditWindowOpen && (
+                    <p className="mt-2 text-[10px] font-semibold text-rose-500">
+                      Editing is only available within 24 hours after posting.
+                    </p>
+                  )}
                 </div>
             )}
 

@@ -32,7 +32,7 @@ import {
 } from "../utils/bookingPayment.js";
 import { getBookingRefundSummary } from "../utils/bookingRefund.js";
 import { createValidatedBooking } from "../utils/bookingService.js";
-import { getBookingReviewEligibility } from "../utils/bookingRules.js";
+import { getBookingReviewEligibility, REVIEW_EDIT_WINDOW_MS } from "../utils/bookingRules.js";
 import {
     hasClaimedEmail,
     hasClaimedPhone,
@@ -1583,6 +1583,15 @@ const rateBooking = async (req, res) => {
         const existingReview = await Review.findOne({ bookingId });
 
         if (existingReview) {
+            if (existingReview.createdAt) {
+                const createdAt = new Date(existingReview.createdAt);
+                if (!Number.isNaN(createdAt.getTime())) {
+                    const ageMs = Date.now() - createdAt.getTime();
+                    if (ageMs > REVIEW_EDIT_WINDOW_MS) {
+                        return res.json({ success: false, message: "You can only edit a review within 24 hours of posting." });
+                    }
+                }
+            }
             if (
                 existingReview.rating !== normalizedRating ||
                 existingReview.comment !== normalizedComment

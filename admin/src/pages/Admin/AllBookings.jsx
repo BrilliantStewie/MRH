@@ -263,6 +263,7 @@ const BookingDetailsModal = ({
         : venueParticipants > 0
           ? `${venueParticipants} venue participant${venueParticipants === 1 ? "" : "s"}`
           : "No participants recorded";
+  const declineReason = String(booking?.declineReason || "").trim();
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -382,6 +383,16 @@ const BookingDetailsModal = ({
           </div>
 
           <div className="md:col-span-2 space-y-3">
+            {String(booking?.status || "").trim().toLowerCase() === "declined" && declineReason && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50/80 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">
+                  Decline Reason
+                </p>
+                <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-rose-800">
+                  {declineReason}
+                </p>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Reserved Units {roomList.length > 0 ? `(${roomList.length})` : "(Venue Only)"}
@@ -526,8 +537,18 @@ const ActionAlertModal = ({
   title,
   description,
   confirmLabel,
+  reasonLabel,
+  reasonPlaceholder,
+  reasonValue,
+  onReasonChange,
+  reasonHelperText,
+  reasonError,
+  reasonRequired = false,
 }) => {
   if (!isOpen) return null;
+
+  const isConfirmDisabled =
+    isSubmitting || (reasonRequired && !String(reasonValue || "").trim());
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-sm animate-in fade-in duration-200">
@@ -554,6 +575,45 @@ const ActionAlertModal = ({
               Review this action carefully before proceeding.
             </p>
           </div>
+
+          {typeof onReasonChange === "function" && (
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <label
+                  htmlFor="decline-reason"
+                  className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500"
+                >
+                  {reasonLabel || "Reason"}
+                </label>
+                {reasonHelperText && (
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    {reasonHelperText}
+                  </span>
+                )}
+              </div>
+              <textarea
+                id="decline-reason"
+                value={reasonValue}
+                onChange={onReasonChange}
+                rows={4}
+                maxLength={500}
+                autoFocus
+                placeholder={reasonPlaceholder}
+                aria-invalid={Boolean(reasonError)}
+                className={`mt-3 w-full resize-none rounded-2xl border bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-rose-300 focus:ring-4 focus:ring-rose-100 ${
+                  reasonError ? "border-rose-300" : "border-slate-200"
+                }`}
+              />
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className={`text-xs ${reasonError ? "text-rose-500" : "text-slate-400"}`}>
+                  {reasonError || "Share a short explanation with the guest."}
+                </p>
+                <span className="text-[11px] font-semibold text-slate-400">
+                  {String(reasonValue || "").length}/500
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
@@ -568,7 +628,7 @@ const ActionAlertModal = ({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSubmitting}
+            disabled={isConfirmDisabled}
             className="flex-1 rounded-2xl bg-rose-500 px-4 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-rose-200 transition-all hover:bg-rose-600 disabled:cursor-not-allowed disabled:bg-rose-300"
           >
             {isSubmitting ? "Processing..." : confirmLabel}
@@ -605,6 +665,8 @@ export const BookingsPage = ({
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionAlert, setActionAlert] = useState(null);
+  const [actionReason, setActionReason] = useState("");
+  const [actionReasonError, setActionReasonError] = useState("");
   const [isActionSubmitting, setIsActionSubmitting] = useState(false);
   const [isDateFilterActive, setIsDateFilterActive] = useState(false);
   const filterRef = useRef(null);
@@ -748,21 +810,46 @@ export const BookingsPage = ({
     setTimeout(() => setFlashBookingId(`booking-${bookingId}`), 0);
   };
 
+  const resetActionAlertState = () => {
+    setActionAlert(null);
+    setActionReason("");
+    setActionReasonError("");
+  };
+
   const closeActionAlert = () => {
     if (isActionSubmitting) return;
-    setActionAlert(null);
+    resetActionAlertState();
+  };
+
+  const handleActionReasonChange = (event) => {
+    setActionReason(event.target.value);
+    if (actionReasonError) {
+      setActionReasonError("");
+    }
   };
 
   const handleActionAlertConfirm = async () => {
     if (!actionAlert?.bookingId) return;
 
+    const trimmedReason = String(actionReason || "").trim();
+
+    if (actionAlert.requiresReason && !trimmedReason) {
+      setActionReasonError("Please enter a reason before declining this booking.");
+      return;
+    }
+
     setIsActionSubmitting(true);
 
     try {
+      let actionSucceeded = true;
+
       if (actionAlert.type === "decline-booking" && typeof onDeclineBooking === "function") {
-        await onDeclineBooking(actionAlert.bookingId);
+        actionSucceeded = await onDeclineBooking(actionAlert.bookingId, trimmedReason);
       }
-      setActionAlert(null);
+
+      if (actionSucceeded !== false) {
+        resetActionAlertState();
+      }
     } finally {
       setIsActionSubmitting(false);
     }
@@ -944,16 +1031,23 @@ export const BookingsPage = ({
           </button>
           {typeof onDeclineBooking === "function" && (
             <button
-              onClick={() =>
+              onClick={() => {
+                setActionReason("");
+                setActionReasonError("");
                 setActionAlert({
                   type: "decline-booking",
                   bookingId: b._id,
                   title: "Decline Booking Request",
                   description:
-                    "This booking request will be declined and the guest will no longer proceed with this reservation unless they create a new request.",
+                    "Add a short reason for the guest before declining this booking request.",
                   confirmLabel: "Decline Booking",
-                })
-              }
+                  requiresReason: true,
+                  reasonLabel: "Reason for decline",
+                  reasonPlaceholder:
+                    "Example: The requested room is no longer available for the selected dates.",
+                  reasonHelperText: "Shown to the guest",
+                });
+              }}
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-rose-200 bg-white px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-rose-500 transition-all hover:bg-rose-50"
             >
               <X size={12} />
@@ -1637,6 +1731,13 @@ export const BookingsPage = ({
         title={actionAlert?.title}
         description={actionAlert?.description}
         confirmLabel={actionAlert?.confirmLabel}
+        reasonLabel={actionAlert?.reasonLabel}
+        reasonPlaceholder={actionAlert?.reasonPlaceholder}
+        reasonValue={actionReason}
+        onReasonChange={actionAlert?.requiresReason ? handleActionReasonChange : undefined}
+        reasonHelperText={actionAlert?.reasonHelperText}
+        reasonError={actionReasonError}
+        reasonRequired={actionAlert?.requiresReason}
       />
     </div>
   );

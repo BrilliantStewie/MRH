@@ -28,6 +28,7 @@ import {
 const USER_BOOKINGS_REFRESH_INTERVAL_MS = 15000;
 const USER_BOOKINGS_PREVIEW_COUNT = 10;
 const BOOKING_FOLLOW_UP_MINIMUM_PAYMENT = 100;
+const REVIEW_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 const normalizeBookingToken = (value) =>
   String(value || "")
     .trim()
@@ -86,6 +87,14 @@ const getRefundPolicyLabel = (booking = {}) => {
   }
 
   return "";
+};
+
+const canEditReview = (booking = {}) => {
+  const createdAt = booking?.reviewCreatedAt || booking?.reviewUpdatedAt;
+  if (!createdAt) return true;
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return Date.now() - parsed.getTime() <= REVIEW_EDIT_WINDOW_MS;
 };
 
 const normalizePaymentAmount = (value) => {
@@ -677,6 +686,7 @@ const MyBookings = () => {
     ? selectedBooking.extraPackages.filter(pkg => typeof pkg === "object" && pkg)
     : [];
   const selectedBookingIsNoShow = isNoShowBooking(selectedBooking);
+  const selectedBookingDeclineReason = String(selectedBooking?.declineReason || "").trim();
   const uniquePackages = Array.from(
     new Map(
       [...selectedPackageObjects, ...selectedExtraPackages].map(pkg => [pkg._id || pkg, pkg])
@@ -1185,12 +1195,22 @@ const MyBookings = () => {
                             </button>
                           )}
 
-                          {hasRated && (
+                          {hasRated && canEditReview(booking) && (
                             <button
                               onClick={(e) => handleOpenReview(e, booking)}
                               className="flex-1 md:flex-none px-6 py-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-50 hover:border-slate-300 transition-all"
                             >
                               Edit Review
+                            </button>
+                          )}
+                          {hasRated && !canEditReview(booking) && (
+                            <button
+                              type="button"
+                              disabled
+                              className="flex-1 md:flex-none px-6 py-2.5 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl font-bold text-sm cursor-not-allowed"
+                              title="Edit window closed (24 hours)"
+                            >
+                              Edit Closed
                             </button>
                           )}
                         </div>
@@ -1316,6 +1336,20 @@ const MyBookings = () => {
                     </p>
                   </div>
                 )}
+                {String(selectedBooking?.status || "").trim().toLowerCase() === "declined" &&
+                  selectedBookingDeclineReason && (
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                      <div className="flex items-center gap-2 text-rose-700">
+                        <AlertTriangle size={16} />
+                        <span className="text-[11px] font-bold uppercase tracking-[0.16em]">
+                          Decline Reason
+                        </span>
+                      </div>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-6 text-rose-700/90">
+                        {selectedBookingDeclineReason}
+                      </p>
+                    </div>
+                  )}
               </div>
 
               <div>
@@ -1414,8 +1448,6 @@ const MyBookings = () => {
 
               <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Billing</p>
-                  <p className="text-xl font-extrabold text-slate-900">{formatPaymentCurrency(selectedBooking.totalPrice || 0)}</p>
                   {!isBookingFullyPaid(selectedBooking) && isBookingSecured(selectedBooking) && (
                     <p className="mt-1 text-xs text-slate-500">
                       {`Amount paid: ${formatPaymentCurrency(getBookingPaidAmount(selectedBooking))}. Remaining balance: ${formatPaymentCurrency(getBookingRemainingBalance(selectedBooking))}.`}
@@ -1427,15 +1459,14 @@ const MyBookings = () => {
                     </p>
                   )}
                 </div>
-                <span className="rounded-full bg-slate-900 px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-white">
-                  {isBookingFullyPaid(selectedBooking)
-                    ? "Paid"
-                    : isBookingSecured(selectedBooking)
-                      ? "Booked"
-                    : selectedBooking.status === "approved"
-                      ? "Waiting for minimum payment"
-                      : "Waiting for approval"}
-                </span>
+                <div className="ml-auto text-right">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                    Total Billing
+                  </p>
+                  <p className="text-lg font-black text-slate-900">
+                    {formatPaymentCurrency(selectedBooking.totalPrice || 0)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

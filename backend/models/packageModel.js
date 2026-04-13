@@ -47,6 +47,16 @@ const packageSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+
+    isArchived: {
+      type: Boolean,
+      default: false,
+    },
+
+    archivedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -55,7 +65,13 @@ const packageSchema = new mongoose.Schema(
   }
 );
 
-packageSchema.index({ name: 1, packageType: 1, roomTypeId: 1 }, { unique: true });
+packageSchema.index(
+  { name: 1, packageType: 1, roomTypeId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { isArchived: false },
+  }
+);
 
 packageSchema.virtual("roomType").get(function () {
   if (this.roomTypeId?.name) {

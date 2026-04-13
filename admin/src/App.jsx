@@ -16,13 +16,14 @@ import StyledToastContainer from "./components/StyledToastContainer";
 // Pages
 import Login from "./pages/Login";
 import AdminReviews from "./pages/Admin/AdminReviews";
-import StaffReviews from "./pages/Staff/StaffReviews";
 import Dashboard from "./pages/Admin/Dashboard";
 import RoomsList from "./pages/Admin/RoomsList";
 import AllBookings from "./pages/Admin/AllBookings";
 import Users from "./pages/Admin/Users";
 import Packages from "./pages/Admin/Packages";
 import Report from "./pages/Admin/Report";
+import AdminProfile from "./pages/Admin/AdminProfile";
+import StaffReviews from "./pages/Staff/StaffReviews";
 import StaffDashboard from "./pages/Staff/StaffDashboard";
 import StaffBookings from "./pages/Staff/StaffBookings";
 import StaffProfile from "./pages/Staff/StaffProfile";
@@ -60,9 +61,11 @@ const ROUTE_SHELL_MAP = {
   "/staff-dashboard": "contained",
   "/admin-packages": "workspace",
   "/admin-users": "workspace",
+  "/admin-profile": "selfPadded",
   "/rooms-list": "immersive",
   "/all-bookings": "immersive",
   "/staff-bookings": "immersive",
+  "/staff-rooms": "immersive",
   "/admin-reviews": "selfPadded",
   "/staff-reviews": "selfPadded",
   "/staff-profile": "selfPadded",
@@ -257,6 +260,7 @@ const App = () => {
                   <Route path="/rooms-list" element={<RoomsList />} />
                   <Route path="/all-bookings" element={<AllBookings />} />
                   <Route path="/admin-users" element={<Users />} />
+                  <Route path="/admin-profile" element={<AdminProfile />} />
                   <Route path="/admin-staff-list" element={<Navigate to="/admin-users" replace />} />
                   <Route path="/admin-packages" element={<Packages />} />
                   <Route path="/admin-reviews" element={<AdminReviews />} />
@@ -300,6 +304,14 @@ const App = () => {
                     element={
                       <StaffProtectedRoute>
                         <StaffBookings />
+                      </StaffProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/staff-rooms"
+                    element={
+                      <StaffProtectedRoute>
+                        <RoomsList readOnly />
                       </StaffProtectedRoute>
                     }
                   />

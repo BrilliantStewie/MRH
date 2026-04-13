@@ -2,17 +2,25 @@ import React, { useContext, useState, useEffect, useRef } from "react";
 import { AppContext } from "../context/AppContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import PhilippinesPhoneField from "../components/PhilippinesPhoneField";
+import ProfileNameChangeDialog from "../components/ProfileNameChangeDialog";
 import VerifyFirebasePhoneOtp from "./VerifyFirebasePhoneOtp";
 import VerifyOtp from "./VerifyOtp";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth } from "../config/firebase";
 import {
-  User, Mail, Phone, Camera, Save, Edit3, Trash2, 
+  User, Mail, Camera, Save, Edit3, Trash2, 
   Eye, EyeOff, UserCircle, Settings, CheckCircle, BadgeCheck, Info, Loader2, Calendar
 } from "lucide-react";
 
 const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
 const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
+const buildFullName = ({ firstName = "", middleName = "", lastName = "", suffix = "" } = {}) =>
+  [firstName, middleName, lastName, suffix]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
 const MyProfile = () => {
   const { userData, setUserData, token, setToken, backendUrl, loadUserProfileData } = useContext(AppContext);
@@ -45,6 +53,7 @@ const MyProfile = () => {
   const [isCheckingEmailAvailability, setIsCheckingEmailAvailability] = useState(false);
   const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
   const [suffixError, setSuffixError] = useState("");
+  const [showNameChangeConfirm, setShowNameChangeConfirm] = useState(false);
   const recaptchaRef = useRef(null);
   const phoneCheckRequestRef = useRef(0);
   const emailCheckRequestRef = useRef(0);
@@ -81,6 +90,7 @@ const MyProfile = () => {
     setShowEmailOtpModal(false);
     setEmailConflictError("");
     setIsCheckingEmailAvailability(false);
+    setShowNameChangeConfirm(false);
   }, [userData, isEdit]);
 
   const normalizePhoneInput = (value) => {
@@ -158,7 +168,9 @@ const MyProfile = () => {
   };
 
   const trimmedFirstName = localEditData.firstName.trim();
+  const trimmedMiddleName = localEditData.middleName.trim();
   const trimmedLastName = localEditData.lastName.trim();
+  const trimmedSuffix = localEditData.suffix.trim();
   const hasMissingRequiredName = !trimmedFirstName || !trimmedLastName;
   const normalizedLocalPhone = normalizePhoneInput(localEditData.phone);
   const isGoogleAuthUser = userData?.authProvider === "google";
@@ -169,6 +181,23 @@ const MyProfile = () => {
   const normalizedEmail = normalizeEmailInput(localEditData.email);
   const normalizedOriginalEmail = normalizeEmailInput(originalEmail);
   const emailChanged = normalizedEmail !== normalizedOriginalEmail;
+  const currentFullName = buildFullName({
+    firstName: userData?.firstName,
+    middleName: userData?.middleName,
+    lastName: userData?.lastName,
+    suffix: userData?.suffix,
+  });
+  const nextFullName = buildFullName({
+    firstName: trimmedFirstName,
+    middleName: trimmedMiddleName,
+    lastName: trimmedLastName,
+    suffix: trimmedSuffix,
+  });
+  const nameChanged =
+    trimmedFirstName !== String(userData?.firstName || "").trim() ||
+    trimmedMiddleName !== String(userData?.middleName || "").trim() ||
+    trimmedLastName !== String(userData?.lastName || "").trim() ||
+    trimmedSuffix !== String(userData?.suffix || "").trim();
   const emailOtpVerified = !emailChanged || verifiedEmailForSave === normalizedEmail;
   const emailOtpSentForCurrent =
     emailChanged && emailOtpTarget === normalizedEmail && !emailOtpVerified;
@@ -291,6 +320,7 @@ const MyProfile = () => {
     setIsCheckingEmailAvailability(false);
     setShowPhoneOtpModal(false);
     setFirebaseConfirmation(null);
+    setShowNameChangeConfirm(false);
     setImage(null);
     setRemoveImage(false);
     setIsEdit(false);
@@ -351,7 +381,7 @@ const MyProfile = () => {
       setVerifiedEmailForSave(verifiedEmail);
       setOriginalEmail(verifiedEmail);
 
-      await updateUserProfileData({ skipEmailOtp: true, verifiedEmail });
+      await updateUserProfileData({ skipEmailOtp: true, verifiedEmail, skipNameConfirm: true });
       return { success: true };
     } catch (err) {
       return {
@@ -361,7 +391,11 @@ const MyProfile = () => {
     }
   };
 
-  const updateUserProfileData = async ({ skipEmailOtp = false, verifiedEmail = "" } = {}) => {
+  const updateUserProfileData = async ({
+    skipEmailOtp = false,
+    verifiedEmail = "",
+    skipNameConfirm = false,
+  } = {}) => {
     const normalizedPhone = normalizedLocalPhone;
     const normalizedOriginal = normalizedOriginalPhone;
     const phoneWasChanged = normalizedPhone !== normalizedOriginal;
@@ -406,6 +440,10 @@ const MyProfile = () => {
       toast.error("Please verify your phone number first.");
       return;
     }
+    if (nameChanged && !skipNameConfirm) {
+      setShowNameChangeConfirm(true);
+      return;
+    }
     if (emailChanged && !skipEmailOtp && !effectiveEmailVerified) {
       await sendEmailChangeOtp(normalizedEmail);
       return;
@@ -415,10 +453,10 @@ const MyProfile = () => {
       const formData = new FormData();
       // Sending Split Names to Backend
       formData.append("firstName", trimmedFirstName);
-      formData.append("middleName", localEditData.middleName.trim());
+      formData.append("middleName", trimmedMiddleName);
       formData.append("lastName", trimmedLastName);
       formData.append("phone", normalizedPhone);
-      formData.append("suffix", localEditData.suffix.trim() || "");
+      formData.append("suffix", trimmedSuffix || "");
       formData.append("email", normalizedEmail);
 
       if (removeImage) formData.append("removeImage", "true");
@@ -453,6 +491,7 @@ const MyProfile = () => {
         setVerifiedEmailForSave(normalizedEmail);
         setEmailOtpTarget("");
         setShowEmailOtpModal(false);
+        setShowNameChangeConfirm(false);
         setLocalEditData(prev => ({ ...prev, oldPassword: "", newPassword: "", confirmPassword: "" }));
         if (!data.userData && loadUserProfileData) await loadUserProfileData();
       } else {
@@ -586,6 +625,18 @@ const MyProfile = () => {
           onVerify={handleVerifyEmailOtp}
         />
       )}
+      <ProfileNameChangeDialog
+        open={showNameChangeConfirm}
+        currentName={currentFullName}
+        nextName={nextFullName}
+        impactText="This updated name will appear on your profile, bookings, reviews, and account notifications."
+        isLoading={isUpdating}
+        onClose={() => setShowNameChangeConfirm(false)}
+        onConfirm={async () => {
+          setShowNameChangeConfirm(false);
+          await updateUserProfileData({ skipNameConfirm: true });
+        }}
+      />
       <div className="w-full space-y-6">
         
         {/* --- HEADER CARD --- */}
@@ -798,39 +849,39 @@ const MyProfile = () => {
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
                   {phoneIsRequired ? "Phone Number" : "Phone Number (Optional)"}
                 </label>
-                <div className={`group relative flex items-center gap-3 px-5 py-3.5 border rounded-xl transition-all ${isEdit ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}>
-                  <Phone size={16} className="text-slate-400" />
-                  <input
-                    disabled={!isEdit}
-                    value={localEditData.phone}
-                    onChange={(e) => {
-                      const normalized = normalizePhoneInput(e.target.value).slice(0, 11);
-                      setLocalEditData({ ...localEditData, phone: normalized });
-                      setPhoneConflictError("");
-                      setIsCheckingPhoneAvailability(false);
-                      setPhoneVerificationToken("");
-                      if (normalized && !isValidPHNumber(normalized)) {
-                        setPhoneError("Use an 11-digit PH number starting with 09.");
-                      } else {
-                        setPhoneError("");
-                      }
-                      setPhoneOtpSent(false);
-                      setPhoneOtpVerified(false);
-                    }}
-                    className="bg-transparent outline-none w-full text-sm font-bold text-slate-800 disabled:opacity-60 pr-24"
-                    placeholder="Phone Number"
-                  />
-                  {isEdit && phoneChanged && isValidPHNumber(normalizePhoneInput(localEditData.phone)) && !activePhoneError && !isCheckingPhoneAvailability && (
-                    <button
-                      type="button"
-                      onClick={sendFirebasePhoneOtp}
-                      disabled={phoneOtpLoading}
-                      className="absolute bottom-2 right-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black disabled:bg-slate-200 disabled:text-slate-400"
-                    >
-                      {phoneOtpLoading ? "Sending..." : (phoneOtpSent ? "OTP Sent" : "Send OTP")}
-                    </button>
-                  )}
-                </div>
+                <PhilippinesPhoneField
+                  disabled={!isEdit}
+                  value={localEditData.phone}
+                  onChange={(e) => {
+                    const normalized = normalizePhoneInput(e.target.value).slice(0, 11);
+                    setLocalEditData({ ...localEditData, phone: normalized });
+                    setPhoneConflictError("");
+                    setIsCheckingPhoneAvailability(false);
+                    setFirebaseConfirmation(null);
+                    if (normalized && !isValidPHNumber(normalized)) {
+                      setPhoneError("Use an 11-digit PH number starting with 09.");
+                    } else {
+                      setPhoneError("");
+                    }
+                    setPhoneOtpSent(false);
+                    setPhoneOtpVerified(false);
+                  }}
+                  containerClassName={`group rounded-xl border px-4 py-3.5 transition-all ${isEdit ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                  prefixClassName={isEdit ? "border-slate-200 bg-slate-100/80" : "border-slate-200 bg-white"}
+                  inputClassName="text-sm font-bold text-slate-800 disabled:opacity-60 pr-24"
+                  action={
+                    isEdit && phoneChanged && isValidPHNumber(normalizePhoneInput(localEditData.phone)) && !activePhoneError && !isCheckingPhoneAvailability ? (
+                      <button
+                        type="button"
+                        onClick={sendFirebasePhoneOtp}
+                        disabled={phoneOtpLoading}
+                        className="absolute bottom-2 right-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-black disabled:bg-slate-200 disabled:text-slate-400"
+                      >
+                        {phoneOtpLoading ? "Sending..." : (phoneOtpSent ? "OTP Sent" : "Send OTP")}
+                      </button>
+                    ) : null
+                  }
+                />
                 {isEdit && hasMissingRequiredPhone && (
                   <p className="mt-2 text-[10px] font-bold text-red-500">Phone number is required.</p>
                 )}

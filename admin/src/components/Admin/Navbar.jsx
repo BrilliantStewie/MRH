@@ -3,7 +3,7 @@ import React, { useContext, useEffect, useState } from "react";
 import { assets } from "../../assets/assets.js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AdminContext } from "../../context/AdminContext.jsx";
-import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu, LogOut } from "lucide-react";
+import { Bell, BellOff, Calendar, MessageSquare, AlertTriangle, MoreHorizontal, Check, Trash2, ChevronDown, ChevronUp, Star, Shield, CreditCard, Menu, LogOut, UserCircle } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { formatDatePHT } from "../../utils/dateTime";
@@ -16,13 +16,18 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { aToken, logoutAdmin, backendUrl } = useContext(AdminContext);
+  const { aToken, adminData, logoutAdmin, backendUrl } = useContext(AdminContext);
 
   const handleLogout = () => {
     setShowLogoutConfirm(true);
   };
 
-  const displayName = "Administrator";
+  const displayName =
+    [adminData?.firstName, adminData?.middleName, adminData?.lastName, adminData?.suffix]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" ") || "Administrator";
+  const displayEmail = String(adminData?.email || "").trim();
   const adminInitials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -601,9 +606,24 @@ const Navbar = ({ onMenuToggle = () => {} }) => {
                         Signed In As
                       </p>
                       <p className="truncate text-sm font-bold text-slate-800">{displayName}</p>
+                      {displayEmail ? (
+                        <p className="mt-1 truncate text-xs font-medium text-slate-500">{displayEmail}</p>
+                      ) : null}
                     </div>
 
                     <div className="mx-3 my-1 h-px bg-slate-100"></div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        navigate("/admin-profile");
+                      }}
+                      className="flex w-full items-center gap-3 px-5 py-3 text-left text-[12px] font-bold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      <UserCircle size={16} className="text-blue-500" />
+                      My Profile
+                    </button>
 
                     <button
                       type="button"

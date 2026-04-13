@@ -1,6 +1,7 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import {
+  BedDouble,
   CalendarCheck,
   LayoutDashboard,
   MessageSquare,
@@ -11,6 +12,7 @@ const StaffSidebar = ({ isOpen = false, onClose = () => {} }) => {
   const navItems = [
     { name: "Dashboard", path: "/staff-dashboard", icon: <LayoutDashboard size={18} /> },
     { name: "Bookings", path: "/staff-bookings", icon: <CalendarCheck size={18} /> },
+    { name: "Rooms", path: "/staff-rooms", icon: <BedDouble size={18} /> },
     { name: "Feedback", path: "/staff-reviews", icon: <MessageSquare size={18} /> },
   ];
 

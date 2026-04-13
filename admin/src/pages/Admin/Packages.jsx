@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { AdminContext } from "../../context/AdminContext";
 import { toast } from "react-toastify";
 import {
+  Archive,
   BedSingle,
   Building2,
   ChevronDown,
@@ -44,9 +45,16 @@ const Packages = () => {
 
   const [filterPackageType, setFilterPackageType] = useState("All");
   const [filterRoomType, setFilterRoomType] = useState("All");
+  const [filterArchive, setFilterArchive] = useState("Active");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState({ show: false, id: null, type: "" });
+  const [confirmDelete, setConfirmDelete] = useState({
+    show: false,
+    id: null,
+    type: "",
+    archived: false,
+    name: "",
+  });
   const [deleteContext, setDeleteContext] = useState(null);
   const [editTypeDialog, setEditTypeDialog] = useState({
     show: false,
@@ -197,7 +205,24 @@ const Packages = () => {
   const handleDeletePackageType = (index, typeToDelete, e) => {
     e.stopPropagation();
     setDeleteContext({ index, typeToDelete });
-    setConfirmDelete({ show: true, id: null, type: "type" });
+    setConfirmDelete({
+      show: true,
+      id: null,
+      type: "type",
+      archived: false,
+      name: typeToDelete,
+    });
+  };
+
+  const handleDeleteTrigger = (pkg) => {
+    setDeleteContext(null);
+    setConfirmDelete({
+      show: true,
+      id: pkg._id,
+      type: "package",
+      archived: Boolean(pkg.isArchived),
+      name: pkg.name || "",
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -258,7 +283,10 @@ const Packages = () => {
 
   const proceedWithDelete = async () => {
     if (confirmDelete.type === "package") {
-      await deletePackage(confirmDelete.id);
+      const deleted = await deletePackage(confirmDelete.id);
+      if (!deleted) {
+        return;
+      }
     } else if (confirmDelete.type === "type") {
       const { index, typeToDelete } = deleteContext;
       setPackageTypes((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
@@ -270,7 +298,13 @@ const Packages = () => {
       }
       toast.success("Category removed");
     }
-    setConfirmDelete({ show: false, id: null, type: "" });
+    setConfirmDelete({
+      show: false,
+      id: null,
+      type: "",
+      archived: false,
+      name: "",
+    });
     setDeleteContext(null);
   };
 
@@ -282,12 +316,18 @@ const Packages = () => {
       (pkg.packageType || "").toLowerCase().includes(searchLower);
     const matchesPkgType =
       filterPackageType === "All" || pkg.packageType === filterPackageType;
+    const matchesArchive =
+      filterArchive === "All"
+        ? true
+        : filterArchive === "Archived"
+          ? Boolean(pkg.isArchived)
+          : !pkg.isArchived;
     const pkgRoomId = String(pkg.roomType?._id || pkg.roomType || "");
     const matchesRoomType =
       !shouldApplyRoomTypeFilter ||
       filterRoomType === "All" ||
       pkgRoomId === filterRoomType;
-    return matchesSearch && matchesPkgType && matchesRoomType;
+    return matchesSearch && matchesPkgType && matchesArchive && matchesRoomType;
   });
 
   const showRoomTypeFilter = filterPackageType.toLowerCase() === "room package";
@@ -296,7 +336,7 @@ const Packages = () => {
   }, [showRoomTypeFilter]);
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterPackageType, filterRoomType]);
+  }, [searchTerm, filterPackageType, filterRoomType, filterArchive]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPackages.length / PACKAGES_PER_PAGE));
   const currentPageSafe = Math.min(currentPage, totalPages);
@@ -359,6 +399,11 @@ const Packages = () => {
       label: roomType.name,
       icon: BedSingle,
     })),
+  ];
+  const archiveFilterOptions = [
+    { value: "Active", label: "Active Packages", icon: Package },
+    { value: "Archived", label: "Archived Packages", icon: Archive },
+    { value: "All", label: "All Packages", icon: Package },
   ];
 
   const isRoomPackageSelected = isRoomPackageType(formData.packageType);
@@ -433,12 +478,25 @@ const Packages = () => {
                 />
               )}
 
+              <FilterDropdown
+                label="Archive"
+                options={archiveFilterOptions}
+                value={filterArchive}
+                onChange={setFilterArchive}
+                icon={Archive}
+                neutralValue="Active"
+                align="left"
+                triggerClassName="w-full justify-between bg-slate-50 sm:w-auto sm:min-w-[176px]"
+                menuClassName="w-full sm:w-60"
+              />
+
               <button
                 type="button"
                 onClick={() => {
                   setSearchTerm("");
                   setFilterPackageType("All");
                   setFilterRoomType("All");
+                  setFilterArchive("Active");
                 }}
                 title="Reset filters"
                 aria-label="Reset filters"
@@ -460,7 +518,9 @@ const Packages = () => {
                 No packages found
               </p>
               <p className="text-sm text-slate-400">
-                Try adjusting your search or create a new one.
+                {filterArchive === "Archived"
+                  ? "No archived packages match the current filters."
+                  : "Try adjusting your search or create a new one."}
               </p>
             </div>
           ) : (
@@ -482,13 +542,24 @@ const Packages = () => {
                   const visibleAmenities = amenitiesExpanded
                     ? pkgAmenities
                     : pkgAmenities.slice(0, 3);
+                  const isArchived = Boolean(pkg.isArchived);
 
                   return (
                     <div
                       key={pkg._id}
-                      className="group relative flex h-full min-h-[200px] w-full max-w-none justify-self-stretch flex-col overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-[0_16px_34px_-30px_rgba(15,23,42,0.48)] transition-all duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_24px_46px_-30px_rgba(15,23,42,0.38)] sm:justify-self-stretch"
+                      className={`group relative flex h-full min-h-[200px] w-full max-w-none justify-self-stretch flex-col overflow-hidden rounded-[1.55rem] border shadow-[0_16px_34px_-30px_rgba(15,23,42,0.48)] transition-all duration-300 sm:justify-self-stretch ${
+                        isArchived
+                          ? "border-amber-200 bg-white/95"
+                          : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_24px_46px_-30px_rgba(15,23,42,0.38)]"
+                      }`}
                     >
-                      <div className="relative bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90 p-2.5">
+                      <div
+                        className={`relative p-2.5 ${
+                          isArchived
+                            ? "bg-gradient-to-br from-amber-100 via-amber-50 to-slate-100"
+                            : "bg-gradient-to-br from-sky-100 via-blue-50 to-indigo-100/90"
+                        }`}
+                      >
                         <div className="absolute right-3 top-3 z-10 flex gap-1">
                           <button
                             type="button"
@@ -499,18 +570,31 @@ const Packages = () => {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteTrigger(pkg._id)}
-                            className="rounded-lg border border-slate-200 bg-white/90 p-1 text-slate-500 shadow-sm transition-colors hover:text-red-600"
+                            onClick={() => handleDeleteTrigger(pkg)}
+                            className={`rounded-lg border border-slate-200 bg-white/90 p-1 text-slate-500 shadow-sm transition-colors ${
+                              isArchived
+                                ? "hover:text-emerald-600"
+                                : "hover:text-amber-700"
+                            }`}
+                            title={isArchived ? "Restore package" : "Archive package"}
                           >
-                            <Trash2 size={13} />
+                            {isArchived ? <RefreshCcw size={13} /> : <Archive size={13} />}
                           </button>
                         </div>
 
                         <div className="relative">
-                          <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
-                            <PackageTypeIcon size={10} />
-                            {pkg.packageType}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/85 px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-slate-700 shadow-sm">
+                              <PackageTypeIcon size={10} />
+                              {pkg.packageType}
+                            </span>
+                            {isArchived && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[8px] font-black uppercase tracking-[0.16em] text-amber-700 shadow-sm">
+                                <Archive size={10} />
+                                Archived
+                              </span>
+                            )}
+                          </div>
                           <div className="mt-2.5 flex items-start gap-3">
                             <h3 className="min-w-0 flex-1 line-clamp-2 pr-2 text-[18px] font-black leading-tight tracking-tight text-slate-900">
                               {pkg.name}
@@ -613,7 +697,7 @@ const Packages = () => {
             <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="w-full text-left sm:w-auto">
                 <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-slate-400">
-                  Package Directory
+                  {filterArchive === "Archived" ? "Archived Directory" : "Package Directory"}
                 </p>
                 <p className="mt-0.5 text-[11px] font-semibold text-slate-800">
                   Showing {visiblePackageStart}-{visiblePackageEnd} of{" "}
@@ -1091,21 +1175,44 @@ const Packages = () => {
       {confirmDelete.show && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/20 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xs rounded-2xl border border-gray-100 bg-white p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
-              <Trash2 className="h-6 w-6" />
+            <div
+              className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full ${
+                confirmDelete.type === "package" && confirmDelete.archived
+                  ? "bg-emerald-50 text-emerald-500"
+                  : confirmDelete.type === "package"
+                    ? "bg-amber-50 text-amber-600"
+                    : "bg-red-50 text-red-500"
+              }`}
+            >
+              {confirmDelete.type === "package" ? (
+                confirmDelete.archived ? <RefreshCcw className="h-6 w-6" /> : <Archive className="h-6 w-6" />
+              ) : (
+                <Trash2 className="h-6 w-6" />
+              )}
             </div>
             <h3 className="mb-1 text-sm font-black text-gray-900">
-              Delete {confirmDelete.type === "package" ? "Package" : "Category"}
-              ?
+              {confirmDelete.type === "package"
+                ? `${confirmDelete.archived ? "Restore" : "Archive"} Package?`
+                : "Delete Category?"}
             </h3>
             <p className="mb-6 text-[10px] text-gray-500">
-              This action is permanent and cannot be undone.
+              {confirmDelete.type === "package"
+                ? confirmDelete.archived
+                  ? `Restore "${confirmDelete.name}" so it can be used in new service selections again.`
+                  : `Archive "${confirmDelete.name}" so it is hidden from new bookings while preserving existing records.`
+                : "This action is permanent and cannot be undone."}
             </p>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() =>
-                  setConfirmDelete({ show: false, id: null, type: "" })
+                  setConfirmDelete({
+                    show: false,
+                    id: null,
+                    type: "",
+                    archived: false,
+                    name: "",
+                  })
                 }
                 className="flex-1 rounded-lg bg-gray-50 px-4 py-2 text-[10px] font-bold text-gray-400 transition-colors hover:bg-gray-100"
               >
@@ -1114,9 +1221,19 @@ const Packages = () => {
               <button
                 type="button"
                 onClick={proceedWithDelete}
-                className="flex-1 rounded-lg bg-red-500 px-4 py-2 text-[10px] font-bold text-white shadow-lg shadow-red-200 transition-all hover:bg-red-600"
+                className={`flex-1 rounded-lg px-4 py-2 text-[10px] font-bold text-white shadow-lg transition-all ${
+                  confirmDelete.type === "package" && confirmDelete.archived
+                    ? "bg-emerald-500 shadow-emerald-200 hover:bg-emerald-600"
+                    : confirmDelete.type === "package"
+                      ? "bg-amber-500 shadow-amber-200 hover:bg-amber-600"
+                      : "bg-red-500 shadow-red-200 hover:bg-red-600"
+                }`}
               >
-                Delete
+                {confirmDelete.type === "package"
+                  ? confirmDelete.archived
+                    ? "Restore"
+                    : "Archive"
+                  : "Delete"}
               </button>
             </div>
           </div>

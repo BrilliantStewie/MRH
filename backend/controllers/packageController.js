@@ -1,4 +1,3 @@
-import bookingModel from "../models/bookingModel.js";
 import packageModel from "../models/packageModel.js";
 import roomTypeModel from "../models/roomtypeModel.js";
 import {
@@ -11,6 +10,9 @@ import {
 
 const isRoomPackageType = (value) =>
   String(value || "").trim().toLowerCase() === "room package";
+
+const shouldIncludeArchived = (req) =>
+  String(req?.query?.includeArchived || "").trim().toLowerCase() === "true";
 
 const parseAmenities = (value) => {
   if (!value) return [];
@@ -44,6 +46,7 @@ const buildDuplicateQuery = ({ name, packageType, roomTypeId, excludeId = null }
     name: { $regex: new RegExp(`^${escapeRegex(name)}$`, "i") },
     packageType: { $regex: new RegExp(`^${escapeRegex(packageType)}$`, "i") },
     roomTypeId: roomTypeId || null,
+    isArchived: { $ne: true },
   };
 
   if (excludeId) {
@@ -129,10 +132,11 @@ const addPackage = async (req, res) => {
 
 const getAllPackages = async (req, res) => {
   try {
+    const includeArchived = shouldIncludeArchived(req);
     const packages = await packageModel
-      .find()
+      .find(includeArchived ? {} : { isArchived: { $ne: true } })
       .populate(packageReferencePopulate)
-      .sort({ createdAt: -1 });
+      .sort({ isArchived: 1, createdAt: -1 });
 
     res.json({
       success: true,
@@ -223,30 +227,44 @@ const updatePackage = async (req, res) => {
 const deletePackage = async (req, res) => {
   try {
     const { id } = req.params;
+    const existingPackage = await packageModel.findById(id);
 
-    const packageInUse = await bookingModel.exists({
-      $or: [
-        { "bookingItems.packageId": id },
-        { extraPackages: id },
-      ],
-    });
-
-    if (packageInUse) {
-      return res.json({
-        success: false,
-        message: "Package is linked to existing bookings and cannot be deleted",
-      });
-    }
-
-    const deletedPackage = await packageModel.findByIdAndDelete(id);
-
-    if (!deletedPackage) {
+    if (!existingPackage) {
       return res.json({ success: false, message: "Package not found" });
     }
 
+    const willRestore = Boolean(existingPackage.isArchived);
+
+    if (willRestore) {
+      const duplicatePackage = await packageModel.findOne(
+        buildDuplicateQuery({
+          name: normalizeName(existingPackage.name),
+          packageType: normalizeName(existingPackage.packageType),
+          roomTypeId: existingPackage.roomTypeId || null,
+          excludeId: existingPackage._id,
+        })
+      );
+
+      if (duplicatePackage) {
+        return res.json({
+          success: false,
+          message: "An active package with the same details already exists",
+        });
+      }
+    }
+
+    existingPackage.isArchived = !willRestore;
+    existingPackage.archivedAt = willRestore ? null : new Date();
+    await existingPackage.save();
+
+    const populatedPackage = await populatePackageById(existingPackage._id);
+
     res.json({
       success: true,
-      message: "Package deleted successfully",
+      message: willRestore
+        ? "Package restored successfully"
+        : "Package archived successfully",
+      package: serializePackage(populatedPackage),
     });
   } catch (error) {
     res.json({ success: false, message: error.message });

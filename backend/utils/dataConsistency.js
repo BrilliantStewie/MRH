@@ -230,6 +230,8 @@ export const serializeBooking = (bookingDoc, reviewDoc = null) => {
     review: comment,
     comment,
     reviewId: review?._id || null,
+    reviewCreatedAt: review?.createdAt || null,
+    reviewUpdatedAt: review?.updatedAt || null,
     reviewImages: Array.isArray(review?.images) ? review.images : [],
     reviewChat,
     hasReview: Boolean(review || rating > 0 || comment || reviewChat.length),

@@ -1,7 +1,8 @@
 import React, { useState, useContext } from "react";
 import { AdminContext } from "../../context/AdminContext";
-import { X, UserPlus, Mail, Phone, Lock } from "lucide-react";
+import { X, UserPlus, Mail, Lock } from "lucide-react";
 import { toast } from "react-toastify";
+import PhilippinesPhoneField from "../../components/PhilippinesPhoneField";
 
 const AddUser = ({ onClose }) => {
   const { aToken, backendUrl, getAllUsers } = useContext(AdminContext);
@@ -90,11 +91,13 @@ const AddUser = ({ onClose }) => {
                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
             </div>
 
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="text" placeholder="Contact Number (Optional)" className="w-full pl-10 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm" 
-                value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-            </div>
+            <PhilippinesPhoneField
+              value={formData.phone}
+              onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, "").slice(0, 11)})}
+              containerClassName="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 transition-all focus-within:ring-2 focus-within:ring-indigo-500/20"
+              prefixClassName="border-slate-200 bg-white"
+              inputClassName="text-sm"
+            />
 
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />

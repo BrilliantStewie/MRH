@@ -36,6 +36,15 @@ import {
 } from "../utils/realtime";
 
 const REVIEWS_REFRESH_INTERVAL_MS = 15000;
+const REVIEW_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+const isReviewEditable = (review) => {
+  const createdAt = review?.createdAt || review?.updatedAt;
+  if (!createdAt) return true;
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return Date.now() - parsed.getTime() <= REVIEW_EDIT_WINDOW_MS;
+};
 
 const AllReviews = () => {
   const { backendUrl, token, userData } = useContext(AppContext);
@@ -667,6 +676,7 @@ const AllReviews = () => {
                 typeof review.viewerOwnsReview === "boolean"
                   ? review.viewerOwnsReview
                   : Boolean(reviewOwnerId) && String(loggedInUserId || "") === reviewOwnerId;
+              const isEditWindowOpen = isMyReview ? isReviewEditable(review) : false;
               const canReply =
                 typeof review.viewerCanReply === "boolean"
                   ? review.viewerCanReply
@@ -739,15 +749,22 @@ const AllReviews = () => {
                         {isMyReview && (
                           <div className="mt-3 flex justify-end overflow-hidden transition-all duration-200 sm:max-h-0 sm:translate-y-1 sm:opacity-0 sm:pointer-events-none sm:group-hover/review-card:max-h-12 sm:group-hover/review-card:translate-y-0 sm:group-hover/review-card:opacity-100 sm:group-hover/review-card:pointer-events-auto sm:group-focus-within/review-card:max-h-12 sm:group-focus-within/review-card:translate-y-0 sm:group-focus-within/review-card:opacity-100 sm:group-focus-within/review-card:pointer-events-auto">
                             <div className="flex items-center gap-1 bg-white/90 backdrop-blur-md border border-slate-200 rounded-lg p-1 shadow-sm">
-                              <button onClick={() => { 
-                                clearEditReviewNewImages();
-                                setEditReviewImages(Array.isArray(review.images) ? review.images : []);
-                                setEditingReviewId(review._id); 
-                                setEditReviewText(review.comment);
-                                setEditReviewRating(review.rating);
-                              }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Review">
-                                <Pencil size={14} />
-                              </button>
+                              {isEditWindowOpen && (
+                                <button onClick={() => { 
+                                  clearEditReviewNewImages();
+                                  setEditReviewImages(Array.isArray(review.images) ? review.images : []);
+                                  setEditingReviewId(review._id); 
+                                  setEditReviewText(review.comment);
+                                  setEditReviewRating(review.rating);
+                                }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded transition-colors" title="Edit Review">
+                                  <Pencil size={14} />
+                                </button>
+                              )}
+                              {!isEditWindowOpen && (
+                                <span className="px-2 py-1 text-[8px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                  Edit closed
+                                </span>
+                              )}
                               <div className="w-px h-4 bg-slate-200"></div>
                               <button onClick={() => setItemToDelete({ type: 'review', id: review._id })} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-slate-50 rounded transition-colors" title="Delete Review">
                                 <Trash2 size={14} />

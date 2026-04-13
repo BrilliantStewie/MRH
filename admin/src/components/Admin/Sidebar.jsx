@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Package,
   BedDouble,
+  UserCircle,
   User,
   BriefcaseBusiness,
   X,

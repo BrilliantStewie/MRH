@@ -19,6 +19,7 @@ import { isNoShowBooking } from "../utils/bookingStay.js";
 import {
   addDays,
   getBookingReviewEligibility,
+  REVIEW_EDIT_WINDOW_MS,
   normalizeDate,
   rangesOverlap,
 } from "../utils/bookingRules.js";
@@ -319,6 +320,15 @@ return res.json({success:false,message:"Please provide a rating between 1 and 5"
 let existingReview = await Review.findOne({ bookingId });
 
 if (existingReview) {
+ if (existingReview.createdAt) {
+  const createdAt = new Date(existingReview.createdAt);
+  if (!Number.isNaN(createdAt.getTime())) {
+   const ageMs = Date.now() - createdAt.getTime();
+   if (ageMs > REVIEW_EDIT_WINDOW_MS) {
+    return res.json({success:false,message:"You can only edit a review within 24 hours of posting."});
+   }
+  }
+ }
  if (
    existingReview.rating !== normalizedRating ||
    existingReview.comment !== normalizedComment

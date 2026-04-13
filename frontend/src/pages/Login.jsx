@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { AppContext } from '../context/AppContext';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Camera, Eye, EyeOff, Loader2, Lock, Phone, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Camera, Eye, EyeOff, Loader2, Lock, UserCircle, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { signInWithPopup, signInWithRedirect, getRedirectResult, RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth, googleProvider } from "../config/firebase";
@@ -10,6 +10,7 @@ import { auth, googleProvider } from "../config/firebase";
 import VerifyOtp from './VerifyOtp'; 
 import VerifyFirebasePhoneOtp from './VerifyFirebasePhoneOtp';
 import AccountStatusModal from '../components/AccountStatusModal';
+import PhilippinesPhoneField from '../components/PhilippinesPhoneField';
 import loginVisual from "../assets/mrh_about.jpg";
 import {
   consumeDisabledAccountNotice,
@@ -814,23 +815,23 @@ const Login = () => {
 
                       <div className='space-y-1.5'>
                         <label className='text-[11px] font-bold text-gray-400 uppercase tracking-wider'>Phone Number</label>
-                        <div className='relative flex items-center'>
-                          <input 
-                            className={`w-full bg-gray-50 border rounded-xl p-3 text-sm outline-none transition-all ${isPhoneFieldTaken ? 'border-red-400 bg-red-50' : 'border-gray-100 focus:border-blue-500'}`}
-                            type="tel" 
-                            onChange={(e) => {
-                              setPhone(formatPhone(e.target.value));
-                              if (state === 'Sign Up') setIsPhoneVerified(false);
-                              setPhoneIdToken('');
-                            }} 
-                            value={phone} 
-                            placeholder="Phone Number" 
-                            required 
-                          />
-                          {state === 'Sign Up' && phone.length === 11 && !isPhoneFieldTaken && (
-                            <button type="button" disabled={loading || googleLoading || Boolean(verificationLoadingMessage)} onClick={() => handleVerifyClick('phone')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-60'>Send OTP</button>
-                          )}
-                        </div>
+                        <PhilippinesPhoneField
+                          value={phone}
+                          onChange={(e) => {
+                            setPhone(formatPhone(e.target.value));
+                            if (state === 'Sign Up') setIsPhoneVerified(false);
+                            setPhoneIdToken('');
+                          }}
+                          required
+                          containerClassName={`rounded-xl border px-3 py-2 transition-all ${isPhoneFieldTaken ? 'border-red-400 bg-red-50' : 'border-gray-100 bg-gray-50 focus-within:border-blue-500'}`}
+                          prefixClassName="bg-white"
+                          inputClassName="py-1 text-sm pr-24"
+                          action={
+                            state === 'Sign Up' && phone.length === 11 && !isPhoneFieldTaken ? (
+                              <button type="button" disabled={loading || googleLoading || Boolean(verificationLoadingMessage)} onClick={() => handleVerifyClick('phone')} className='absolute right-2 top-1/2 -translate-y-1/2 bg-white text-blue-600 border border-blue-100 px-3 py-1.5 rounded-lg text-[10px] font-bold shadow-sm hover:bg-blue-50 uppercase tracking-tight disabled:cursor-not-allowed disabled:opacity-60'>Send OTP</button>
+                            ) : null
+                          }
+                        />
 
                         {state === 'Sign Up' && isPhoneVerified && (
                           <p className='mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-600'>

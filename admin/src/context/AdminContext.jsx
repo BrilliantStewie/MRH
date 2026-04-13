@@ -33,6 +33,7 @@ const getRequestErrorMessage = (error, fallbackMessage) =>
 const AdminContextProvider = ({ children }) => {
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [aToken, setAToken] = useState(localStorage.getItem("aToken") || "");
+  const [adminData, setAdminData] = useState(null);
 
   // 🔥 NEW
   const authHeader = {
@@ -44,6 +45,7 @@ const AdminContextProvider = ({ children }) => {
   const logoutAdmin = ({ silent = false, disabledMessage = "" } = {}) => {
     localStorage.removeItem("aToken");
     setAToken("");
+    setAdminData(null);
     if (disabledMessage) {
       storeDisabledAccountNotice(disabledMessage);
     }
@@ -163,6 +165,64 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 📊 DASHBOARD
   // ============================================================
+  const loadAdminData = async ({ silent = false } = {}) => {
+    if (!aToken) {
+      setAdminData(null);
+      return;
+    }
+
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/admin/profile`, authHeader);
+
+      if (data.success) {
+        setAdminData(data.userData || null);
+      } else if (!silent) {
+        toast.error(data.message || "Failed to load admin profile");
+      }
+    } catch (error) {
+      if (silent) {
+        console.error("Failed to refresh admin profile", error);
+      } else {
+        reportRequestError(error, "Failed to load admin profile");
+      }
+    }
+  };
+
+  const updateAdminProfile = async (profileData = {}) => {
+    try {
+      const { data } = await axios.post(
+        `${backendUrl}/api/admin/update-profile`,
+        profileData,
+        authHeader
+      );
+
+      if (!data.success) {
+        toast.error(data.message || "Failed to update profile");
+        return data;
+      }
+
+      if (data.token) {
+        localStorage.setItem("aToken", data.token);
+        setAToken(data.token);
+      }
+
+      if (data.userData) {
+        setAdminData(data.userData);
+      } else {
+        await loadAdminData({ silent: true });
+      }
+
+      toast.success(data.message || "Profile updated successfully");
+      return data;
+    } catch (error) {
+      reportRequestError(error, "Failed to update profile");
+      return {
+        success: false,
+        message: getRequestErrorMessage(error, "Failed to update profile"),
+      };
+    }
+  };
+
   const getDashboardData = async ({ silent = false } = {}) => {
     try {
       const { data } = await axios.get(
@@ -351,10 +411,11 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 🛏️ ROOM MANAGEMENT
   // ============================================================
-  const getAllRooms = async ({ silent = false } = {}) => {
+  const getAllRooms = async ({ silent = false, includeArchived = true } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/all-rooms`, {
         headers: { token: aToken },
+        params: { includeArchived },
       });
       if (data.success) {
         setAllRooms((data.rooms || []).map(normalizeRoomRecord));
@@ -375,7 +436,7 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllRooms();
+        getAllRooms({ includeArchived: true });
       } else {
         toast.error(data.message);
       }
@@ -393,12 +454,15 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllRooms();
+        getAllRooms({ includeArchived: true });
+        return true;
       } else {
         toast.error(data.message);
+        return false;
       }
     } catch (error) {
       toast.error(error.message);
+      return false;
     }
   };
 
@@ -439,22 +503,26 @@ const AdminContextProvider = ({ children }) => {
     }
   };
 
-  const declineBooking = async (bookingId) => {
+  const declineBooking = async (bookingId, declineReason) => {
     try {
+      const trimmedDeclineReason = String(declineReason || "").trim();
       const { data } = await axios.put(
         `${backendUrl}/api/admin/bookings/${bookingId}/decline`,
-        {},
+        { declineReason: trimmedDeclineReason },
         { headers: { token: aToken } }
       );
       if (data.success) {
         toast.success(data.message);
         getAllBookings();
         getDashboardData();
+        return true;
       } else {
         toast.error(data.message);
+        return false;
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(error.response?.data?.message || error.message);
+      return false;
     }
   };
 
@@ -541,10 +609,11 @@ const AdminContextProvider = ({ children }) => {
   // ============================================================
   // 📦 PACKAGES MANAGEMENT
   // ============================================================
-  const getAllPackages = async ({ silent = false } = {}) => {
+  const getAllPackages = async ({ silent = false, includeArchived = true } = {}) => {
     try {
       const { data } = await axios.get(`${backendUrl}/api/admin/packages`, {
         headers: { token: aToken },
+        params: { includeArchived },
       });
       if (data.success) {
         setAllPackages(data.packages);
@@ -565,7 +634,7 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllPackages();
+        getAllPackages({ includeArchived: true });
         return true;
       }
       toast.error(data.message);
@@ -585,7 +654,7 @@ const AdminContextProvider = ({ children }) => {
       );
       if (data.success) {
         toast.success(data.message);
-        getAllPackages();
+        getAllPackages({ includeArchived: true });
         return true;
       }
       toast.error(data.message);
@@ -604,13 +673,16 @@ const AdminContextProvider = ({ children }) => {
         { headers: { token: aToken } }
       );
       if (data.success) {
-        toast.success("Package deleted successfully");
-        getAllPackages();
+        toast.success(data.message);
+        getAllPackages({ includeArchived: true });
+        return true;
       } else {
         toast.error(data.message);
+        return false;
       }
     } catch (error) {
       toast.error(error.message);
+      return false;
     }
   };
 
@@ -621,7 +693,9 @@ const AdminContextProvider = ({ children }) => {
 
   const getAllReviews = async ({ silent = false } = {}) => {
     try {
-      const { data } = await axios.get(`${backendUrl}/api/reviews/all-reviews`);
+      const { data } = await axios.get(`${backendUrl}/api/reviews/admin/all-reviews`, {
+        headers: { token: aToken },
+      });
       if (data.success) {
         setAllReviews(data.reviews);
       } else if (!silent) {
@@ -641,6 +715,7 @@ const AdminContextProvider = ({ children }) => {
 
     try {
       await Promise.allSettled([
+        loadAdminData({ silent }),
         getDashboardData({ silent }),
         getAllBookings({ silent }),
         getAllReviews({ silent }),
@@ -654,6 +729,14 @@ const AdminContextProvider = ({ children }) => {
       adminRealtimeSyncInProgressRef.current = false;
     }
   };
+
+  useEffect(() => {
+    if (aToken) {
+      loadAdminData({ silent: true });
+    } else {
+      setAdminData(null);
+    }
+  }, [aToken, backendUrl]);
 
   useEffect(() => {
     if (!backendUrl || !aToken) return undefined;
@@ -784,7 +867,11 @@ const AdminContextProvider = ({ children }) => {
     backendUrl,
     aToken,
     setAToken,
+    adminData,
+    setAdminData,
     adminLogin,
+    loadAdminData,
+    updateAdminProfile,
     logoutAdmin,
 
     // Dashboard

@@ -307,7 +307,7 @@ const buildHistoricalTrend = ({ bookings, reportType, periodYear, periodMonth = 
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(getBookingPaidAmount(booking) || 0);
+      bucket.income += Number(getBookingNetPaidAmount(booking) || 0);
     }
   });
 
@@ -343,7 +343,7 @@ const buildMonthlyWeekTrend = ({ bookings, periodYear, periodMonth }) => {
     bucket.bookings += 1;
 
     if (isPaidBooking(booking)) {
-      bucket.income += Number(getBookingPaidAmount(booking) || 0);
+      bucket.income += Number(getBookingNetPaidAmount(booking) || 0);
     }
   });
 

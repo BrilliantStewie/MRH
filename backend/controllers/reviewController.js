@@ -12,7 +12,7 @@ import {
   serializeReview,
 } from "../utils/dataConsistency.js";
 import { BOOKING_DATE_SELECT } from "../utils/bookingDateFields.js";
-import { getBookingReviewEligibility } from "../utils/bookingRules.js";
+import { getBookingReviewEligibility, REVIEW_EDIT_WINDOW_MS } from "../utils/bookingRules.js";
 
 const uploadReviewImage = (fileBuffer, folder = "mrh_reviews") =>
   new Promise((resolve, reject) => {
@@ -256,6 +256,18 @@ export const createReview = async (req, res) => {
     const existingReview = await Review.findOne({ bookingId });
 
     if (existingReview) {
+      if (existingReview.createdAt) {
+        const createdAt = new Date(existingReview.createdAt);
+        if (!Number.isNaN(createdAt.getTime())) {
+          const ageMs = Date.now() - createdAt.getTime();
+          if (ageMs > REVIEW_EDIT_WINDOW_MS) {
+            return res.status(400).json({
+              success: false,
+              message: "You can only edit a review within 24 hours of posting.",
+            });
+          }
+        }
+      }
 
       const providedExistingImages = normalizeImageList(req.body.existingImages);
       const baseImages = Array.isArray(providedExistingImages)
@@ -382,6 +394,19 @@ export const editReview = async (req, res) => {
         success: false,
         message: "Unauthorized."
       });
+    }
+
+    if (review.createdAt) {
+      const createdAt = new Date(review.createdAt);
+      if (!Number.isNaN(createdAt.getTime())) {
+        const ageMs = Date.now() - createdAt.getTime();
+        if (ageMs > REVIEW_EDIT_WINDOW_MS) {
+          return res.status(400).json({
+            success: false,
+            message: "You can only edit a review within 24 hours of posting.",
+          });
+        }
+      }
     }
 
     if (imageFiles.length > 6) {

@@ -5,11 +5,13 @@ import jwt from "jsonwebtoken";
 
 // Models
 import userModel from "../models/userModel.js";
+import contactVerificationModel from "../models/contactVerificationModel.js";
 import roomModel from "../models/roomModel.js";
 import bookingModel from "../models/bookingModel.js";
 import buildingModel from "../models/buildingModel.js";
 import roomTypeModel from "../models/roomtypeModel.js";
 import packageModel from "../models/packageModel.js";
+import { admin as firebaseAdmin, initFirebaseAdmin } from "../config/firebaseAdmin.js";
 import { createOrRefreshNotification } from "../utils/notificationUtils.js";
 import {
   buildSessionTokenPayload,
@@ -61,6 +63,48 @@ const formatPHNumber = (number) => {
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
+const generateOtpCode = () =>
+  Math.floor(100000 + Math.random() * 900000).toString();
+
+const createVerificationToken = ({ purpose, target, adminId }) =>
+  jwt.sign(
+    {
+      purpose,
+      target,
+      adminId,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "30m" }
+  );
+
+const verifyVerificationToken = (token, expectedPurpose) => {
+  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+  if (!decoded || decoded.purpose !== expectedPurpose || !decoded.target) {
+    throw new Error("Invalid verification token");
+  }
+
+  return decoded;
+};
+
+const buildAdminDisplayName = (admin) =>
+  [admin?.firstName, admin?.middleName, admin?.lastName, admin?.suffix]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ") || "Administrator";
+
+const createAdminToken = (admin) =>
+  jwt.sign(
+    buildSessionTokenPayload({
+      id: admin._id,
+      role: "admin",
+      name: buildAdminDisplayName(admin),
+      sessionVersion: getSessionVersion(admin),
+    }),
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+  );
+
 const normalizePHPhone = (value) => {
   const digits = String(value || "").replace(/\D/g, "");
   if (digits.startsWith("63") && digits.length === 12) {
@@ -72,7 +116,36 @@ const normalizePHPhone = (value) => {
   return digits;
 };
 
+const formatEmailMultilineText = (value) =>
+  validator.escape(String(value || "").trim()).replace(/\r?\n/g, "<br />");
+
 const isValidPHPhone = (value) => /^09\d{9}$/.test(value);
+
+const verifyFirebasePhoneToken = async (idToken) => {
+  if (!idToken) {
+    throw new Error("Missing phone verification token");
+  }
+
+  initFirebaseAdmin();
+  const decoded = await firebaseAdmin.auth().verifyIdToken(idToken);
+  const signInProvider = decoded.firebase?.sign_in_provider;
+
+  if (signInProvider && signInProvider !== "phone") {
+    throw new Error("Invalid phone verification token");
+  }
+
+  const phoneNumber = decoded.phone_number;
+  if (!phoneNumber) {
+    throw new Error("Phone number not found in verification token");
+  }
+
+  const normalizedPhone = normalizePHPhone(phoneNumber);
+  if (!isValidPHPhone(normalizedPhone)) {
+    throw new Error("Invalid Philippine phone number");
+  }
+
+  return { decoded, normalizedPhone };
+};
 
 const buildPhoneCandidates = (value) => {
   const rawDigits = String(value || "").replace(/\D/g, "");
@@ -148,6 +221,9 @@ const getRoomCapacityValidationMessage = (roomTypeName, rawCapacity) => {
   return "";
 };
 
+const shouldIncludeArchived = (req) =>
+  String(req?.query?.includeArchived || "").trim().toLowerCase() === "true";
+
 // ======================================================================
 // 🔐 AUTHENTICATION
 // ======================================================================
@@ -195,17 +271,7 @@ const loginAdmin = async (req, res) => {
       });
     }
 
-    // Create token
-    const token = jwt.sign(
-      buildSessionTokenPayload({
-        id: admin._id,
-        role: admin.role,
-        name: `${admin.firstName || "Admin"} ${admin.lastName || ""}`.trim(),
-        sessionVersion: getSessionVersion(admin),
-      }),
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    const token = createAdminToken(admin);
 
     res.json({
       success: true,
@@ -223,6 +289,162 @@ const loginAdmin = async (req, res) => {
 
 const verifyAdminSession = async (req, res) => {
   res.json({ success: true });
+};
+
+const getAdminProfile = async (req, res) => {
+  try {
+    const admin = await userModel.findById(req.userId).select("-password");
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(404).json({
+        success: false,
+        message: "Admin account not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      userData: admin,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to load admin profile",
+    });
+  }
+};
+
+const updateAdminProfile = async (req, res) => {
+  try {
+    const { firstName, middleName, lastName, suffix, email, currentPassword, newPassword } = req.body;
+
+    const admin = await userModel.findById(req.userId);
+
+    if (!admin || admin.role !== "admin") {
+      return res.status(404).json({
+        success: false,
+        message: "Admin account not found",
+      });
+    }
+
+    const normalizedFirstName =
+      typeof firstName === "string" ? normalizeName(firstName) : normalizeName(admin.firstName);
+    const normalizedMiddleName =
+      typeof middleName === "string" ? normalizeName(middleName) : normalizeName(admin.middleName || "");
+    const normalizedLastName =
+      typeof lastName === "string" ? normalizeName(lastName) : normalizeName(admin.lastName);
+    const normalizedSuffix =
+      typeof suffix === "string" ? normalizeName(suffix) : normalizeName(admin.suffix || "");
+    const normalizedEmail =
+      typeof email === "string" ? normalizeEmail(email) : normalizeEmail(admin.email);
+    const currentEmail = normalizeEmail(admin.email);
+    const emailChanged = normalizedEmail !== currentEmail;
+    const wantsPasswordChange = Boolean(String(newPassword || "").trim());
+    const trimmedNewPassword = String(newPassword || "").trim();
+    const trimmedCurrentPassword = String(currentPassword || "");
+    let currentPasswordValidated = false;
+
+    if (!normalizedFirstName || !normalizedLastName) {
+      return res.status(400).json({
+        success: false,
+        message: "First name and last name are required",
+      });
+    }
+
+    if (!validator.isEmail(normalizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address",
+      });
+    }
+
+    if (emailChanged) {
+      const existingUser = await userModel.findOne({
+        email: normalizedEmail,
+        _id: { $ne: admin._id },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use",
+        });
+      }
+    }
+
+    if (emailChanged || wantsPasswordChange) {
+      if (!trimmedCurrentPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is required",
+        });
+      }
+
+      const isMatch = await bcrypt.compare(trimmedCurrentPassword, admin.password);
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          message: "Current password is incorrect",
+        });
+      }
+
+      currentPasswordValidated = true;
+    }
+
+    if (wantsPasswordChange) {
+      if (trimmedNewPassword.length < 8) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 8 characters",
+        });
+      }
+
+      if (trimmedCurrentPassword === trimmedNewPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "New password must be different from your current password",
+        });
+      }
+    }
+
+    admin.firstName = normalizedFirstName;
+    admin.middleName = normalizedMiddleName;
+    admin.lastName = normalizedLastName;
+    admin.suffix = normalizedSuffix;
+    admin.email = normalizedEmail;
+    if (emailChanged) {
+      admin.emailVerified = true;
+      admin.pendingEmail = "";
+    }
+
+    let refreshedToken = "";
+
+    if (wantsPasswordChange && currentPasswordValidated) {
+      const salt = await bcrypt.genSalt(10);
+      admin.password = await bcrypt.hash(trimmedNewPassword, salt);
+      admin.passwordSet = true;
+      bumpSessionVersion(admin);
+    }
+
+    await admin.save();
+    const safeAdmin = await userModel.findById(admin._id).select("-password");
+
+    if (wantsPasswordChange) {
+      refreshedToken = createAdminToken(admin);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      userData: safeAdmin,
+      token: refreshedToken || undefined,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to update admin profile",
+    });
+  }
 };
 
 const logoutAdminSession = async (req, res) => {
@@ -251,7 +473,7 @@ const adminDashboard = async (req, res) => {
         const [userCount, staffCount, roomCount, bookings] = await Promise.all([
             userModel.countDocuments({ role: 'guest' }),
             userModel.countDocuments({ role: 'staff' }),
-            roomModel.countDocuments({}),
+            roomModel.countDocuments({ isArchived: { $ne: true } }),
             bookingModel.find({}).sort({ date: -1 })
         ]);
 
@@ -376,22 +598,225 @@ const addGuestUser = async (req, res) => {
     }
 };
 
-const createStaff = async (req, res) => {
+const sendStaffEmailOTP = async (req, res) => {
     try {
-        const { firstName, lastName, middleName, suffix, email, password, phone } = req.body;
-        const imageFile = req.file;
+        const normalizedEmail = normalizeEmail(req.body.email);
 
-        if (!firstName || !lastName || !email || !password) {
-            return res.json({ success: false, message: "Missing required fields" });
-        }
-
-        if (!validator.isEmail(email)) {
+        if (!validator.isEmail(normalizedEmail)) {
             return res.json({ success: false, message: "Invalid email" });
         }
 
-        const exists = await userModel.findOne({ email });
+        const existingUser = await userModel.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            return res.json({ success: false, message: "Email already exists" });
+        }
+
+        const otp = generateOtpCode();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        await contactVerificationModel.findOneAndUpdate(
+            { purpose: "staff_email", target: normalizedEmail },
+            {
+                purpose: "staff_email",
+                target: normalizedEmail,
+                otp,
+                expiresAt,
+                verifiedAt: null,
+                createdBy: req.userId || null,
+            },
+            {
+                upsert: true,
+                new: true,
+                setDefaultsOnInsert: true,
+            }
+        );
+
+        const emailResult = await sendEmail(
+            normalizedEmail,
+            "Your staff verification code",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Use this code to verify the staff email address:</p>
+                <p style="font-size: 20px; font-weight: 700; letter-spacing: 2px;">${otp}</p>
+                <p>This code expires in 10 minutes.</p>
+                <p>Mercedarian Retreat House</p>
+            </div>
+            `,
+            `Your MRH staff verification code is ${otp}. It expires in 10 minutes.`
+        );
+
+        if (!emailResult?.success) {
+            return res.json({
+                success: false,
+                message: emailResult?.message || "Unable to send email right now.",
+            });
+        }
+
+        return res.json({
+            success: true,
+            message: "OTP sent to email",
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+const verifyStaffEmailOTP = async (req, res) => {
+    try {
+        const normalizedEmail = normalizeEmail(req.body.email);
+        const providedOtp = String(req.body.otp || "").trim();
+
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        const verification = await contactVerificationModel.findOne({
+            purpose: "staff_email",
+            target: normalizedEmail,
+        });
+
+        if (!verification) {
+            return res.json({ success: false, message: "No verification request found" });
+        }
+
+        if (!verification.otp || String(verification.otp).trim() !== providedOtp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (new Date() > new Date(verification.expiresAt)) {
+            return res.json({ success: false, message: "OTP expired" });
+        }
+
+        const existingUser = await userModel.findOne({ email: normalizedEmail });
+        if (existingUser) {
+            return res.json({ success: false, message: "Email already exists" });
+        }
+
+        verification.verifiedAt = new Date();
+        await verification.save();
+
+        return res.json({
+            success: true,
+            message: "Email verified successfully",
+            email: normalizedEmail,
+            verificationToken: createVerificationToken({
+                purpose: "staff_email",
+                target: normalizedEmail,
+                adminId: req.userId,
+            }),
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+const verifyStaffPhoneFirebase = async (req, res) => {
+    try {
+        const { idToken } = req.body;
+        const { normalizedPhone } = await verifyFirebasePhoneToken(idToken);
+
+        const existingUser = await userModel.findOne({
+            phone: { $in: buildPhoneCandidates(normalizedPhone) },
+        });
+
+        if (existingUser) {
+            return res.json({ success: false, message: "Phone number already exists" });
+        }
+
+        return res.json({
+            success: true,
+            message: "Phone verified successfully",
+            phone: normalizedPhone,
+            verificationToken: createVerificationToken({
+                purpose: "staff_phone",
+                target: normalizedPhone,
+                adminId: req.userId,
+            }),
+        });
+    } catch (error) {
+        return res.json({ success: false, message: error.message });
+    }
+};
+
+const createStaff = async (req, res) => {
+    try {
+        const {
+            firstName,
+            lastName,
+            middleName,
+            suffix,
+            email,
+            password,
+            phone,
+            emailVerificationToken,
+            phoneVerificationToken,
+        } = req.body;
+        const imageFile = req.file;
+        const normalizedFirstName = normalizeName(firstName);
+        const normalizedMiddleName = normalizeName(middleName);
+        const normalizedLastName = normalizeName(lastName);
+        const normalizedSuffix = normalizeName(suffix);
+        const normalizedEmail = normalizeEmail(email);
+        const normalizedPhone = normalizePHPhone(phone);
+
+        if (!normalizedFirstName || !normalizedLastName || !normalizedEmail || !password) {
+            return res.json({ success: false, message: "Missing required fields" });
+        }
+
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        if (!normalizedPhone || !isValidPHPhone(normalizedPhone)) {
+            return res.json({ success: false, message: "Invalid phone number" });
+        }
+
+        if (!emailVerificationToken || !phoneVerificationToken) {
+            return res.json({
+                success: false,
+                message: "Please verify the email and phone number before creating the account",
+            });
+        }
+
+        let emailVerification;
+        let phoneVerification;
+
+        try {
+            emailVerification = verifyVerificationToken(emailVerificationToken, "staff_email");
+            phoneVerification = verifyVerificationToken(phoneVerificationToken, "staff_phone");
+        } catch (error) {
+            return res.json({
+                success: false,
+                message: error.message || "Invalid verification token",
+            });
+        }
+
+        if (String(emailVerification.adminId || "") !== String(req.userId || "")) {
+            return res.json({ success: false, message: "Email verification is no longer valid" });
+        }
+
+        if (String(phoneVerification.adminId || "") !== String(req.userId || "")) {
+            return res.json({ success: false, message: "Phone verification is no longer valid" });
+        }
+
+        if (normalizeEmail(emailVerification.target) !== normalizedEmail) {
+            return res.json({ success: false, message: "Email verification does not match the current email" });
+        }
+
+        if (normalizePHPhone(phoneVerification.target) !== normalizedPhone) {
+            return res.json({ success: false, message: "Phone verification does not match the current phone number" });
+        }
+
+        const exists = await userModel.findOne({ email: normalizedEmail });
         if (exists) {
             return res.json({ success: false, message: "User already exists" });
+        }
+
+        const existingPhoneUser = await userModel.findOne({
+            phone: { $in: buildPhoneCandidates(normalizedPhone) }
+        });
+        if (existingPhoneUser) {
+            return res.json({ success: false, message: "Phone number already exists" });
         }
 
         let imageUrl = ""; 
@@ -403,17 +828,17 @@ const createStaff = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newStaff = new userModel({
-            firstName,
-            lastName,
-            middleName,
-            suffix,
-            email,
+            firstName: normalizedFirstName,
+            lastName: normalizedLastName,
+            middleName: normalizedMiddleName,
+            suffix: normalizedSuffix,
+            email: normalizedEmail,
             password: hashedPassword,
-            phone,
+            phone: normalizedPhone || null,
             image: imageUrl,
             role: 'staff',
             emailVerified: true,
-            phoneVerified: Boolean(phone),
+            phoneVerified: Boolean(normalizedPhone),
             sessionVersion: 0
         });
 
@@ -428,7 +853,7 @@ const createStaff = async (req, res) => {
 
 const updateStaff = async (req, res) => {
     try {
-        const { id, firstName, lastName, middleName, suffix, phone, removeImage, password } = req.body;
+        const { id, firstName, lastName, middleName, suffix, email, phone, removeImage, password } = req.body;
         const imageFile = req.file;
 
         const staff = await userModel.findById(id);
@@ -436,15 +861,43 @@ const updateStaff = async (req, res) => {
             return res.json({ success: false, message: "Staff not found" });
         }
 
-        if (firstName) staff.firstName = firstName;
-        if (lastName) staff.lastName = lastName;
-        if (middleName !== undefined) staff.middleName = middleName; 
-        if (suffix !== undefined) staff.suffix = suffix;
-        if (phone) staff.phone = phone;
+        const normalizedEmail = typeof email === "string" ? normalizeEmail(email) : normalizeEmail(staff.email);
+
+        if (!normalizedEmail || !validator.isEmail(normalizedEmail)) {
+            return res.json({ success: false, message: "Invalid email" });
+        }
+
+        if (normalizedEmail !== normalizeEmail(staff.email)) {
+            const existingUser = await userModel.findOne({
+                email: normalizedEmail,
+                _id: { $ne: staff._id }
+            });
+
+            if (existingUser) {
+                return res.json({ success: false, message: "User already exists" });
+            }
+        }
+
+        if (firstName) staff.firstName = normalizeName(firstName);
+        if (lastName) staff.lastName = normalizeName(lastName);
+        if (middleName !== undefined) staff.middleName = normalizeName(middleName); 
+        if (suffix !== undefined) staff.suffix = normalizeName(suffix);
+        if (phone !== undefined) {
+            const normalizedPhone = normalizePHPhone(phone);
+            staff.phone = normalizedPhone || null;
+            staff.phoneVerified = Boolean(normalizedPhone);
+            if (normalizedPhone) {
+                staff.pendingPhone = "";
+            }
+        }
+        staff.email = normalizedEmail;
+        staff.emailVerified = true;
+        staff.pendingEmail = "";
 
         if (password && password.trim() !== "") {
             const salt = await bcrypt.genSalt(10);
             staff.password = await bcrypt.hash(password, salt);
+            staff.passwordSet = true;
             bumpSessionVersion(staff);
         }
 
@@ -680,10 +1133,11 @@ const updateRoom = async (req, res) => {
 
 const getAllRooms = async (req, res) => {
     try {
+        const includeArchived = shouldIncludeArchived(req);
         const rooms = await roomModel
-            .find({})
+            .find(includeArchived ? {} : { isArchived: { $ne: true } })
             .populate(roomReferencePopulate)
-            .sort({ createdAt: -1 });
+            .sort({ isArchived: 1, createdAt: -1 });
 
         res.json({ success: true, rooms: rooms.map((room) => serializeRoom(room)) });
     } catch (error) {
@@ -696,6 +1150,12 @@ const changeAvailability = async (req, res) => {
         const { roomId } = req.body;
         const room = await roomModel.findById(roomId);
         if (!room) return res.json({ success: false, message: "Room not found" });
+        if (room.isArchived) {
+            return res.json({
+                success: false,
+                message: "Restore the room before changing availability",
+            });
+        }
         
         room.available = !room.available;
         await room.save();
@@ -708,24 +1168,28 @@ const changeAvailability = async (req, res) => {
 const deleteRoom = async (req, res) => {
     try {
         const id = req.body.id || req.params.id;
-
-        const bookingExists = await bookingModel.exists({
-            "bookingItems.roomId": id
-        });
-
-        if (bookingExists) {
-            return res.json({
-                success: false,
-                message: "Room is linked to existing bookings and cannot be deleted"
-            });
-        }
-
-        const deletedRoom = await roomModel.findByIdAndDelete(id);
-        if (!deletedRoom) {
+        const room = await roomModel.findById(id);
+        if (!room) {
             return res.json({ success: false, message: "Room not found" });
         }
 
-        res.json({ success: true, message: "Room Deleted" });
+        const willRestore = Boolean(room.isArchived);
+        room.isArchived = !willRestore;
+        room.archivedAt = willRestore ? null : new Date();
+        if (!willRestore) {
+            room.available = false;
+        }
+        await room.save();
+
+        const populatedRoom = await roomModel
+            .findById(room._id)
+            .populate(roomReferencePopulate);
+
+        res.json({
+            success: true,
+            message: willRestore ? "Room restored successfully" : "Room archived successfully",
+            room: serializeRoom(populatedRoom)
+        });
     } catch (error) {
         res.json({ success: false, message: error.message });
     }
@@ -801,6 +1265,58 @@ const declineBooking = async (req, res) => {
             <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
                 <p>Hello ${booking.userId.firstName},</p>
                 <p>Your booking request was declined.</p>
+                <p>You can submit a new request or contact us if you need help.</p>
+                <p>Mercedarian Retreat House</p>
+            </div>
+            `
+        );
+
+        res.json({ success: true, message: "Booking Declined" });
+    } catch (error) {
+        res.json({ success: false, message: error.message });
+    }
+};
+
+const declineBookingWithReason = async (req, res) => {
+    try {
+        const { bookingId } = req.params;
+        const declineReason = String(req.body?.declineReason || "").trim();
+
+        if (!declineReason) {
+            return res.json({
+                success: false,
+                message: "Please provide a reason before declining this booking.",
+            });
+        }
+
+        const booking = await bookingModel.findByIdAndUpdate(
+            bookingId,
+            {
+                status: "declined",
+                declineReason,
+            },
+            { new: true, runValidators: true }
+        ).populate("userId");
+
+        if (!booking) return res.json({ success: false, message: "Booking not found" });
+
+        const declineReasonHtml = formatEmailMultilineText(declineReason);
+
+        await sendEmail(
+            booking.userId.email,
+            "Booking update - Mercedarian Retreat House",
+            `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111;">
+                <p>Hello ${booking.userId.firstName || "Guest"},</p>
+                <p>Your booking request was declined.</p>
+                <div style="margin: 16px 0; border: 1px solid #fecdd3; border-radius: 12px; padding: 14px; background: #fff1f2;">
+                    <p style="margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #be123c;">
+                        Reason
+                    </p>
+                    <p style="margin: 0; color: #111;">
+                        ${declineReasonHtml}
+                    </p>
+                </div>
                 <p>You can submit a new request or contact us if you need help.</p>
                 <p>Mercedarian Retreat House</p>
             </div>
@@ -1200,11 +1716,16 @@ const updateRoomType = async (req, res) => {
 export {
     loginAdmin, 
     verifyAdminSession,
+    getAdminProfile,
+    updateAdminProfile,
     logoutAdminSession,
     adminDashboard, 
     getAllUsers, 
     getAllStaff, 
     addGuestUser,
+    sendStaffEmailOTP,
+    verifyStaffEmailOTP,
+    verifyStaffPhoneFirebase,
     createStaff,
     updateStaff,
     changeUserStatus,       
@@ -1215,7 +1736,7 @@ export {
     deleteRoom,
     allBookings,
     approveBooking,
-    declineBooking,
+    declineBookingWithReason as declineBooking,
     paymentConfirmed,
     approveCancellationRequest,
     processRefund,

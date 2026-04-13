@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { StaffContext } from "../../context/StaffContext";
 import axios from "axios";
 import { toast } from "react-toastify";
+import ProfileNameChangeDialog from "../../components/ProfileNameChangeDialog";
 import VerifyFirebasePhoneOtp from "../../components/VerifyFirebasePhoneOtp";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
 import { auth } from "../../config/firebase";
@@ -25,6 +26,12 @@ import {
 
 const NAME_INPUT_REGEX = /[^a-zA-Z\u00D1\u00F1.'\s-]/g;
 const NAME_CAPITALIZE_REGEX = /(^|[\s\-'.])([a-z\u00f1])/g;
+const buildFullName = ({ firstName = "", middleName = "", lastName = "", suffix = "" } = {}) =>
+  [firstName, middleName, lastName, suffix]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 
 const EMPTY_FORM = {
   firstName: "",
@@ -63,6 +70,7 @@ const StaffProfile = () => {
   const [firebaseConfirmation, setFirebaseConfirmation] = useState(null);
   const [phoneVerificationToken, setPhoneVerificationToken] = useState("");
   const [suffixError, setSuffixError] = useState("");
+  const [showNameChangeConfirm, setShowNameChangeConfirm] = useState(false);
   const recaptchaRef = useRef(null);
   const phoneCheckRequestRef = useRef(0);
 
@@ -197,7 +205,7 @@ const StaffProfile = () => {
   };
 
   useEffect(() => {
-    if (!staffData) return;
+    if (!staffData || isEdit) return;
 
     const mappedProfile = mapStaffProfileToForm(staffData);
     setLocalEditData({ ...EMPTY_FORM, ...mappedProfile });
@@ -211,10 +219,11 @@ const StaffProfile = () => {
     setPhoneVerificationToken("");
     setShowPhoneOtpModal(false);
     setFirebaseConfirmation(null);
+    setShowNameChangeConfirm(false);
     setRemoveImage(false);
     setImage(null);
     setImagePreview("");
-  }, [staffData]);
+  }, [staffData, isEdit]);
 
   useEffect(() => {
     if (!image) {
@@ -255,6 +264,23 @@ const StaffProfile = () => {
   const trimmedMiddleName = localEditData.middleName.trim();
   const trimmedLastName = localEditData.lastName.trim();
   const trimmedSuffix = localEditData.suffix.trim();
+  const currentFullName = buildFullName({
+    firstName: staffData?.firstName,
+    middleName: staffData?.middleName,
+    lastName: staffData?.lastName,
+    suffix: staffData?.suffix,
+  });
+  const nextFullName = buildFullName({
+    firstName: trimmedFirstName,
+    middleName: trimmedMiddleName,
+    lastName: trimmedLastName,
+    suffix: trimmedSuffix,
+  });
+  const nameChanged =
+    trimmedFirstName !== String(staffData?.firstName || "").trim() ||
+    trimmedMiddleName !== String(staffData?.middleName || "").trim() ||
+    trimmedLastName !== String(staffData?.lastName || "").trim() ||
+    trimmedSuffix !== String(staffData?.suffix || "").trim();
   const normalizedLocalPhone = normalizePhoneInput(localEditData.phone);
   const normalizedOriginalPhone = normalizePhoneInput(originalPhone);
   const normalizedEmail = normalizeEmailInput(localEditData.email);
@@ -323,13 +349,14 @@ const StaffProfile = () => {
     setPhoneVerificationToken("");
     setShowPhoneOtpModal(false);
     setFirebaseConfirmation(null);
+    setShowNameChangeConfirm(false);
     setImage(null);
     setImagePreview("");
     setRemoveImage(false);
     setIsEdit(false);
   };
 
-  const updateStaffProfileData = async () => {
+  const updateStaffProfileData = async ({ skipNameConfirm = false } = {}) => {
     if (hasMissingRequiredName) {
       toast.error("First name and last name are required.");
       return;
@@ -376,6 +403,11 @@ const StaffProfile = () => {
 
     if (phoneChanged && !phoneOtpVerified) {
       toast.error("Please verify your phone number first.");
+      return;
+    }
+
+    if (nameChanged && !skipNameConfirm) {
+      setShowNameChangeConfirm(true);
       return;
     }
 
@@ -428,6 +460,7 @@ const StaffProfile = () => {
       setImage(null);
       setImagePreview("");
       setRemoveImage(false);
+      setShowNameChangeConfirm(false);
       setOriginalPhone(normalizedLocalPhone);
       setPhoneVerificationToken("");
       setLocalEditData((prev) => ({
@@ -553,6 +586,18 @@ const StaffProfile = () => {
           onResend={sendFirebasePhoneOtp}
         />
       )}
+      <ProfileNameChangeDialog
+        open={showNameChangeConfirm}
+        currentName={currentFullName}
+        nextName={nextFullName}
+        impactText="This updated name will appear across your staff profile, notifications, review replies, and staff tools."
+        isLoading={isUpdating}
+        onClose={() => setShowNameChangeConfirm(false)}
+        onConfirm={async () => {
+          setShowNameChangeConfirm(false);
+          await updateStaffProfileData({ skipNameConfirm: true });
+        }}
+      />
 
       <div className="w-full space-y-6">
         <div className="overflow-hidden rounded-[2rem] border border-slate-100 bg-white shadow-sm">
@@ -803,16 +848,24 @@ const StaffProfile = () => {
                   Phone Number
                 </label>
                 <div
-                  className={`group relative flex items-center gap-3 rounded-xl border px-5 py-3.5 transition-all ${
+                  className={`group relative flex items-center gap-3 rounded-xl border px-4 py-3.5 transition-all ${
                     isEdit ? "border-slate-200 bg-white shadow-sm" : "border-slate-100 bg-slate-50"
                   }`}
                 >
-                  <Phone size={16} className="text-slate-400" />
+                  <div className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100/80 px-3 py-2 text-[10px] font-black uppercase tracking-[0.24em] text-slate-500">
+                    <Phone size={14} className="text-slate-400" />
+                    <span className="hidden sm:inline">Philippines</span>
+                    <span className="sm:hidden">PH</span>
+                    <span className="rounded-md bg-white px-2 py-1 text-[11px] tracking-[0.18em] text-slate-700">
+                      +63
+                    </span>
+                  </div>
                   <input
                     disabled={!isEdit}
                     value={localEditData.phone}
                     onChange={handlePhoneChange}
                     className="w-full bg-transparent pr-24 text-sm font-bold tracking-wide text-slate-800 outline-none placeholder:text-slate-300 disabled:opacity-60"
+                    placeholder="09XXXXXXXXX"
                     maxLength={11}
                   />
                   {isEdit && phoneChanged && isValidPHNumber(normalizedLocalPhone) && !activePhoneError && !isCheckingPhoneAvailability && (

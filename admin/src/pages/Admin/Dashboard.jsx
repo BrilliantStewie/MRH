@@ -199,6 +199,7 @@ const Dashboard = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isReportVisible, setIsReportVisible] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState(null);
   const reportRef = useRef(null);
 
   useEffect(() => {
@@ -209,9 +210,13 @@ const Dashboard = () => {
     }
   }, [aToken]);
 
+  useEffect(() => {
+    setReportFeedback(null);
+  }, [reportType, reportMonth, reportYear, showReportModal]);
+
   const stats = useMemo(() => {
     const bookings = allBookings || [];
-    const rooms = allRooms || [];
+    const rooms = (allRooms || []).filter((room) => !room.isArchived);
     const currentDate = new Date();
     const today = startOfDay(currentDate);
     const todayEnd = endOfDay(currentDate);
@@ -494,7 +499,7 @@ const Dashboard = () => {
   }, [reportBookings]);
 
   const roomUtilization = useMemo(() => {
-    const rooms = allRooms || [];
+    const rooms = (allRooms || []).filter((room) => !room.isArchived);
     const total = rooms.length || 1;
     const dormitoryCount = rooms.filter((room) => (room.roomType || "").toLowerCase().includes("dorm")).length;
     const nolascoCount = rooms.filter((room) => (room.building || "").toLowerCase().includes("nolasco")).length;
@@ -511,7 +516,9 @@ const Dashboard = () => {
   const commonAmenities = useMemo(() => {
     const counts = new Map();
 
-    (allRooms || []).forEach((room) => {
+    (allRooms || [])
+      .filter((room) => !room.isArchived)
+      .forEach((room) => {
       (room.amenities || []).forEach((amenity) => {
         const label = formatAmenity(amenity);
         if (!label) return;
@@ -652,6 +659,10 @@ const Dashboard = () => {
     if (!reportRef.current || isDownloading) return;
     setIsDownloading(true);
     setIsReportVisible(true);
+    setReportFeedback({
+      tone: "info",
+      message: `Generating ${reportLabel} report...`,
+    });
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -673,8 +684,16 @@ const Dashboard = () => {
 
       const safeLabel = reportLabel.replace(/\s+/g, "_");
       pdf.save(`MRH_Report_${safeLabel}.pdf`);
+      setReportFeedback({
+        tone: "success",
+        message: `${reportLabel} report saved.`,
+      });
     } catch (error) {
       console.error("Failed to generate PDF:", error);
+      setReportFeedback({
+        tone: "error",
+        message: "Could not generate the report. Please try again.",
+      });
     } finally {
       setIsReportVisible(false);
       setIsDownloading(false);
@@ -685,6 +704,10 @@ const Dashboard = () => {
     if (!reportRef.current || isPrinting) return;
     setIsPrinting(true);
     setIsReportVisible(true);
+    setReportFeedback({
+      tone: "info",
+      message: `Preparing ${reportLabel} report for printing...`,
+    });
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -693,9 +716,21 @@ const Dashboard = () => {
         window.removeEventListener("afterprint", onAfterPrint);
         setIsReportVisible(false);
         setIsPrinting(false);
+        setReportFeedback({
+          tone: "success",
+          message: `${reportLabel} report sent to printer.`,
+        });
       };
       window.addEventListener("afterprint", onAfterPrint);
       window.print();
+    } catch (error) {
+      console.error("Failed to prepare print:", error);
+      setIsReportVisible(false);
+      setIsPrinting(false);
+      setReportFeedback({
+        tone: "error",
+        message: "Could not prepare the report for printing.",
+      });
     } finally {
       // no-op: handled in onAfterPrint
     }
@@ -958,6 +993,19 @@ const Dashboard = () => {
                     </span>
                   </button>
                 </div>
+                {reportFeedback?.message && (
+                  <div
+                    className={`mt-3 rounded-2xl px-3 py-2 text-[11px] font-semibold ${
+                      reportFeedback.tone === "success"
+                        ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : reportFeedback.tone === "error"
+                          ? "border border-rose-200 bg-rose-50 text-rose-600"
+                          : "border border-slate-200 bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    {reportFeedback.message}
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -370,7 +370,7 @@ const SummaryMetric = ({ label, value, detail }) => (
   </div>
 );
 
-const ModalMonthSelector = ({ value, onChange }) => {
+const ModalMonthSelector = ({ value, onChange, maxMonthIndex = 11 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef(null);
 
@@ -430,6 +430,7 @@ const ModalMonthSelector = ({ value, onChange }) => {
           <div className="grid grid-cols-2 gap-1 p-2">
             {REPORT_MONTH_OPTIONS.map((option) => {
               const isSelected = option.value === value;
+              const isDisabled = option.value > maxMonthIndex;
 
               return (
                 <button
@@ -437,14 +438,19 @@ const ModalMonthSelector = ({ value, onChange }) => {
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  aria-disabled={isDisabled}
+                  disabled={isDisabled}
                   onClick={() => {
+                    if (isDisabled) return;
                     onChange(option.value);
                     setIsOpen(false);
                   }}
                   className={`flex items-center justify-between rounded-xl px-2.5 py-2 text-[10px] font-bold transition ${
                     isSelected
-                      ? "bg-[#3466dd] text-white shadow-[0_12px_24px_-20px_rgba(52,102,221,0.95)]"
-                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      ? "border border-[#3466dd]/30 bg-[#3466dd] text-white shadow-[0_12px_24px_-20px_rgba(52,102,221,0.95)]"
+                      : isDisabled
+                        ? "border-0 bg-transparent text-slate-300 cursor-not-allowed"
+                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                   }`}
                 >
                   <span>{option.label}</span>
@@ -727,6 +733,8 @@ const Report = () => {
     backendUrl,
     allBookings,
     getAllBookings,
+    allReviews,
+    getAllReviews,
   } = useContext(AdminContext);
 
   const [reportType, setReportType] = useState("monthly");
@@ -734,7 +742,29 @@ const Report = () => {
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [chartMode, setChartMode] = useState("booking");
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const currentManilaParts = useMemo(
+    () =>
+      getManilaDateParts(new Date()) || {
+        year: new Date().getFullYear(),
+        monthIndex: new Date().getMonth(),
+        day: new Date().getDate(),
+      },
+    []
+  );
+  const currentManilaYear = currentManilaParts.year;
+  const currentManilaMonth = currentManilaParts.monthIndex;
+  const isFutureMonthlyReport =
+    reportType === "monthly" &&
+    reportYear === currentManilaYear &&
+    reportMonth > currentManilaMonth;
+
+  useEffect(() => {
+    if (isFutureMonthlyReport) {
+      setReportMonth(currentManilaMonth);
+    }
+  }, [isFutureMonthlyReport, currentManilaMonth]);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState(null);
   const [isExportVisible, setIsExportVisible] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [storedReports, setStoredReports] = useState([]);
@@ -749,6 +779,11 @@ const Report = () => {
   }, [aToken]);
 
   useEffect(() => {
+    if (!aToken) return;
+    getAllReviews({ silent: true });
+  }, [aToken]);
+
+  useEffect(() => {
     if (!isSummaryModalOpen) return undefined;
 
     const previousOverflow = document.body.style.overflow;
@@ -758,6 +793,10 @@ const Report = () => {
       document.body.style.overflow = previousOverflow;
     };
   }, [isSummaryModalOpen]);
+
+  useEffect(() => {
+    setReportFeedback(null);
+  }, [reportType, reportMonth, reportYear]);
 
   useEffect(() => {
     if (!aToken) return;
@@ -863,8 +902,18 @@ const Report = () => {
       availableYears.map((year) => ({
         label: String(year),
         value: year,
+        disabled: year > currentManilaYear,
       })),
-    [availableYears]
+    [availableYears, currentManilaYear]
+  );
+
+  const reportMonthOptions = useMemo(
+    () =>
+      REPORT_MONTH_OPTIONS.map((option) => ({
+        ...option,
+        disabled: reportYear === currentManilaYear && option.value > currentManilaMonth,
+      })),
+    [currentManilaMonth, currentManilaYear, reportYear]
   );
 
   const reportBookings = useMemo(
@@ -873,6 +922,60 @@ const Report = () => {
   );
 
   const reportSummary = useMemo(() => summarizePeriodBookings(reportBookings), [reportBookings]);
+
+  const reportReviews = useMemo(() => {
+    if (!Array.isArray(allReviews)) return [];
+
+    return allReviews.filter((review) => {
+      const createdAt = new Date(review?.createdAt || review?.updatedAt);
+      if (Number.isNaN(createdAt.getTime())) return false;
+      return createdAt >= reportWindow.start && createdAt <= reportWindow.end;
+    });
+  }, [allReviews, reportWindow.end, reportWindow.start]);
+
+  const reportReviewStats = useMemo(() => {
+    const ratingCounts = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+    let totalRatings = 0;
+
+    reportReviews.forEach((review) => {
+      const rating = Number(review?.rating || 0);
+      if (rating >= 1 && rating <= 5) {
+        ratingCounts[Math.round(rating)] += 1;
+        totalRatings += rating;
+      }
+    });
+
+    const count = reportReviews.length;
+    const averageRating = count ? totalRatings / count : 0;
+
+    return {
+      count,
+      averageRating,
+      ratingCounts,
+    };
+  }, [reportReviews]);
+
+  const reportFeedbackRows = useMemo(
+    () => [
+      { label: "Total Reviews", value: formatCount(reportReviewStats.count) },
+      {
+        label: "Average Rating",
+        value: reportReviewStats.count ? `${reportReviewStats.averageRating.toFixed(1)} / 5` : "No ratings yet",
+      },
+      { label: "5-Star Reviews", value: formatCount(reportReviewStats.ratingCounts[5]) },
+      { label: "4-Star Reviews", value: formatCount(reportReviewStats.ratingCounts[4]) },
+      { label: "3-Star Reviews", value: formatCount(reportReviewStats.ratingCounts[3]) },
+      { label: "2-Star Reviews", value: formatCount(reportReviewStats.ratingCounts[2]) },
+      { label: "1-Star Reviews", value: formatCount(reportReviewStats.ratingCounts[1]) },
+    ],
+    [reportReviewStats]
+  );
 
   const currentStoredReport = useMemo(
     () =>
@@ -1071,8 +1174,20 @@ const Report = () => {
 
   const handleGenerateReport = async () => {
     if (!aToken || isGeneratingReport) return;
+    if (isFutureMonthlyReport) {
+      toast.error("You can only generate reports up to the current month.");
+      return;
+    }
+    if (reportYear > currentManilaYear) {
+      toast.error("You can only generate reports up to the current year.");
+      return;
+    }
 
     setIsGeneratingReport(true);
+    setReportFeedback({
+      tone: "info",
+      message: `Generating ${reportLabel} report...`,
+    });
 
     try {
       const payload =
@@ -1086,6 +1201,10 @@ const Report = () => {
 
       if (!data?.success) {
         toast.error(data?.message || "Failed to generate report");
+        setReportFeedback({
+          tone: "error",
+          message: data?.message || "Failed to generate report.",
+        });
         return;
       }
 
@@ -1131,9 +1250,17 @@ const Report = () => {
       getAllBookings();
       setReportDataRefreshKey((current) => current + 1);
       toast.success(data.message || "Report generated successfully");
+      setReportFeedback({
+        tone: "success",
+        message: `${reportLabel} report generated successfully.`,
+      });
       setIsSummaryModalOpen(true);
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to generate report");
+      setReportFeedback({
+        tone: "error",
+        message: error.response?.data?.message || "Failed to generate report.",
+      });
     } finally {
       setIsGeneratingReport(false);
     }
@@ -1266,6 +1393,13 @@ const Report = () => {
                 valueHeader="Value"
                 rows={pdfReportDetailRows}
               />
+              <PdfKeyValueTable
+                title="Guest Feedback Summary"
+                detail={`Review signals for ${reportType === "monthly" ? "this month" : "this year"}`}
+                labelHeader="Metric"
+                valueHeader="Value"
+                rows={reportFeedbackRows}
+              />
             </div>
 
           </div>
@@ -1279,21 +1413,36 @@ const Report = () => {
             <p className="mt-1 text-sm font-medium text-slate-500">Save monthly or yearly reports.</p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleGenerateReport}
-            disabled={isGeneratingReport || isDownloading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-          >
-            {isGeneratingReport || isDownloading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Database size={16} />
+          <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:items-end">
+            <button
+              type="button"
+              onClick={handleGenerateReport}
+              disabled={isGeneratingReport || isDownloading}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-white shadow-sm transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            >
+              {isGeneratingReport || isDownloading ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Database size={16} />
+              )}
+              <span className="text-sm font-black uppercase tracking-wide">
+                {isGeneratingReport ? "Generating..." : isDownloading ? "Preparing PDF..." : "Generate Report"}
+              </span>
+            </button>
+            {reportFeedback?.message && (
+              <div
+                className={`rounded-lg px-3 py-2 text-[11px] font-semibold ${
+                  reportFeedback.tone === "success"
+                    ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : reportFeedback.tone === "error"
+                      ? "border border-rose-200 bg-rose-50 text-rose-600"
+                      : "border border-slate-200 bg-slate-50 text-slate-600"
+                }`}
+              >
+                {reportFeedback.message}
+              </div>
             )}
-            <span className="text-sm font-black uppercase tracking-wide">
-              {isGeneratingReport ? "Generating..." : isDownloading ? "Preparing PDF..." : "Generate Report"}
-            </span>
-          </button>
+          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1357,7 +1506,7 @@ const Report = () => {
             {reportType === "monthly" && (
               <FilterDropdown
                 label="Month"
-                options={REPORT_MONTH_OPTIONS}
+                options={reportMonthOptions}
                 value={reportMonth}
                 onChange={setReportMonth}
                 icon={CalendarDays}
@@ -1480,6 +1629,121 @@ const Report = () => {
         </div>
       </section>
 
+      <section className="rounded-[34px] border border-[#e1e9f5] bg-[linear-gradient(140deg,#ffffff_0%,#f7fbff_45%,#eef4ff_100%)] px-4 py-5 shadow-[0_28px_60px_-40px_rgba(30,64,175,0.25)] print:hidden sm:px-6 sm:py-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-[#5f84c4]">Guest Feedback Report</p>
+            <h2 className="mt-2 text-[22px] font-black tracking-tight text-slate-900">
+              {reportType === "monthly" ? `Feedback for ${reportLabel}` : `Feedback Summary for ${reportYear}`}
+            </h2>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {reportType === "monthly"
+                ? "Insights collected for the selected month."
+                : "Insights collected across the full year."}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 shadow-sm">
+              {reportReviewStats.count} reviews
+            </div>
+            <div className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-700">
+              Avg {reportReviewStats.count ? reportReviewStats.averageRating.toFixed(1) : "0.0"} / 5
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {reportFeedbackRows.slice(0, 2).map((row) => (
+                <div
+                  key={row.label}
+                  className="rounded-[20px] border border-[#dbe6f5] bg-white px-4 py-4 shadow-[0_20px_40px_-32px_rgba(30,64,175,0.18)]"
+                >
+                  <p className="text-[9px] font-black uppercase tracking-[0.22em] text-slate-400">{row.label}</p>
+                  <p className="mt-2 text-[26px] font-black tracking-tight text-slate-900">{row.value}</p>
+                  <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                    {row.label === "Total Reviews" ? "Submitted by guests" : "Based on ratings"}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-[22px] border border-[#dbe6f5] bg-white px-4 py-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Rating Mix</p>
+              <div className="mt-3 space-y-2">
+                {[5, 4, 3, 2, 1].map((rating) => {
+                  const count = reportReviewStats.ratingCounts[rating] || 0;
+                  const percent = reportReviewStats.count
+                    ? Math.round((count / reportReviewStats.count) * 100)
+                    : 0;
+                  return (
+                    <div key={`rating-${rating}`} className="flex items-center gap-3">
+                      <span className="w-10 text-[11px] font-black text-slate-600">{rating}★</span>
+                      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <span className="w-10 text-right text-[11px] font-bold text-slate-500">
+                        {count}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {reportFeedbackRows.slice(2).map((row) => (
+                <div
+                  key={row.label}
+                  className="rounded-[18px] border border-[#e3eaf6] bg-[#f7faff] px-3 py-3"
+                >
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{row.label}</p>
+                  <p className="mt-1 text-[16px] font-black tracking-tight text-slate-900">{row.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-[#dbe6f5] bg-white px-4 py-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Rating Summary</p>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">
+                {reportType === "monthly" ? "This month" : "This year"}
+              </span>
+            </div>
+            <div className="mt-3 space-y-2">
+              {[5, 4, 3, 2, 1].map((rating) => {
+                const count = reportReviewStats.ratingCounts[rating] || 0;
+                const percent = reportReviewStats.count
+                  ? Math.round((count / reportReviewStats.count) * 100)
+                  : 0;
+                return (
+                  <div key={`summary-rating-${rating}`} className="flex items-center gap-3">
+                    <span className="w-10 text-[11px] font-black text-slate-600">
+                      {rating}
+                      <span className="text-amber-400">★</span>
+                    </span>
+                    <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-300 via-amber-400 to-amber-500"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <span className="w-10 text-right text-[11px] font-bold text-slate-500">
+                      {formatCount(count)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mt-8 border-t border-slate-200 pt-8 print:hidden">
         <Analytics />
       </section>
@@ -1490,10 +1754,10 @@ const Report = () => {
           onClick={() => setIsSummaryModalOpen(false)}
         >
           <div
-            className="w-full max-w-md overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+            className="w-full max-w-3xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-2 border-b border-slate-100 px-3 py-2.5">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-7 py-6">
               <div>
                 <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500">
                   Report Summary
@@ -1525,7 +1789,7 @@ const Report = () => {
               </div>
             </div>
 
-            <div className="max-h-[72vh] space-y-2.5 overflow-y-auto px-3 py-2.5">
+            <div className="max-h-[calc(62vh+5px)] space-y-5 overflow-y-auto px-7 py-7">
               <div className={`grid gap-2 ${reportType === "monthly" ? "grid-cols-3" : "grid-cols-2"}`}>
                 <label className="block">
                   <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
@@ -1553,7 +1817,11 @@ const Report = () => {
                     <span className="mb-1 block text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
                       Month
                     </span>
-                    <ModalMonthSelector value={reportMonth} onChange={setReportMonth} />
+                    <ModalMonthSelector
+                      value={reportMonth}
+                      onChange={setReportMonth}
+                      maxMonthIndex={reportYear === currentManilaYear ? currentManilaMonth : 11}
+                    />
                   </label>
                 )}
 
@@ -1617,6 +1885,56 @@ const Report = () => {
                   axisMode="income"
                   tooltipLabel="Income"
                 />
+              </div>
+
+              <div className="rounded-[20px] border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Guest Feedback</p>
+                </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-[16px] border border-slate-200 bg-white px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">Average Rating</p>
+                    <p className="mt-1 text-[16px] font-black text-slate-900">
+                      {reportReviewStats.count ? reportReviewStats.averageRating.toFixed(1) : "0.0"} / 5
+                    </p>
+                  </div>
+                  <div className="rounded-[16px] border border-slate-200 bg-white px-3 py-2">
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">Total Reviews</p>
+                    <p className="mt-1 text-[16px] font-black text-slate-900">
+                      {formatCount(reportReviewStats.count)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <div className="overflow-hidden rounded-[14px] border border-slate-200 bg-white">
+                    <table className="w-full table-fixed border-separate border-spacing-y-2 px-2 pb-2 pt-1">
+                      <thead>
+                        <tr className="bg-slate-100 text-left">
+                          <th className="rounded-l-[10px] px-3 py-2 text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            Rating
+                          </th>
+                          <th className="rounded-r-[10px] px-3 py-2 text-right text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                            Count
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[5, 4, 3, 2, 1].map((rating) => (
+                          <tr key={`modal-rating-${rating}`} className="bg-white">
+                            <td className="rounded-l-[10px] border border-r-0 border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-700">
+                              <span>{rating}</span>
+                              <span className="ml-1 text-amber-400">★</span>
+                            </td>
+                            <td className="rounded-r-[10px] border border-l-0 border-slate-200 px-3 py-2 text-right text-[10px] font-semibold text-slate-700">
+                              {formatCount(reportReviewStats.ratingCounts[rating])}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
 
               {activeReportSummary.totalBookings === 0 && (

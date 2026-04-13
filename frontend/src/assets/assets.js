@@ -19,7 +19,6 @@ import arrow_icon from './arrow_icon.svg';             // KEEP
 import info_icon from './info_icon.svg';               // KEEP
 import upload_icon from './upload_icon.png';           // KEEP
 import stripe_logo from './stripe_logo.png';           // KEEP (if you still show Stripe)
-import razorpay_logo from './razorpay_logo.png';       // KEEP (or remove if not needed)
 
 // =====================================================
 // 2. ROOM-TYPE ICONS (YOU MUST ADD THESE FILES)
@@ -49,7 +48,6 @@ export const assets = {
   dropdown_icon,
   upload_icon,
   stripe_logo,
-  razorpay_logo,
 };
 
 // =====================================================

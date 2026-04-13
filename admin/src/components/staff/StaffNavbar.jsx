@@ -329,8 +329,8 @@ const StaffNavbar = ({ onMenuToggle = () => {} }) => {
           >
             <Menu size={19} />
           </button>
-          <div 
-            className="group flex cursor-pointer items-center gap-3 select-none" 
+          <div
+            className="group flex cursor-pointer items-center gap-3 select-none"
             onClick={() => navigate("/staff-dashboard")}
           >
           <img 

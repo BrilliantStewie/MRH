@@ -2,7 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Loader2, X, CheckCircle, Lock, RefreshCw } from "lucide-react";
 
-const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
+const VerifyOtp = ({
+  email,
+  onClose,
+  onSuccess,
+  backendUrl,
+  isResetMode,
+  onVerify,
+  onResend,
+}) => {
   const [otp, setOtp] = useState(new Array(6).fill(""));
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -41,13 +49,16 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
     setResending(true);
     setError("");
     try {
-      const { data } = await axios.post(`${backendUrl}/api/user/send-otp`, { email });
-      if (data.success) {
+      const result = onResend
+        ? await onResend()
+        : await axios.post(`${backendUrl}/api/user/send-otp`, { email }).then((response) => response.data);
+
+      if (result?.success) {
         setTimer(59);
         setOtp(new Array(6).fill(""));
         inputRefs.current[0].focus();
       } else {
-        setError(data.message);
+        setError(result?.message || "Failed to resend code.");
       }
     } catch (err) {
       setError("Failed to resend code.");
@@ -65,16 +76,18 @@ const VerifyOtp = ({ email, onClose, onSuccess, backendUrl, isResetMode }) => {
     setError("");
 
     try {
-      const { data } = await axios.post(`${backendUrl}/api/user/verify-otp`, {
-        email: email.toLowerCase().trim(),
-        otp: otpCode,
-        isResetMode: isResetMode
-      });
+      const data = onVerify
+        ? await onVerify(otpCode)
+        : await axios.post(`${backendUrl}/api/user/verify-otp`, {
+            email: email.toLowerCase().trim(),
+            otp: otpCode,
+            isResetMode: isResetMode
+          }).then((response) => response.data);
 
-      if (data.success) {
+      if (data?.success) {
         setIsSuccess(true);
         if (typeof onSuccess === "function") {
-          onSuccess(otpCode);
+          onSuccess(onVerify ? data : otpCode);
         }
 
         setTimeout(() => {
